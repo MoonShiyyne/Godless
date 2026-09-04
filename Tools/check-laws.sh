@@ -63,6 +63,14 @@ check "L2" "nondeterministic source in the sim core" \
 check "L2" "GetHashCode is randomised per process — use StableHash" \
   '\.GetHashCode[[:space:]]*\('
 
+# System.Math forwards the transcendentals to the platform libm, and two
+# runtimes may legitimately differ by an ulp. Sqrt, Abs, Floor, Ceiling,
+# Round, Min, Max, Truncate and Sign are exactly specified and stay legal.
+# The leading character class is what stops this matching SimMath's own
+# qualified calls.
+check "L2" "platform transcendental — use Godless.Sim.Core.SimMath" \
+  '(^|[^A-Za-z0-9_])Math\.(Sin|Cos|Tan|Asin|Acos|Atan|Atan2|Sinh|Cosh|Tanh|Pow|Exp|Log|Log2|Log10|Cbrt)[[:space:]]*\('
+
 # foreach over a Dictionary/HashSet field: iteration order is not guaranteed.
 check "L2" "unordered collection iterated — sort the keys or use an ordered structure" \
   'foreach[[:space:]]*\([^)]*\bin[[:space:]]+_?[A-Za-z0-9_]*(Dict|Dictionary|Map|Set|Lookup)\b'

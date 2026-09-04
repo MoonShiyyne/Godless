@@ -71,6 +71,54 @@ S02's half is green too: `WithoutTheBaseMod_ItStillBoots` loads a content
 root with no base mod and gets zero mods, zero documents and no exception.
 Remaining for G0: the harness running unattended (S08).
 
+## Numerics: decided
+
+**`double` under guard-enforced discipline**, not fixed-point. Recorded in
+CLAUDE.md under L2 and enforced by `Tools/check-laws.sh`.
+
+The four basic operations and `Sqrt` are IEEE-754 correctly rounded and give
+bit-identical results in CoreCLR, Mono and IL2CPP. Only the transcendentals
+vary, because `System.Math` forwards those to the platform's libm — so those
+are banned inside `Assets/Sim` and `Core.SimMath` reimplements them from
+`+ - * /` and `Sqrt` alone, verified against `System.Math` to 1e-12.
+
+Fixed-point was rejected as a tax on every gene value, utility score,
+influence map and site weight in the game, for certainty the narrow ban
+already buys.
+
+## Stratum 0 — Substrate (M0, ~4 units)
+
+| ID | System | Deps |
+|----|--------|------|
+| S00 | Sim / Unity assembly split, plus CI guard | — |
+| S01 | Fixed tick + seeded RNG streams | S00 |
+| S02 | Content pipeline, base game as mods | S00 |
+| S03 | Voxel chunk store, 512x512x160 | S00 |
+| S04 | Voxel delta log + snapshots | S03, S01 |
+| S05 | Annalist record schema | S01 |
+| S06 | Binary greedy meshing + baked AO | S03 |
+| S07 | Camera, input, terrain editing | S06 |
+| S08 | Headless runner + assertion framework | S00, S01 |
+| S09 | Island generator, biomes, material deposits | S03, S02 |
+| S0A | Palette, module grid, material cap, contrast rule | S02 |
+| S0B | Water table + flow accumulation | S03, S09 |
+| S0C | Save / load serialization contract | S03, S04, S05 |
+
+S00 is complete: the asmdef sets `noEngineReferences: true`, `Tools/check-laws.sh`
+guards L1 and L2, and CI runs it.
+
+**Exit (G0):** determinism test green (same seed, 300 years, byte-identical
+annals); the guard fails a planted `using UnityEngine;`; deleting
+`Assets/Content/base` still boots; the harness runs unattended.
+**On failure: do not start stratum 1.**
+
+S01's half of G0 is green: 300 simulated years digest-identical across runs,
+and identical under a different stream registration order.
+
+S02's half is green too: `WithoutTheBaseMod_ItStillBoots` loads a content
+root with no base mod and gets zero mods, zero documents and no exception.
+Remaining for G0: the harness running unattended (S08).
+
 ## The open stratum-0 decision
 
 **Fixed-point, or float under strict discipline, in the sim core.** Part 23

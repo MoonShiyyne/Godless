@@ -22,8 +22,18 @@ L1 LAYERING. `Assets/Unity` may reference `Assets/Sim`. `Assets/Sim` may
     violation is a compile error. Never remove that flag.
 L2 DETERMINISM. All randomness through seeded per-system streams keyed by
     hashed STRING ids, never load-order indices. No `DateTime.Now`. No
+    `GetHashCode` — it is randomised per process; use `Core.StableHash`. No
     unordered dictionary iteration in the sim. Same seed must give
     byte-identical annals.
+    NUMERICS, decided: the sim core uses `double` under discipline, not
+    fixed-point. The four basic operations and `Sqrt` are IEEE-754 correctly
+    rounded and agree across CoreCLR, Mono and IL2CPP; the transcendentals
+    do not, because `System.Math` forwards those to the platform libm. So
+    `Math.Sin/Cos/Tan/Asin/Acos/Atan/Atan2/Sinh/Cosh/Tanh/Pow/Exp/Log/`
+    `Log2/Log10/Cbrt` are banned inside `Assets/Sim` and the guard enforces
+    it. Use `Core.SimMath`, which builds all of them from `+ - * /` and
+    `Sqrt` alone. `Math.Sqrt/Abs/Floor/Ceiling/Round/Min/Max/Truncate/Sign`
+    stay legal.
 L3 PROVENANCE. Every voxel change, intent and gene mutation carries the
     event that caused it, from the first line that writes one. The chronicle,
     the Silence scoring, the stratigraphic probe and the timelapse all read
