@@ -9,10 +9,12 @@ disagree, the doc wins and this file gets re-synced.
 
 ## Current position
 
-Stage 0 (repo setup): **done**. S00, S01: **done**.
+Stage 0 (repo setup): **done**. S00, S01, S02: **done**.
 
-Next: **S02** (content pipeline) or **S03** (chunk store). Both depend only on
-S00, so either can go first; S03 is the longer pole and S02 gates S09/S0A.
+Next: **S05** (annalist schema) or **S03** (chunk store). S05 is pure schema
+work and S04 writes into it; S03 is the longer pole and the critical path to
+G1 runs through it. S06/S07 need a reachable Editor and are the only
+stratum-0 systems that do.
 
 Nothing in stratum 1 may start until S00–S09 and S0A–S0C are green. Each is a
 decision the rest of the codebase encodes rather than calls.
@@ -64,6 +66,10 @@ annals); the guard fails a planted `using UnityEngine;`; deleting
 
 S01's half of G0 is green: 300 simulated years digest-identical across runs,
 and identical under a different stream registration order.
+
+S02's half is green too: `WithoutTheBaseMod_ItStillBoots` loads a content
+root with no base mod and gets zero mods, zero documents and no exception.
+Remaining for G0: the harness running unattended (S08).
 
 ## The open stratum-0 decision
 

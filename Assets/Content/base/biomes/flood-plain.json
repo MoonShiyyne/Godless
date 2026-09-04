@@ -1,0 +1,12 @@
+{
+  "type": "biome",
+  "id": "flood-plain",
+
+  // No timber and no stone. Part 19's test of whether the parameter space is
+  // wide enough: handed this, the generator should be able to reach something
+  // Djenné-like without anyone ever writing that word.
+  "materials": ["mud", "reed"],
+  "rainfallMm": 1400,
+  "winterSeverity": 0,
+  "treeCoverPercent": 5
+}

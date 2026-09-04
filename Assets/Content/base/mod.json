@@ -1,0 +1,11 @@
+{
+  // The base game ships as a mod. There is no privileged code path (law L5),
+  // so deleting this folder must leave a game that boots with nothing to
+  // build — which is exactly what the empty-content test asserts.
+  "id": "base",
+  "name": "Godless",
+  "version": "0.1.0",
+  "requires": [],
+  "loadAfter": [],
+  "codeMod": false
+}

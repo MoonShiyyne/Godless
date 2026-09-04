@@ -1,0 +1,12 @@
+{
+  "type": "biome",
+  "id": "temperate",
+
+  // Part 05: bind the palette to the biome. The same genome in two biomes
+  // must produce two visibly different cities, and that is nearly free once
+  // the stock system exists.
+  "materials": ["oak", "granite", "thatch"],
+  "rainfallMm": 800,
+  "winterSeverity": 2,
+  "treeCoverPercent": 55
+}
