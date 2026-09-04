@@ -9,7 +9,10 @@ disagree, the doc wins and this file gets re-synced.
 
 ## Current position
 
-Stage 0 (repo setup) is **done**. Stratum 0 has not started.
+Stage 0 (repo setup): **done**. S00, S01: **done**.
+
+Next: **S02** (content pipeline) or **S03** (chunk store). Both depend only on
+S00, so either can go first; S03 is the longer pole and S02 gates S09/S0A.
 
 Nothing in stratum 1 may start until S00–S09 and S0A–S0C are green. Each is a
 decision the rest of the codebase encodes rather than calls.
@@ -59,14 +62,27 @@ annals); the guard fails a planted `using UnityEngine;`; deleting
 `Assets/Content/base` still boots; the harness runs unattended.
 **On failure: do not start stratum 1.**
 
-## Next action
+S01's half of G0 is green: 300 simulated years digest-identical across runs,
+and identical under a different stream registration order.
 
-Build **S01** — the fixed tick loop and the seeded RNG stream registry, in
-`Assets/Sim`. Streams resolve by hashed string id, never by index. Write the
-determinism test first in `Sim.Tests`: same seed, 300 ticks, identical output
-sequence. Then make it pass.
+## The open stratum-0 decision
 
-An open stratum-0 decision blocks part of this: **fixed-point or strict float
-discipline** in the sim core. Part 23 requires one or the other and the doc
-never calls it. G0's byte-identical-annals requirement cannot hold across
-machines until it is decided. Decide before S01 hardens the tick.
+**Fixed-point, or float under strict discipline, in the sim core.** Part 23
+requires one or the other and the doc never calls it. G0's byte-identical
+annals cannot hold across machines until it is decided.
+
+It did **not** block S01 — the tick is a counter and the streams produce
+integers, so `Assets/Sim/Core` is representation-agnostic and `RngStream`
+deliberately exposes no `NextDouble`. It binds at **S03** (chunk and column
+data), **S10** (influence maps) and **S17** (gene values) — the first systems
+that store a continuous quantity. Decide before S03.
+
+Recommendation: **double, under discipline enforced by the guard.** In .NET
+the four basic operations and `Sqrt` are IEEE-754 correctly rounded and agree
+across CoreCLR, Mono and IL2CPP; what varies is the transcendentals, because
+those come from the platform's libm. So the discipline is narrow and
+greppable — ban `Math.Sin/Cos/Tan/Pow/Exp/Log` in `Assets/Sim`, provide
+deterministic replacements in `Core/SimMath`, and add the ban to
+`Tools/check-laws.sh` in the same commit. Fixed-point buys a little more
+certainty for a tax on every gene, score and field in the game, which is the
+wrong trade for a solo build. Not yet decided — this is a recommendation.
