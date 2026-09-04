@@ -110,3 +110,15 @@ Sim.Headless/bin/
 Sim.Headless/obj/
 Sim.Tests/bin/
 Sim.Tests/obj/
+
+Sim/bin/
+Sim/obj/
+
+# Unity regenerates *.csproj and *.sln from the asmdefs, so the block above
+# ignores them. These three are hand-written and ARE the headless build — the
+# thing that lets the sim run with no Editor in the loop. Without these
+# negations they are silently untracked and the harness exists on one machine.
+!Sim/Godless.Sim.csproj
+!Sim.Headless/Godless.Sim.Headless.csproj
+!Sim.Tests/Godless.Sim.Tests.csproj
+!Godless.Sim.slnx

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Sim.Headless/">
+    <Project Path="Sim.Headless/Godless.Sim.Headless.csproj" />
+  </Folder>
+  <Folder Name="/Sim.Tests/">
+    <Project Path="Sim.Tests/Godless.Sim.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Sim/">
+    <Project Path="Sim/Godless.Sim.csproj" />
+  </Folder>
+</Solution>

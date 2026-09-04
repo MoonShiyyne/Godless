@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Sim logic tests. Runs with no Editor: `dotnet test` is the inner loop.
+       No LangVersion pin here — only the library is compiled by Unity, so the
+       tests are free to use modern C#. Pinning 9.0 here breaks the xunit
+       template with CS8773. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Godless.Sim.Tests</RootNamespace>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Sim/Godless.Sim.csproj" />
+  </ItemGroup>
+
+</Project>

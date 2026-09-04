@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  laws-and-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The guard runs first and on its own: a layering violation should fail
+      # the build before anything spends time compiling.
+      - name: Law guard (L1, L2)
+        run: Tools/check-laws.sh
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build the sim (no Unity in the loop — that is the point)
+        run: dotnet build Sim/Godless.Sim.csproj -c Release
+
+      - name: Test
+        run: dotnet test Sim.Tests/Godless.Sim.Tests.csproj -c Release

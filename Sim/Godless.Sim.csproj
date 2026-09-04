@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The simulation core. One source of truth, two compilers: Unity compiles
+       Assets/Sim through Godless.Sim.asmdef, this project compiles the same
+       files for the headless harness and the tests.
+
+       netstandard2.1 is Unity 6's API compatibility level. The asmdef stops
+       Unity types leaking INTO /Sim (law L1); this TFM stops .NET 10 BCL
+       surface leaking the other way and producing code that tests green and
+       will not build in the Editor.
+
+       LangVersion 9.0 because Unity 6 compiles C# 9. Do not raise either. -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <RootNamespace>Godless.Sim</RootNamespace>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Assets/Sim/**/*.cs" />
+  </ItemGroup>
+
+</Project>
