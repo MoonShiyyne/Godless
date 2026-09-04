@@ -9,12 +9,17 @@ disagree, the doc wins and this file gets re-synced.
 
 ## Current position
 
-Stage 0 (repo setup): **done**. S00, S01, S02: **done**.
+Stage 0 (repo setup): **done**. S00, S01, S02, S05: **done**.
 
-Next: **S05** (annalist schema) or **S03** (chunk store). S05 is pure schema
-work and S04 writes into it; S03 is the longer pole and the critical path to
-G1 runs through it. S06/S07 need a reachable Editor and are the only
-stratum-0 systems that do.
+Next: **S03** (chunk store, 512x512x160, palette-compressed). It is the
+longer pole, the critical path to G1 runs through it, and S04 needs it.
+After S03: S04 (delta log), S0B (water), S09 (worldgen), S08 (harness).
+
+S06/S07 need a reachable Editor and are the only stratum-0 systems that do.
+`unity status` currently reports no connected Editor, so they are the natural
+work for a session with Unity open. Runbook step B4 is also still unverified
+there: the grep guard is proven to catch a Unity reference, but that the
+asmdef itself refuses to compile one has not been confirmed in the Editor.
 
 Nothing in stratum 1 may start until S00–S09 and S0A–S0C are green. Each is a
 decision the rest of the codebase encodes rather than calls.
@@ -69,7 +74,11 @@ and identical under a different stream registration order.
 
 S02's half is green too: `WithoutTheBaseMod_ItStillBoots` loads a content
 root with no base mod and gets zero mods, zero documents and no exception.
-Remaining for G0: the harness running unattended (S08).
+
+S05 gives "byte-identical annals" something to actually mean: `Annalist`
+digests its whole record, so the G0 assertion becomes a digest comparison
+once there are systems writing into it. Remaining for G0: the harness
+running unattended (S08), and the hill-raise scene (S03, S06, S07).
 
 ## Numerics: decided
 
@@ -117,7 +126,11 @@ and identical under a different stream registration order.
 
 S02's half is green too: `WithoutTheBaseMod_ItStillBoots` loads a content
 root with no base mod and gets zero mods, zero documents and no exception.
-Remaining for G0: the harness running unattended (S08).
+
+S05 gives "byte-identical annals" something to actually mean: `Annalist`
+digests its whole record, so the G0 assertion becomes a digest comparison
+once there are systems writing into it. Remaining for G0: the harness
+running unattended (S08), and the hill-raise scene (S03, S06, S07).
 
 ## The open stratum-0 decision
 
