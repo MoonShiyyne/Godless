@@ -111,6 +111,18 @@ added Parts 16, 09 and 10. Do not file that material under `Culture/`.
     unity command recompile # only when touching Assets/Unity
     unity status            # "ready" means the Editor is reachable
 
+The headless harness (S08) is the thing that lets you iterate without a
+human looking at a screen. Build once, then:
+
+    dotnet build Sim.Headless -c Release
+    Sim.Headless/bin/Release/net10.0/sim verify   # same seed twice, byte-identical
+    Sim.Headless/bin/Release/net10.0/sim run      # 200 seeds x 300 years, all invariants
+    Sim.Headless/bin/Release/net10.0/sim content  # what Assets/Content actually loads
+
+Do not use `dotnet run -v q -- <cmd>`; the -v flag eats the app's arguments.
+Every system you add from stratum 2 on owes an entry in StandardInvariants,
+owned by its registry id. That is law L7 and `sim run` prints what it checked.
+
 If `unity status` or `unity command` will not connect, the Editor is almost
 certainly in Safe Mode from a compile error. Run `unity pipeline list` to
 confirm, fix the errors, restart Unity. Do not fall back to editing scene

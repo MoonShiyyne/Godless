@@ -9,17 +9,21 @@ disagree, the doc wins and this file gets re-synced.
 
 ## Current position
 
-Stage 0 (repo setup): **done**. S00, S01, S02, S03, S04, S05: **done**.
+Stage 0 (repo setup): **done**. S00, S01, S02, S03, S04, S05, S08: **done**.
 
 **Write voxels through `VoxelWorld.Set`, which requires a cause.**
 `ChunkStore.SetRaw` records nothing and exists only for worldgen and save
 restore. That is L3, and it is the one thing in this stratum that cannot be
 fixed later.
 
-Next: **S08** (headless runner + assertion framework). Its deps are green,
-it closes the last non-Editor part of G0, and until it exists every
-iteration needs a human to open the Editor and look. Then S09 (worldgen),
-S0B (water), S0A (constants), S0C (save/load).
+Next: **S09** (island generator, biomes, material deposit fields). It is the
+last big non-Editor piece of stratum 0, G1's first test is "change the biome
+and see whether the architecture changes", and S10/S11/S15/S16 all depend on
+it. Then S0B (water), S0A (constants), S0C (save/load).
+
+Measured: the harness runs **60,000 simulated years in 0.19s** — about
+318,000 sim-years/sec on an empty world. `sim verify` is proven to catch a
+system that reads the wall clock.
 
 S06/S07 need a reachable Editor and are the only stratum-0 systems that do.
 `unity status` currently reports no connected Editor, so they are the natural
@@ -96,8 +100,12 @@ scrubs back to tick 0, finds the flat ground, and confirms the reconstructed
 world digests identically to the original. What is missing from that scene is
 the renderer, not the history.
 
-Remaining for G0: the harness running unattended (S08), and the hill-raise
-scene rendered at 60fps (S06, S07 — both need an Editor).
+S08 closes the harness half of G0: `sim verify` runs each seed twice and
+compares byte for byte, and `sim run` checks every registered invariant
+across 200 seeds and exits non-zero when one fails.
+
+Remaining for G0: the hill-raise scene rendered at 60fps (S06, S07 — both
+need an Editor).
 
 ## Numerics: decided
 
@@ -161,8 +169,12 @@ scrubs back to tick 0, finds the flat ground, and confirms the reconstructed
 world digests identically to the original. What is missing from that scene is
 the renderer, not the history.
 
-Remaining for G0: the harness running unattended (S08), and the hill-raise
-scene rendered at 60fps (S06, S07 — both need an Editor).
+S08 closes the harness half of G0: `sim verify` runs each seed twice and
+compares byte for byte, and `sim run` checks every registered invariant
+across 200 seeds and exits non-zero when one fails.
+
+Remaining for G0: the hill-raise scene rendered at 60fps (S06, S07 — both
+need an Editor).
 
 ## The open stratum-0 decision
 
