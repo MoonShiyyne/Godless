@@ -9,15 +9,17 @@ disagree, the doc wins and this file gets re-synced.
 
 ## Current position
 
-Stage 0 (repo setup): **done**. S00, S01, S02, S03, S05: **done**.
+Stage 0 (repo setup): **done**. S00, S01, S02, S03, S04, S05: **done**.
 
-Next: **S04** (voxel delta log + snapshots). It is the sanctioned writer that
-makes L3 structural — `ChunkStore.SetRaw` deliberately records nothing and is
-named to be awkward, so S04's provenance-carrying path is the only one any
-system should use. Doing it immediately after S03 is the point: the doc calls
-retrofitting provenance the most expensive mistake available in this project.
+**Write voxels through `VoxelWorld.Set`, which requires a cause.**
+`ChunkStore.SetRaw` records nothing and exists only for worldgen and save
+restore. That is L3, and it is the one thing in this stratum that cannot be
+fixed later.
 
-After S04: S0B (water), S09 (worldgen), S08 (harness).
+Next: **S08** (headless runner + assertion framework). Its deps are green,
+it closes the last non-Editor part of G0, and until it exists every
+iteration needs a human to open the Editor and look. Then S09 (worldgen),
+S0B (water), S0A (constants), S0C (save/load).
 
 S06/S07 need a reachable Editor and are the only stratum-0 systems that do.
 `unity status` currently reports no connected Editor, so they are the natural
@@ -88,8 +90,14 @@ across 512 of 1280 chunks, against 160 MB for a naive int per voxel — 78x.
 The budget test is set at 8 MB so that losing uniform-chunk elision fails
 in CI rather than in a profiler.
 
+S04 answers the simulation half of M0's exit condition already:
+`RaiseAHill_ThenScrubBackToBeforeYouRaisedIt` raises a hill in year 12,
+scrubs back to tick 0, finds the flat ground, and confirms the reconstructed
+world digests identically to the original. What is missing from that scene is
+the renderer, not the history.
+
 Remaining for G0: the harness running unattended (S08), and the hill-raise
-scene (S06, S07 — both need an Editor).
+scene rendered at 60fps (S06, S07 — both need an Editor).
 
 ## Numerics: decided
 
@@ -147,8 +155,14 @@ across 512 of 1280 chunks, against 160 MB for a naive int per voxel — 78x.
 The budget test is set at 8 MB so that losing uniform-chunk elision fails
 in CI rather than in a profiler.
 
+S04 answers the simulation half of M0's exit condition already:
+`RaiseAHill_ThenScrubBackToBeforeYouRaisedIt` raises a hill in year 12,
+scrubs back to tick 0, finds the flat ground, and confirms the reconstructed
+world digests identically to the original. What is missing from that scene is
+the renderer, not the history.
+
 Remaining for G0: the harness running unattended (S08), and the hill-raise
-scene (S06, S07 — both need an Editor).
+scene rendered at 60fps (S06, S07 — both need an Editor).
 
 ## The open stratum-0 decision
 

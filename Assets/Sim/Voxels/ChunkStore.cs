@@ -111,6 +111,28 @@ namespace Godless.Sim.Voxels
             }
         }
 
+        /// <summary>A deep copy, for snapshots.</summary>
+        public ChunkStore Clone()
+        {
+            var copy = new ChunkStore();
+            for (int i = 0; i < _chunks.Length; i++)
+                if (_chunks[i] != null) copy._chunks[i] = _chunks[i].Clone();
+            return copy;
+        }
+
+        /// <summary>Writes by raw chunk and voxel index. Used by delta replay.</summary>
+        internal void SetByIndex(int chunkIndex, int voxelIndex, ushort type)
+        {
+            Chunk chunk = _chunks[chunkIndex];
+            if (chunk == null)
+            {
+                if (type == VoxelTypes.AirId) return;
+                chunk = new Chunk(VoxelTypes.AirId);
+                _chunks[chunkIndex] = chunk;
+            }
+            chunk.Set(voxelIndex & 31, (voxelIndex >> 10) & 31, (voxelIndex >> 5) & 31, type);
+        }
+
         /// <summary>
         /// A digest of the whole world. Chunk order is fixed by index, so two
         /// runs that generated the same island agree on this exactly.

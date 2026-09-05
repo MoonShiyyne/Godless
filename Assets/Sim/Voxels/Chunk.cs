@@ -168,6 +168,17 @@ namespace Godless.Sim.Voxels
             _data[word] = (_data[word] & ~(mask << shift)) | (((ulong)value & mask) << shift);
         }
 
+        /// <summary>A deep copy, for snapshots.</summary>
+        public Chunk Clone()
+        {
+            var copy = new Chunk(_palette[0]);
+            copy._palette = (ushort[])_palette.Clone();
+            copy._counts = (int[])_counts.Clone();
+            copy._bits = _bits;
+            copy._data = _data == null ? null : (ulong[])_data.Clone();
+            return copy;
+        }
+
         /// <summary>Approximate heap cost, for the memory-budget assertion.</summary>
         public int MemoryBytes
         {
