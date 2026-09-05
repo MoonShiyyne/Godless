@@ -9,11 +9,15 @@ disagree, the doc wins and this file gets re-synced.
 
 ## Current position
 
-Stage 0 (repo setup): **done**. S00, S01, S02, S05: **done**.
+Stage 0 (repo setup): **done**. S00, S01, S02, S03, S05: **done**.
 
-Next: **S03** (chunk store, 512x512x160, palette-compressed). It is the
-longer pole, the critical path to G1 runs through it, and S04 needs it.
-After S03: S04 (delta log), S0B (water), S09 (worldgen), S08 (harness).
+Next: **S04** (voxel delta log + snapshots). It is the sanctioned writer that
+makes L3 structural — `ChunkStore.SetRaw` deliberately records nothing and is
+named to be awkward, so S04's provenance-carrying path is the only one any
+system should use. Doing it immediately after S03 is the point: the doc calls
+retrofitting provenance the most expensive mistake available in this project.
+
+After S04: S0B (water), S09 (worldgen), S08 (harness).
 
 S06/S07 need a reachable Editor and are the only stratum-0 systems that do.
 `unity status` currently reports no connected Editor, so they are the natural
@@ -77,8 +81,15 @@ root with no base mod and gets zero mods, zero documents and no exception.
 
 S05 gives "byte-identical annals" something to actually mean: `Annalist`
 digests its whole record, so the G0 assertion becomes a digest comparison
-once there are systems writing into it. Remaining for G0: the harness
-running unattended (S08), and the hill-raise scene (S03, S06, S07).
+once there are systems writing into it.
+
+S03's tell is measured, not asserted: a full island surface costs **2 MB**
+across 512 of 1280 chunks, against 160 MB for a naive int per voxel — 78x.
+The budget test is set at 8 MB so that losing uniform-chunk elision fails
+in CI rather than in a profiler.
+
+Remaining for G0: the harness running unattended (S08), and the hill-raise
+scene (S06, S07 — both need an Editor).
 
 ## Numerics: decided
 
@@ -129,8 +140,15 @@ root with no base mod and gets zero mods, zero documents and no exception.
 
 S05 gives "byte-identical annals" something to actually mean: `Annalist`
 digests its whole record, so the G0 assertion becomes a digest comparison
-once there are systems writing into it. Remaining for G0: the harness
-running unattended (S08), and the hill-raise scene (S03, S06, S07).
+once there are systems writing into it.
+
+S03's tell is measured, not asserted: a full island surface costs **2 MB**
+across 512 of 1280 chunks, against 160 MB for a naive int per voxel — 78x.
+The budget test is set at 8 MB so that losing uniform-chunk elision fails
+in CI rather than in a profiler.
+
+Remaining for G0: the harness running unattended (S08), and the hill-raise
+scene (S06, S07 — both need an Editor).
 
 ## The open stratum-0 decision
 
