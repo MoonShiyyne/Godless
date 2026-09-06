@@ -1,0 +1,6 @@
+{
+  "type": "voxel",
+  "id": "granite",
+  "solid": true,
+  "hardness": 8
+}

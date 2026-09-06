@@ -51,6 +51,13 @@ namespace Godless.Sim.Harness
         public VoxelTypes VoxelTypes { get; private set; }
 
         /// <summary>
+        /// The generated island, or null in a world that never made one. Set
+        /// once at construction time by whoever generated it, so that nothing
+        /// downstream has to re-derive terrain it could just read.
+        /// </summary>
+        public World.IslandMap Island { get; set; }
+
+        /// <summary>
         /// Systems tick in registration order, which is a design decision and
         /// therefore explicit. Nothing here discovers systems by reflection —
         /// discovery order is load order, and L2 has already been paid for

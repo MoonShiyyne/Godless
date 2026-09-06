@@ -1,0 +1,16 @@
+{
+  "type": "biome",
+  "id": "shore",
+
+  // The band the sea keeps rewriting. Its job in stratum 0 is to make the
+  // island's edge legible from the air.
+  "materials": ["sand", "reed"],
+  "rainfallMm": 900,
+  "winterSeverity": 1,
+  "treeCoverPercent": 8,
+
+  "surface": "sand",
+  "subsurface": "sand",
+
+  "select": { "minElevation": 0, "maxElevation": 45, "minMoisture": 0, "maxMoisture": 101 }
+}

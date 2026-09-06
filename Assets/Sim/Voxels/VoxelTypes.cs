@@ -57,6 +57,17 @@ namespace Godless.Sim.Voxels
             return new VoxelTypes(byId, idByHash);
         }
 
+        /// <summary>
+        /// Builds the table from the loaded content's voxel documents. The
+        /// L5 path: types are declared in Assets/Content, never in code.
+        /// </summary>
+        public static VoxelTypes FromContent(Godless.Sim.Content.ContentDatabase content)
+        {
+            var declared = new List<Symbol>();
+            foreach (string id in content.Ids("voxel")) declared.Add(Symbol.For("voxel." + id));
+            return Build(declared);
+        }
+
         public int Count { get { return _byId.Length; } }
 
         public Symbol SymbolOf(ushort id)

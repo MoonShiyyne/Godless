@@ -9,21 +9,28 @@ disagree, the doc wins and this file gets re-synced.
 
 ## Current position
 
-Stage 0 (repo setup): **done**. S00, S01, S02, S03, S04, S05, S08: **done**.
+Stage 0 (repo setup): **done**. S00, S01, S02, S03, S04, S05, S08, S09: **done**.
 
 **Write voxels through `VoxelWorld.Set`, which requires a cause.**
 `ChunkStore.SetRaw` records nothing and exists only for worldgen and save
 restore. That is L3, and it is the one thing in this stratum that cannot be
 fixed later.
 
-Next: **S09** (island generator, biomes, material deposit fields). It is the
-last big non-Editor piece of stratum 0, G1's first test is "change the biome
-and see whether the architecture changes", and S10/S11/S15/S16 all depend on
-it. Then S0B (water), S0A (constants), S0C (save/load).
+Next: **S0A** (palette, module grid, material cap, contrast rule) and
+**S0C** (save/load). Both are small. S0B (water) is partly served already —
+the generator floods everything below sea level — and the rest of it belongs
+with the systems that read drainage.
 
-Measured: the harness runs **60,000 simulated years in 0.19s** — about
-318,000 sim-years/sec on an empty world. `sim verify` is proven to catch a
-system that reads the wall clock.
+Then stratum 0 is done except S06/S07, which need an Editor.
+
+Measured: the harness runs **60,000 simulated years in 0.19s** on an empty
+world, about 318,000 sim-years/sec. With real terrain it is 46 sim-years/sec,
+because generating an island costs about 0.45s and dominates a short run.
+`sim verify` is proven to catch a system that reads the wall clock.
+
+`sim island --seed N` draws the world as text. Until S06/S07 exist it is the
+only way to look at the game, and a coastline in the wrong place is obvious
+there and invisible in a digest.
 
 S06/S07 need a reachable Editor and are the only stratum-0 systems that do.
 `unity status` currently reports no connected Editor, so they are the natural

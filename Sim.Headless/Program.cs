@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
 using Godless.Sim.Harness;
 using Godless.Sim.Voxels;
+using Godless.Sim.World;
 
 namespace Godless.Sim.Headless
 {
@@ -33,6 +35,7 @@ namespace Godless.Sim.Headless
                 case "run": return Run(cli);
                 case "verify": return Verify(cli);
                 case "content": return Content(cli);
+                case "island": return Island(cli);
                 case "help": Help(); return 0;
                 default:
                     Console.Error.WriteLine("unknown command '" + command + "'");
@@ -45,11 +48,41 @@ namespace Godless.Sim.Headless
 
         static int Run(Args cli)
         {
+            bool withIsland = cli.Text("island", "false") != "false";
+
             ulong first; int count;
-            cli.Seeds(out first, out count);
+            // Generating an island costs about half a second, so the default
+            // batch shrinks when one is asked for. Two hundred seeds of an
+            // empty world is a framework check; twenty seeds of a real island
+            // is a content check.
+            cli.Seeds(out first, out count, defaultCount: withIsland ? 20 : 200);
             int years = cli.Int("years", 300);
 
-            var runner = new BatchRunner(BatchRunner.EmptyWorld());
+            BatchRunner runner;
+            if (withIsland)
+            {
+                LoadResult content;
+                try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
+                catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
+
+                BiomeTable biomes = BiomeTable.FromContent(content.Database);
+                VoxelTypes types = VoxelTypes.FromContent(content.Database);
+                if (biomes.Count == 0) { Console.Error.WriteLine("no biomes declared"); return 1; }
+
+                runner = new BatchRunner(seed =>
+                {
+                    var world = new SimWorld(seed, content.Database, types);
+                    world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types);
+                    return world;
+                });
+                runner.Collect(IslandInvariants.Collector(biomes));
+                foreach (Invariant i in IslandInvariants.All()) runner.Assert(i);
+            }
+            else
+            {
+                runner = new BatchRunner(BatchRunner.EmptyWorld());
+            }
+
             foreach (Invariant i in StandardInvariants.All()) runner.Assert(i);
 
             var watch = Stopwatch.StartNew();
@@ -144,6 +177,103 @@ namespace Godless.Sim.Headless
             return 0;
         }
 
+        // ── sim island ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Draws the generated island as text.
+        ///
+        /// Not a toy: until S06 and S07 exist there is no renderer, and a
+        /// world nobody can look at is a world whose bugs nobody can see. A
+        /// coastline in the wrong place is obvious here and invisible in a
+        /// digest.
+        /// </summary>
+        static int Island(Args cli)
+        {
+            var c = CultureInfo.InvariantCulture;
+            ulong seed = (ulong)cli.Int("seed", 7);
+            int width = cli.Int("width", 100);
+            if (width < 16) width = 16;
+            if (width > 400) width = 400;
+
+            LoadResult content;
+            try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
+            catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
+
+            BiomeTable biomes = BiomeTable.FromContent(content.Database);
+            VoxelTypes types = VoxelTypes.FromContent(content.Database);
+            if (biomes.Count == 0) { Console.Error.WriteLine("no biomes declared — nothing to generate"); return 1; }
+
+            var store = new ChunkStore();
+            var watch = Stopwatch.StartNew();
+            IslandMap map = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types);
+            watch.Stop();
+
+            // Terminal cells are about twice as tall as wide.
+            int height = width / 2;
+            int stepX = ChunkStore.SizeX / width;
+            int stepZ = ChunkStore.SizeZ / height;
+            if (stepX < 1) stepX = 1;
+            if (stepZ < 1) stepZ = 1;
+
+            var glyphs = new char[biomes.Count];
+            for (int i = 0; i < biomes.Count; i++) glyphs[i] = GlyphFor(biomes.At(i).Id.ToString());
+
+            var sb = new StringBuilder();
+            for (int z = 0; z < ChunkStore.SizeZ; z += stepZ)
+            {
+                for (int x = 0; x < ChunkStore.SizeX; x += stepX)
+                {
+                    if (!map.IsLand(x, z)) { sb.Append(map.HeightAt(x, z) > IslandMap.SeaLevel - 6 ? '~' : ' '); continue; }
+                    int b = map.BiomeAt(x, z);
+                    sb.Append(b < 0 ? '?' : glyphs[b]);
+                }
+                sb.Append('\n');
+            }
+            Console.Write(sb.ToString());
+
+            // Coverage, which is the number worth watching when tuning.
+            var counts = new int[biomes.Count + 1];
+            int land = 0;
+            for (int z = 0; z < ChunkStore.SizeZ; z++)
+                for (int x = 0; x < ChunkStore.SizeX; x++)
+                {
+                    if (!map.IsLand(x, z)) continue;
+                    land++;
+                    int b = map.BiomeAt(x, z);
+                    counts[b < 0 ? biomes.Count : b]++;
+                }
+
+            long total = (long)ChunkStore.SizeX * ChunkStore.SizeZ;
+            Console.WriteLine("\nseed " + seed.ToString(c) + "  ~ sea  ? unclaimed");
+            for (int i = 0; i < biomes.Count; i++)
+                Console.WriteLine("  " + glyphs[i] + "  " + biomes.At(i).Id
+                    + "  " + Pct(counts[i], land) + " of land");
+            if (counts[biomes.Count] > 0)
+                Console.WriteLine("  ?  no biome accepted these columns  " + Pct(counts[biomes.Count], land)
+                    + " of land  <- a gap in the selection windows");
+
+            Console.WriteLine("\nland " + Pct(land, total) + " of the map, "
+                + (store.MemoryBytes / 1024).ToString(c) + " KB across "
+                + store.AllocatedChunks.ToString(c) + "/" + ChunkStore.ChunkCount.ToString(c)
+                + " chunks, generated in " + watch.Elapsed.TotalSeconds.ToString("0.00", c) + "s");
+            return 0;
+        }
+
+        static string Pct(long part, long whole)
+        {
+            if (whole <= 0) return "0.0%";
+            return (100.0 * part / whole).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        }
+
+        static char GlyphFor(string biomeId)
+        {
+            if (biomeId.EndsWith("shore", StringComparison.Ordinal)) return '.';
+            if (biomeId.EndsWith("flood-plain", StringComparison.Ordinal)) return ',';
+            if (biomeId.EndsWith("temperate", StringComparison.Ordinal)) return 'n';
+            if (biomeId.EndsWith("highland", StringComparison.Ordinal)) return '^';
+            return '#';
+        }
+
         static string DefaultContentRoot()
         {
             var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
@@ -163,11 +293,15 @@ namespace Godless.Sim.Headless
             Console.WriteLine(
 @"godless sim harness
 
-  sim run      [--seeds A..B] [--years N]   batch run, checking every invariant
+  sim run      [--seeds A..B] [--years N] [--island]
+                                            batch run, checking every invariant
   sim verify   [--seeds A..B] [--years N]   run each seed twice, compare byte for byte
   sim content  [--path P]                   load Assets/Content and report what it holds
+  sim island   [--seed N] [--width W]       generate an island and draw it
 
-Defaults: run 0..200 x 300 years, verify 0..20 x 100 years.
+Defaults: run 0..200 x 300 years (0..20 with --island), verify 0..20 x 100 years.
+--island generates real terrain from Assets/Content for every seed, which is
+what makes the S09 invariants meaningful and costs about half a second each.
 Exit code is 0 when everything passed and 1 when something did not.
 
 Invariants are declared per system and owned by a registry id (law L7). The

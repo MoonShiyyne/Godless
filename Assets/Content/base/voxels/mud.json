@@ -1,0 +1,6 @@
+{
+  "type": "voxel",
+  "id": "mud",
+  "solid": true,
+  "hardness": 1
+}

@@ -19,12 +19,26 @@ namespace Godless.Sim.Harness
     /// seeds and tells you which ones broke, which is what turns balance bugs
     /// from invisible into obvious.
     /// </summary>
+    /// <summary>
+    /// Records whatever a run wants asserted later. Systems own their own
+    /// metrics: the runner cannot know what "median pop" means until there
+    /// are people.
+    /// </summary>
+    public delegate void MetricCollector(SimWorld world, RunResult into);
+
     public sealed class BatchRunner
     {
         readonly WorldFactory _factory;
         readonly List<Invariant> _invariants = new List<Invariant>();
+        readonly List<MetricCollector> _collectors = new List<MetricCollector>();
 
         public BatchRunner(WorldFactory factory) { _factory = factory; }
+
+        public BatchRunner Collect(MetricCollector collector)
+        {
+            _collectors.Add(collector);
+            return this;
+        }
 
         public BatchRunner Assert(Invariant invariant)
         {
@@ -48,10 +62,12 @@ namespace Godless.Sim.Harness
         {
             SimWorld world = _factory(seed);
             world.RunYears(years);
-            return Collect(world, years);
+            RunResult result = Standard(world, years);
+            foreach (MetricCollector collector in _collectors) collector(world, result);
+            return result;
         }
 
-        static RunResult Collect(SimWorld world, int years)
+        static RunResult Standard(SimWorld world, int years)
         {
             var result = new RunResult
             {

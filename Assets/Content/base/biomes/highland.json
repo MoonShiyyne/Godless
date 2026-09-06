@@ -1,0 +1,16 @@
+{
+  "type": "biome",
+  "id": "highland",
+
+  // Stone and no long-span timber. The constraint that should push the
+  // generator toward heavy walls, small openings and terracing.
+  "materials": ["granite", "slate"],
+  "rainfallMm": 500,
+  "winterSeverity": 5,
+  "treeCoverPercent": 12,
+
+  "surface": "granite",
+  "subsurface": "granite",
+
+  "select": { "minElevation": 68, "maxElevation": 200, "minMoisture": 0, "maxMoisture": 101 }
+}

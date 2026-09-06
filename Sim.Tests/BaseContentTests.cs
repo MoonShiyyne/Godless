@@ -35,7 +35,12 @@ namespace Godless.Sim.Tests
             // The flood plain has no timber — that constraint is the whole
             // reason it exists as a test of the parameter space (Part 19).
             Assert.InRange(r.Database.Get("biome", "flood-plain")["treeCoverPercent"].AsInt32(-1), 0, 10);
-            Assert.Equal(2, r.Database.Ids("biome").Count);
+
+            // Deliberately not an exact count: content grows, and a test that
+            // has to be edited every time a biome is added trains people to
+            // edit it without reading it.
+            Assert.True(r.Database.Ids("biome").Count >= 2);
+            Assert.True(r.Database.Ids("voxel").Count >= 1);
         }
 
         /// <summary>

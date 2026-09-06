@@ -8,5 +8,10 @@
   "materials": ["mud", "reed"],
   "rainfallMm": 1400,
   "winterSeverity": 0,
-  "treeCoverPercent": 5
+  "treeCoverPercent": 5,
+
+  "surface": "mud",
+  "subsurface": "mud",
+
+  "select": { "minElevation": 43, "maxElevation": 52, "minMoisture": 72, "maxMoisture": 101 }
 }

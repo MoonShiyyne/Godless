@@ -1,0 +1,6 @@
+{
+  "type": "voxel",
+  "id": "soil",
+  "solid": true,
+  "hardness": 2
+}

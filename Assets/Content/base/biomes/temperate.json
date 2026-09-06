@@ -8,5 +8,12 @@
   "materials": ["oak", "granite", "thatch"],
   "rainfallMm": 800,
   "winterSeverity": 2,
-  "treeCoverPercent": 55
+  "treeCoverPercent": 55,
+
+  "surface": "soil",
+  "subsurface": "granite",
+
+  // Worldgen picks the first biome, in id order, whose window contains the
+  // column. Windows may overlap; the ordering makes the choice deterministic.
+  "select": { "minElevation": 46, "maxElevation": 70, "minMoisture": 0, "maxMoisture": 101 }
 }

@@ -1,0 +1,6 @@
+{
+  "type": "voxel",
+  "id": "water",
+  "solid": false,
+  "hardness": 0
+}

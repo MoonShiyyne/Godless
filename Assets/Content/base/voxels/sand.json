@@ -1,0 +1,6 @@
+{
+  "type": "voxel",
+  "id": "sand",
+  "solid": true,
+  "hardness": 1
+}
