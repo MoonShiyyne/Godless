@@ -1,0 +1,31 @@
+{
+  "type": "palette",
+  "id": "base",
+
+  // Not an art task. These are the constants the whole visual language is
+  // built on, and every one of them is cheap now and a re-authoring job
+  // later — which is why they sit in stratum 0 rather than in M5.
+  //
+  // Part 26 ranks readability as risk #1 and says the countermeasures are
+  // design-side and must be committed early: a tight material palette,
+  // consistent module sizes, hard silhouette rules.
+
+  "voxelSizeMetres": 0.5,
+
+  // A storey is 6 voxels — 3 m. A door is 2 wide by 4 tall, a structural bay
+  // is 8. Every grammar rule in stratum 1 divides against these, so changing
+  // one later changes every building ever generated.
+  "floorHeightVoxels": 6,
+  "doorWidthVoxels": 2,
+  "doorHeightVoxels": 4,
+  "bayWidthVoxels": 8,
+
+  // The cap is the point. A wide palette is what turns generated
+  // architecture into procedural mush, because nothing contrasts with
+  // anything. Sixteen is already generous.
+  "maxMaterials": 16,
+
+  // Two materials closer than this in value are the same material at camera
+  // distance. Checked as a hard rule, not a guideline.
+  "minValueSeparation": 8
+}

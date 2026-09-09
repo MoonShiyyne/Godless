@@ -2,5 +2,12 @@
   "type": "voxel",
   "id": "water",
   "solid": false,
-  "hardness": 0
+  "hardness": 0,
+
+  // Bright enough to separate from every shoreline material it touches.
+  // `value` is perceived lightness 0-100. The palette's contrast rule is
+  // checked against it, because two materials that read as the same value at
+  // camera distance are one material as far as the player is concerned.
+  "value": 61,
+  "class": "water"
 }

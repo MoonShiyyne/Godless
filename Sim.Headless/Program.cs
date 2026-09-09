@@ -170,6 +170,22 @@ namespace Godless.Sim.Headless
 
             foreach (string warning in result.Warnings) Console.WriteLine("\nwarning: " + warning);
 
+            // The palette rule is checked where a content author will look
+            // for it, rather than only in a test they will never run.
+            Palette palette = Palette.FromContent(result.Database);
+            IReadOnlyList<string> problems = palette.Violations();
+            if (problems.Count > 0)
+            {
+                Console.WriteLine("\npalette (S0A) — " + problems.Count.ToString(c) + " problem(s):");
+                foreach (string problem in problems) Console.WriteLine("  " + problem);
+            }
+            else if (palette.Materials.Count > 0)
+            {
+                Console.WriteLine("\npalette ok — " + palette.Materials.Count.ToString(c)
+                    + " materials, all at least " + palette.MinValueSeparation.ToString(c)
+                    + " apart in value; storey " + palette.FloorHeightMetres.ToString("0.0", c) + " m");
+            }
+
             Console.WriteLine("\ndigest " + result.Database.Digest().ToString("x16", c));
             if (result.ContainsCodeMod)
                 Console.WriteLine("a code mod is loaded — determinism is not guaranteed and the save records it");
