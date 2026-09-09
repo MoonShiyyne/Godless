@@ -58,6 +58,13 @@ namespace Godless.Sim.Harness
         public World.IslandMap Island { get; set; }
 
         /// <summary>
+        /// Part 22: a code mod voids the determinism guarantee, so the save
+        /// records that it was present rather than letting a later bug report
+        /// look like a sim failure.
+        /// </summary>
+        public bool ContainsCodeMod { get; set; }
+
+        /// <summary>
         /// Systems tick in registration order, which is a design decision and
         /// therefore explicit. Nothing here discovers systems by reflection —
         /// discovery order is load order, and L2 has already been paid for

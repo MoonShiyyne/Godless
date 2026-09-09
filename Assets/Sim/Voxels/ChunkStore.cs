@@ -121,7 +121,7 @@ namespace Godless.Sim.Voxels
         }
 
         /// <summary>Writes by raw chunk and voxel index. Used by delta replay.</summary>
-        internal void SetByIndex(int chunkIndex, int voxelIndex, ushort type)
+        public void SetByIndex(int chunkIndex, int voxelIndex, ushort type)
         {
             Chunk chunk = _chunks[chunkIndex];
             if (chunk == null)

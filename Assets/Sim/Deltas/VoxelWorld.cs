@@ -62,6 +62,22 @@ namespace Godless.Sim.Deltas
         }
 
         /// <summary>
+        /// Restores one delta from a save: applies the voxel and re-appends
+        /// the record unchanged, without consulting the current state.
+        ///
+        /// Separate from Set because Set derives OldType from what is there
+        /// now, which during a replay is whatever the previous delta left —
+        /// correct, but it would silently paper over a corrupt log instead of
+        /// letting the digest check catch it.
+        /// </summary>
+        public void ReplaySaved(long tick, ushort chunkIndex, ushort voxelIndex,
+                                ushort oldType, ushort newType, RecordId cause)
+        {
+            _store.SetByIndex(chunkIndex, voxelIndex, newType);
+            _log.Append(new VoxelDelta(tick, chunkIndex, voxelIndex, oldType, newType, cause));
+        }
+
+        /// <summary>
         /// Snapshots if the interval has elapsed. Call once per tick from the
         /// simulation loop, after that tick's writes.
         /// </summary>
