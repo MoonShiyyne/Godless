@@ -79,13 +79,29 @@ namespace Godless.Unity
             Status = "brush radius " + radius + "   (click raise, shift-click lower, [ ] size)";
 
             if (!mouse.leftButton.isPressed) return;
-            Vector2 pointer = mouse.position.ReadValue();
-            if (_timeline != null && _timeline.Covers(pointer)) return;
             if (Time.unscaledTime < _nextStroke) return;
             _nextStroke = Time.unscaledTime + strokeInterval;
 
+            bool lower = keys != null && (keys.leftShiftKey.isPressed || keys.rightShiftKey.isPressed);
+            StrokeAt(mouse.position.ReadValue(), lower);
+        }
+
+        /// <summary>
+        /// One stroke of the brush at a screen point (origin bottom-left).
+        /// Separate from Update so the whole edit path — camera ray, pick,
+        /// brush, annal record, remesh — can be driven without a physical
+        /// mouse. Synthetic device events share Mouse.current with the real
+        /// one, so a test that queues a press is overwritten the moment the
+        /// user's hand moves. Returns false if nothing was picked.
+        /// </summary>
+        public bool StrokeAt(Vector2 pointer, bool lower)
+        {
+            var world = _boot.World;
+            if (world == null || _solid == null) return false;
+            if (_timeline != null && (_timeline.IsScrubbed || _timeline.Covers(pointer))) return false;
+
             Camera cam = Camera.main;
-            if (cam == null) return;
+            if (cam == null) return false;
             Ray ray = cam.ScreenPointToRay(pointer);
 
             // Water stops the ray too, so clicking the sea finds the column
@@ -94,9 +110,7 @@ namespace Godless.Unity
             if (!VoxelRaycast.Cast(world.Voxels.Store, ray.origin.x, ray.origin.y, ray.origin.z,
                                    ray.direction.x, ray.direction.y, ray.direction.z, 3000,
                                    id => id < _solid.Length && (_solid[id] || id == _water), out hit))
-                return;
-
-            bool lower = keys != null && (keys.leftShiftKey.isPressed || keys.rightShiftKey.isPressed);
+                return false;
 
             world.Clock.Advance();
             long tick = world.Clock.Tick;
@@ -114,6 +128,7 @@ namespace Godless.Unity
             for (int i = 0; i < _changed.Count; i++) _boot.View.MarkDirty(_changed[i]);
             world.Voxels.EndTick(tick);
             Strokes++;
+            return true;
         }
     }
 }
