@@ -1,0 +1,12 @@
+{
+  "type": "activity",
+  "id": "work",
+
+  // The one productive activity: labour the settlement can spend. Utility
+  // AI picks the highest of base + the urgency of each need an activity
+  // relieves, so this base is the bar an urgent need has to clear.
+  // Urgency is level squared: a need wins over work above about 0.55.
+  "base": 0.3,
+  "productive": true,
+  "requires": ["day"]
+}

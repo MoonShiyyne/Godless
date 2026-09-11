@@ -1,0 +1,14 @@
+{
+  "type": "need",
+  "id": "warmth",
+  "tell": "A night in the rain still shows the next morning: whoever slept out spends it at the fire, not at work.",
+  "start": 0.2,
+  "drift": -0.03,
+  "threshold": 0.6,
+  "urgencyPower": 2,
+
+  // Weather only reaches whoever is out in it. By day that is everyone;
+  // by night it is whoever did not get a roof. A shower by day is a
+  // nuisance; a night soaked through is the thing that shows next morning.
+  "rises": { "cold": 0.08, "rain": 0.04, "soaked": 0.3, "unsheltered": 0.12, "sheltered": -0.1 }
+}

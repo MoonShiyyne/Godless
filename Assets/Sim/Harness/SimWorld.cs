@@ -3,6 +3,7 @@ using Godless.Sim.Annals;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
 using Godless.Sim.Deltas;
+using Godless.Sim.Settlements;
 using Godless.Sim.Voxels;
 
 namespace Godless.Sim.Harness
@@ -56,6 +57,12 @@ namespace Godless.Sim.Harness
         /// downstream has to re-derive terrain it could just read.
         /// </summary>
         public World.IslandMap Island { get; set; }
+
+        /// <summary>
+        /// The settlements on the island, in founding order. Stratum 1 has one.
+        /// Systems iterate this list, so its order is tick order.
+        /// </summary>
+        public List<Settlement> Settlements { get; } = new List<Settlements.Settlement>();
 
         /// <summary>
         /// Part 22: a code mod voids the determinism guarantee, so the save

@@ -80,6 +80,8 @@ L7 ONE ASSERTION. From stratum 2 on, every system ships with at least one
       Deltas/           voxel delta log, snapshots, seek and replay
       Build/            intents, site scoring, grammar, WFC
       Chronicle/        provenance presentation over the annals
+      Settlements/      a settlement's people, hearth and roofs; what drives and intents belong to
+      World/            island, biomes, weather, parcel grid and influence maps
     Assets/Unity/       rendering, meshing jobs, input, UI
     Assets/Content/     base game shipped AS MODS
     Sim/                library csproj — compiles Assets/Sim for tooling

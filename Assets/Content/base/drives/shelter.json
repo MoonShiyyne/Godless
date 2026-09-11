@@ -1,0 +1,19 @@
+{
+  "type": "need",
+  "id": "shelter",
+
+  // What a stranger sees when it goes unmet (required, like a gene's tell).
+  "tell": "People sleeping round the fire in the open, and next morning a settlement that wants a roof.",
+
+  // Levels run 0 (met) to 1 (desperate). Every number below is per tick;
+  // a day is four ticks and the last of them is the night.
+  "start": 0.0,
+  "drift": -0.02,
+  "threshold": 0.4,
+  "urgencyPower": 2,
+
+  // Condition -> change per tick it holds. Signed: a roof takes it away.
+  // No activity relieves shelter. Only a roof does, and agents cannot
+  // build one; they can only go on wanting it (Part 03).
+  "rises": { "unsheltered": 0.2, "soaked": 0.1, "rain": 0.02, "sheltered": -0.5 }
+}

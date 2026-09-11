@@ -5,8 +5,12 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using Godless.Sim.Content;
+using Godless.Sim.Annals;
 using Godless.Sim.Core;
+using Godless.Sim.Drives;
+using Activity = Godless.Sim.Drives.Activity;
 using Godless.Sim.Harness;
+using Godless.Sim.Settlements;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 
@@ -37,6 +41,7 @@ namespace Godless.Sim.Headless
                 case "content": return Content(cli);
                 case "island": return Island(cli);
                 case "parcels": return Parcels(cli);
+                case "settle": return Settle(cli);
                 case "help": Help(); return 0;
                 default:
                     Console.Error.WriteLine("unknown command '" + command + "'");
@@ -201,6 +206,23 @@ namespace Godless.Sim.Headless
                     Console.WriteLine("  " + g.Name.PadRight(16) + g.Tell);
             }
 
+            // Needs and activities (S12), with anything refused and why.
+            DriveRules drives = DriveRules.FromContent(result.Database);
+            IReadOnlyList<string> refused = drives.Problems();
+            if (refused.Count > 0)
+            {
+                Console.WriteLine("\ndrives (S12) — " + refused.Count.ToString(c) + " refused:");
+                foreach (string problem in refused) Console.WriteLine("  " + problem);
+            }
+            if (drives.Needs.Count > 0)
+            {
+                Console.WriteLine("\n" + drives.Needs.Count.ToString(c) + " need(s), each with what a stranger sees when it goes unmet:");
+                foreach (Need n in drives.Needs.All) Console.WriteLine("  " + n.Name.PadRight(16) + n.Tell);
+                var acts = new List<string>();
+                foreach (Activity a in drives.Activities.All) acts.Add(a.Name + (a.Productive ? "*" : ""));
+                Console.WriteLine("  activities: " + string.Join(", ", acts) + "   (* productive)");
+            }
+
             Console.WriteLine("\ndigest " + result.Database.Digest().ToString("x16", c));
             if (result.ContainsCodeMod)
                 Console.WriteLine("a code mod is loaded — determinism is not guaranteed and the save records it");
@@ -360,6 +382,139 @@ namespace Godless.Sim.Headless
             return 0;
         }
 
+        // ── sim settle ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Founds one settlement on a real island and prints its days: the
+        /// weather, who slept in the open, what people did with their time and
+        /// what pressure it left. S12's tell, readable without a renderer.
+        /// </summary>
+        static int Settle(Args cli)
+        {
+            var c = CultureInfo.InvariantCulture;
+            ulong seed = (ulong)cli.Int("seed", 7);
+            int days = cli.Int("days", 30);
+            int people = cli.Int("people", 20);
+            int roofs = cli.Int("roofs", 0);
+            string wantBiome = cli.Text("biome", "temperate");
+
+            LoadResult content;
+            try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
+            catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
+
+            ContentDatabase db = content.Database;
+            VoxelTypes types = VoxelTypes.FromContent(db);
+            BiomeTable biomes = BiomeTable.FromContent(db);
+            DriveRules rules = DriveRules.FromContent(db);
+            if (biomes.Count == 0) { Console.Error.WriteLine("no biomes declared — nowhere to settle"); return 1; }
+
+            var world = new SimWorld(seed, db, types);
+            IslandMap island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types);
+            world.Island = island;
+            world.BeginHistory();
+
+            bool[] solid = TerrainBrush.SolidTable(db, types);
+            var wet = new bool[types.Count];
+            ushort water;
+            if (types.TryGetId(Symbol.For("voxel.water"), out water)) wet[water] = true;
+            ParcelGrid grid = ParcelGrid.Build(world.Voxels.Store, solid, wet);
+
+            int px, pz;
+            if (!StandInSite(grid, island, biomes, Symbol.For("biome." + wantBiome), out px, out pz)
+                && !StandInSite(grid, island, biomes, Symbol.None, out px, out pz))
+            { Console.Error.WriteLine("no dry, flat parcel near water on this island"); return 1; }
+
+            int hx = px * ParcelGrid.Size + 2, hz = pz * ParcelGrid.Size + 2;
+            var hearth = new Int3(hx, grid.GroundAt(hx, hz) + 1, hz);
+            int b = island.BiomeAt(hx, hz);
+            Biome biome = b >= 0 ? biomes.At(b) : null;
+
+            Settlement s = Settlement.Found("first", hearth, biome, people, rules, 0, world.Annals, RecordId.None);
+            s.ShelterCapacity = roofs;
+            var tally = new PressureTally(rules.Needs.Count);
+            s.Pressure = tally;
+            world.Settlements.Add(s);
+            world.Add(new DriveSystem(rules));
+
+            Console.WriteLine("seed " + seed.ToString(c) + ": " + people.ToString(c) + " people found a settlement at parcel ("
+                + px.ToString(c) + ", " + pz.ToString(c) + ") in " + (biome == null ? "no biome" : biome.Id.ToString())
+                + ", with " + roofs.ToString(c) + " roof(s)");
+            Console.WriteLine("site is a stand-in: the flattest dry parcel within four of water. S15 and S30 replace it.\n");
+
+            var header = new StringBuilder("  day  weather     in open ");
+            foreach (Activity a in rules.Activities.All) if (a.Name != "sleep") header.Append(a.Name.PadLeft(11));
+            header.Append("   pressure:");
+            foreach (Need n in rules.Needs.All) header.Append(n.Name.PadLeft(9));
+            Console.WriteLine(header.ToString());
+
+            var lastTicks = new long[rules.Activities.Count];
+            var lastPressure = new double[rules.Needs.Count];
+            for (int d = 0; d < days; d++)
+            {
+                for (int t = 0; t < world.Clock.TicksPerDay; t++) world.Tick();
+
+                long day = world.Clock.TotalDays - 1;
+                Sky sky = Weather.On(world.Streams, biome, day, world.Clock.DaysPerYear);
+                int inOpen = 0;
+                foreach (Agent a in s.People) if (!a.ShelteredLastNight) inOpen++;
+
+                var line = new StringBuilder();
+                line.Append(day.ToString(c).PadLeft(5)).Append("  ").Append(sky.ToString().PadRight(10))
+                    .Append((inOpen.ToString(c) + "/" + people.ToString(c)).PadLeft(8)).Append(' ');
+                for (int i = 0; i < rules.Activities.Count; i++)
+                {
+                    long ticks = s.ActivityTicks[i] - lastTicks[i];
+                    lastTicks[i] = s.ActivityTicks[i];
+                    if (rules.Activities[i].Name != "sleep") line.Append(ticks.ToString(c).PadLeft(11));
+                }
+                line.Append("            ");
+                for (int n = 0; n < rules.Needs.Count; n++)
+                {
+                    double p = tally.Total(n) - lastPressure[n];
+                    lastPressure[n] = tally.Total(n);
+                    line.Append(p.ToString("0.0", c).PadLeft(9));
+                }
+                Console.WriteLine(line.ToString());
+            }
+
+            IReadOnlyList<AnnalRecord> spells = world.Annals.OfKind(DriveSystem.ExposedKind);
+            Console.WriteLine("\n" + spells.Count.ToString(c) + " spell(s) of nights in the open on record; every unit of pressure names its cause:");
+            for (int n = 0; n < rules.Needs.Count; n++)
+            {
+                double total = tally.Total(n);
+                if (total <= 0.0) continue;
+                Console.WriteLine("  " + rules.Needs[n].Name.PadRight(10) + total.ToString("0.0", c).PadLeft(9)
+                    + "   " + Pct((long)(tally.Caused(n) * 1000), (long)(total * 1000)) + " traced to a record");
+            }
+            Console.WriteLine("\nactivity ticks are agent-ticks: " + people.ToString(c) + " people x 3 daylight ticks a day.");
+            return 0;
+        }
+
+        /// <summary>
+        /// The flattest land parcel in the biome within four parcels of water,
+        /// ties to the lowest index. A stand-in for S15 site scoring and S30
+        /// founding, so the drives have somewhere real to happen.
+        /// </summary>
+        static bool StandInSite(ParcelGrid grid, IslandMap island, BiomeTable biomes, Symbol biome, out int bestX, out int bestZ)
+        {
+            bestX = bestZ = -1;
+            double bestSlope = double.MaxValue;
+            for (int pz = 0; pz < ParcelGrid.Depth; pz++)
+                for (int px = 0; px < ParcelGrid.Width; px++)
+                {
+                    if (!grid.IsLand(px, pz) || grid.WetColumns(px, pz) > 0) continue;
+                    double wd = grid.WaterDistance[px, pz];
+                    if (wd < 1.0 || wd > 4.0) continue;
+                    if (!biome.IsNone)
+                    {
+                        int b = island.BiomeAt(px * ParcelGrid.Size + 2, pz * ParcelGrid.Size + 2);
+                        if (b < 0 || biomes.At(b).Id != biome) continue;
+                    }
+                    if (grid.Slope[px, pz] < bestSlope) { bestSlope = grid.Slope[px, pz]; bestX = px; bestZ = pz; }
+                }
+            return bestX >= 0;
+        }
+
         static string Pct(long part, long whole)
         {
             if (whole <= 0) return "0.0%";
@@ -400,6 +555,8 @@ namespace Godless.Sim.Headless
   sim content  [--path P]                   load Assets/Content and report what it holds
   sim island   [--seed N] [--width W]       generate an island and draw it
   sim parcels  [--seed N] [--field F]       draw a planning field: height, slope, water-distance
+  sim settle   [--seed N] [--days D] [--people P] [--roofs R] [--biome B]
+                                            found a settlement and print its days (S12)
 
 Defaults: run 0..200 x 300 years (0..20 with --island), verify 0..20 x 100 years.
 --island generates real terrain from Assets/Content for every seed, which is

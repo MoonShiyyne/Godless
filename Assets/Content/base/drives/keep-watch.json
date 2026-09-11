@@ -1,0 +1,1 @@
+{ "type": "activity", "id": "keep-watch", "requires": ["day", "hearth"], "relieves": { "safety": 0.2 } }
