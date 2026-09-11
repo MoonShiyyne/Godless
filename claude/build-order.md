@@ -9,43 +9,30 @@ disagree, the doc wins and this file gets re-synced.
 
 ## Current position
 
-Stage 0 (repo setup): **done**. S00–S05, S08, S09, S0A, S0C: **done**.
+**Stratum 0 is complete. G0 passed on 2026-09-11.** Next is stratum 1, which
+ends at **G1 — the go/no-go gate that can cancel the project.**
 
-**Write voxels through `VoxelWorld.Set`, which requires a cause.**
-`ChunkStore.SetRaw` records nothing and exists only for worldgen and save
-restore. That is L3, and it is the one thing in this stratum that cannot be
-fixed later.
+| G0 condition | Evidence |
+|---|---|
+| Guard catches L1 / L2 violations | `Tools/check-laws.sh`; asmdef refusal of `using UnityEngine;` verified in the Editor (runbook B4) |
+| Same seed, 300 years, byte-identical | `sim verify --seeds 0..20 --years 300` |
+| Harness runs unattended | `sim run` — 60,000 sim-years in 0.28 s |
+| Deleting base content still boots | `WithoutTheBaseMod_ItStillBoots` |
+| M0: raise a hill at 60 fps, scrub back | In-Editor: 1.39 ms CPU / 0.67 ms GPU per frame; a scrub to tick 0 reproduces the untouched island's digest exactly |
 
-Next: **S06 and S07** — binary greedy meshing with baked AO, then camera,
-input and terrain editing. Both need a reachable Editor and are the only
-stratum-0 systems that do. `unity status` currently reports none connected.
+**Stratum 1, in dependency order** (the critical path to G1 runs down the
+middle column):
 
-S0B (water) is served for stratum 0: the generator floods everything below
-sea level and the palette separates water from every shore material. Drainage
-and flow belong with S15 site scoring, which is what actually reads them.
+| Parallel | Critical path | Parallel |
+|---|---|---|
+| S17 minimal genome (6 genes) | S10 parcel grid + influence maps | S11 material stock |
+| S1D base tileset + silhouette rules | S15 site scoring | S12 drives, S1C task allocation |
+| S1F constraint fields | S18 split grammar | S1E subsistence |
+| S1G separation metric | S19 WFC against stock | S13 simple pather |
+| S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**When the Editor is next open, also verify runbook step B4** — that the
-asmdef itself refuses to compile a `using UnityEngine;` inside Assets/Sim.
-The grep guard is proven to catch it; the asmdef is not, and they are
-different mechanisms.
-
-Measured: the harness runs **60,000 simulated years in 0.19s** on an empty
-world, about 318,000 sim-years/sec. With real terrain it is 46 sim-years/sec,
-because generating an island costs about 0.45s and dominates a short run.
-`sim verify` is proven to catch a system that reads the wall clock.
-
-`sim island --seed N` draws the world as text. Until S06/S07 exist it is the
-only way to look at the game, and a coastline in the wrong place is obvious
-there and invisible in a digest.
-
-S06/S07 need a reachable Editor and are the only stratum-0 systems that do.
-`unity status` currently reports no connected Editor, so they are the natural
-work for a session with Unity open. Runbook step B4 is also still unverified
-there: the grep guard is proven to catch a Unity reference, but that the
-asmdef itself refuses to compile one has not been confirmed in the Editor.
-
-Nothing in stratum 1 may start until S00–S09 and S0A–S0C are green. Each is a
-decision the rest of the codebase encodes rather than calls.
+Start with **S17** and **S10**: both depend only on finished work, and S17 is
+the smallest thing that can make a silhouette respond to a number.
 
 ## Registry health warning
 
@@ -119,6 +106,17 @@ across 200 seeds and exits non-zero when one fails.
 
 Remaining for G0: the hill-raise scene rendered at 60fps (S06, S07 — both
 need an Editor).
+
+## History: rules learned in S07
+
+- **Call `SimWorld.BeginHistory()` once worldgen finishes.** It snapshots the
+  baseline every reconstruction replays from. Without it a world plays but
+  cannot be scrubbed back.
+- **Advance the clock before writing voxels.** Snapshots are end-of-tick, so a
+  write on an already-snapshotted tick is refused; `VoxelWorld.Set` validates
+  before it touches the store, so a refused write leaves no trace.
+- **World digests compare contents, not allocation.** A chunk emptied back to
+  air is freed. Two worlds with the same voxels digest the same.
 
 ## Numerics: decided
 
