@@ -621,8 +621,8 @@ namespace Godless.Sim.Headless
             ParcelGrid grid = ParcelGrid.Build(world.Voxels.Store, solid, wet);
 
             int px, pz;
-            if (!StandInSite(grid, island, biomes, Symbol.For("biome." + wantBiome), out px, out pz)
-                && !StandInSite(grid, island, biomes, Symbol.None, out px, out pz))
+            if (!Founding.StandInSite(grid, island, biomes, Symbol.For("biome." + wantBiome), out px, out pz)
+                && !Founding.StandInSite(grid, island, biomes, Symbol.None, out px, out pz))
             { Console.Error.WriteLine("no dry, flat parcel near water on this island"); return 1; }
 
             int hx = px * ParcelGrid.Size + 2, hz = pz * ParcelGrid.Size + 2;
@@ -810,31 +810,6 @@ namespace Godless.Sim.Headless
             Console.WriteLine("\nroofs now: " + s.ShelterCapacity.ToString(c) + " sleeping places for " + people.ToString(c) + " people.");
             Console.WriteLine("activity ticks are agent-ticks: " + people.ToString(c) + " people x 3 daylight ticks a day.");
             return 0;
-        }
-
-        /// <summary>
-        /// The flattest land parcel in the biome within four parcels of water,
-        /// ties to the lowest index. A stand-in for S15 site scoring and S30
-        /// founding, so the drives have somewhere real to happen.
-        /// </summary>
-        static bool StandInSite(ParcelGrid grid, IslandMap island, BiomeTable biomes, Symbol biome, out int bestX, out int bestZ)
-        {
-            bestX = bestZ = -1;
-            double bestSlope = double.MaxValue;
-            for (int pz = 0; pz < ParcelGrid.Depth; pz++)
-                for (int px = 0; px < ParcelGrid.Width; px++)
-                {
-                    if (!grid.IsLand(px, pz) || grid.WetColumns(px, pz) > 0) continue;
-                    double wd = grid.WaterDistance[px, pz];
-                    if (wd < 1.0 || wd > 4.0) continue;
-                    if (!biome.IsNone)
-                    {
-                        int b = island.BiomeAt(px * ParcelGrid.Size + 2, pz * ParcelGrid.Size + 2);
-                        if (b < 0 || biomes.At(b).Id != biome) continue;
-                    }
-                    if (grid.Slope[px, pz] < bestSlope) { bestSlope = grid.Slope[px, pz]; bestX = px; bestZ = pz; }
-                }
-            return bestX >= 0;
         }
 
         /// <summary>Whether any column in a drawn cell holds river or lake water. Rivers are one column wide; sampling would miss them.</summary>

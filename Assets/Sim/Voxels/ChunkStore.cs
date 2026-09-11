@@ -38,6 +38,21 @@ namespace Godless.Sim.Voxels
             return (cy * ChunksZ + cz) * ChunksX + cx;
         }
 
+        /// <summary>
+        /// Where a delta's chunk and voxel indices sit in the world. The
+        /// renderer needs it to know which chunk a simulated change dirtied.
+        /// </summary>
+        public static Int3 PositionOf(int chunkIndex, int voxelIndex)
+        {
+            int cx = chunkIndex % ChunksX;
+            int cz = (chunkIndex / ChunksX) % ChunksZ;
+            int cy = chunkIndex / (ChunksX * ChunksZ);
+            int x = voxelIndex % Chunk.Size;
+            int z = (voxelIndex / Chunk.Size) % Chunk.Size;
+            int y = voxelIndex / (Chunk.Size * Chunk.Size);
+            return new Int3(cx * Chunk.Size + x, cy * Chunk.Size + y, cz * Chunk.Size + z);
+        }
+
         /// <summary>Reads out of bounds as air, so callers need not guard every edge.</summary>
         public ushort Get(int x, int y, int z)
         {
