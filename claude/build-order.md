@@ -31,8 +31,15 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-Start with **S17** and **S10**: both depend only on finished work, and S17 is
-the smallest thing that can make a silhouette respond to a number.
+**Done in stratum 1: S10, S17.**
+
+Next, in dependency order toward G1: **S12** drives and **S14** the
+BuildIntent bus (S18 needs S14), **S11** material stock and **S1D** the base
+tileset (S19 needs both). S18 split grammar is the first system that can turn
+a gene into a visible shape — S17's tell only becomes testable there.
+
+`sim content` lists every gene with its tell. `sim parcels --field
+water-distance|slope|height` draws the planning fields.
 
 ## Registry health warning
 

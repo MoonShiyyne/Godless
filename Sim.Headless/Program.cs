@@ -36,6 +36,7 @@ namespace Godless.Sim.Headless
                 case "verify": return Verify(cli);
                 case "content": return Content(cli);
                 case "island": return Island(cli);
+                case "parcels": return Parcels(cli);
                 case "help": Help(); return 0;
                 default:
                     Console.Error.WriteLine("unknown command '" + command + "'");
@@ -289,6 +290,76 @@ namespace Godless.Sim.Headless
             return 0;
         }
 
+        // ── sim parcels ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Draws one of S10's planning fields over the island. The fields are
+        /// what settlements will read when choosing where to build, so this is
+        /// the first view of the island as a settlement will see it.
+        /// </summary>
+        static int Parcels(Args cli)
+        {
+            var c = CultureInfo.InvariantCulture;
+            ulong seed = (ulong)cli.Int("seed", 7);
+            string field = cli.Text("field", "water-distance");
+
+            LoadResult content;
+            try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
+            catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
+
+            VoxelTypes types = VoxelTypes.FromContent(content.Database);
+            BiomeTable biomes = BiomeTable.FromContent(content.Database);
+            var store = new ChunkStore();
+            IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types);
+
+            bool[] solid = TerrainBrush.SolidTable(content.Database, types);
+            var wet = new bool[types.Count];
+            ushort water;
+            if (types.TryGetId(Symbol.For("voxel.water"), out water)) wet[water] = true;
+
+            var watch = Stopwatch.StartNew();
+            ParcelGrid grid = ParcelGrid.Build(store, solid, wet);
+            watch.Stop();
+            double first = watch.Elapsed.TotalMilliseconds;
+            watch.Restart();
+            ParcelGrid.Build(store, solid, wet);
+            watch.Stop();
+
+            InfluenceMap map;
+            switch (field)
+            {
+                case "height": map = grid.Height; break;
+                case "slope": map = grid.Slope; break;
+                case "water-distance": map = grid.WaterDistance; break;
+                default: Console.Error.WriteLine("unknown field '" + field + "' — try height, slope or water-distance"); return 2;
+            }
+
+            // Ramp over land only; the sea is drawn as blank so the coast reads.
+            const string ramp = " .:-=+*#%@";
+            double lo = double.MaxValue, hi = double.MinValue;
+            for (int pz = 0; pz < ParcelGrid.Depth; pz++)
+                for (int px = 0; px < ParcelGrid.Width; px++)
+                    if (grid.IsLand(px, pz)) { lo = Math.Min(lo, map[px, pz]); hi = Math.Max(hi, map[px, pz]); }
+
+            var sb = new StringBuilder();
+            for (int pz = 0; pz < ParcelGrid.Depth; pz += 2)
+            {
+                for (int px = 0; px < ParcelGrid.Width; px++)
+                {
+                    if (!grid.IsLand(px, pz)) { sb.Append(' '); continue; }
+                    double t = hi > lo ? (map[px, pz] - lo) / (hi - lo) : 0.0;
+                    sb.Append(ramp[1 + (int)Math.Min(ramp.Length - 2, t * (ramp.Length - 1))]);
+                }
+                sb.Append('\n');
+            }
+            Console.Write(sb.ToString());
+            Console.WriteLine("\nfield." + field + " over land: " + lo.ToString("0.#", c) + " (.) to "
+                + hi.ToString("0.#", c) + " (@), sea blank");
+            Console.WriteLine("128 x 128 parcels of 4 x 4 columns, built in " + first.ToString("0", c)
+                + " ms cold, " + watch.Elapsed.TotalMilliseconds.ToString("0", c) + " ms warm");
+            return 0;
+        }
+
         static string Pct(long part, long whole)
         {
             if (whole <= 0) return "0.0%";
@@ -328,6 +399,7 @@ namespace Godless.Sim.Headless
   sim verify   [--seeds A..B] [--years N]   run each seed twice, compare byte for byte
   sim content  [--path P]                   load Assets/Content and report what it holds
   sim island   [--seed N] [--width W]       generate an island and draw it
+  sim parcels  [--seed N] [--field F]       draw a planning field: height, slope, water-distance
 
 Defaults: run 0..200 x 300 years (0..20 with --island), verify 0..20 x 100 years.
 --island generates real terrain from Assets/Content for every seed, which is

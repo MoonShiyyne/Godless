@@ -93,6 +93,41 @@ namespace Godless.Sim.Voxels
 
         public bool SetRaw(Int3 at, ushort type) { return SetRaw(at.X, at.Y, at.Z, type); }
 
+        /// <summary>
+        /// The highest y in a column whose voxel type is marked in
+        /// <paramref name="matches"/>, or -1 if none is.
+        ///
+        /// Walks the column a chunk at a time from the top: a missing chunk is
+        /// 32 voxels of air skipped in one step, and a uniform chunk is
+        /// answered from its single type. Most of an island's sky is missing
+        /// chunks, so this is what makes a whole-island height pass cheap.
+        /// </summary>
+        public int TopMatching(int x, int z, bool[] matches)
+        {
+            if (x < 0 || x >= SizeX || z < 0 || z >= SizeZ) return -1;
+            int cx = x >> 5, cz = z >> 5, lx = x & 31, lz = z & 31;
+
+            for (int cy = ChunksY - 1; cy >= 0; cy--)
+            {
+                Chunk chunk = _chunks[ChunkIndex(cx, cy, cz)];
+                if (chunk == null) continue;
+
+                if (chunk.IsUniform)
+                {
+                    ushort t = chunk.UniformType;
+                    if (t < matches.Length && matches[t]) return cy * Chunk.Size + Chunk.Size - 1;
+                    continue;
+                }
+
+                for (int ly = Chunk.Size - 1; ly >= 0; ly--)
+                {
+                    ushort t = chunk.Get(lx, ly, lz);
+                    if (t < matches.Length && matches[t]) return cy * Chunk.Size + ly;
+                }
+            }
+            return -1;
+        }
+
         public Chunk ChunkAt(int cx, int cy, int cz)
         {
             if (cx < 0 || cx >= ChunksX || cy < 0 || cy >= ChunksY || cz < 0 || cz >= ChunksZ) return null;

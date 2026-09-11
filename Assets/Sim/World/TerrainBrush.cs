@@ -38,12 +38,7 @@ namespace Godless.Sim.World
         /// <summary>Highest solid voxel in a column, or -1 if there is none.</summary>
         public static int TopSolid(ChunkStore store, bool[] solid, int x, int z)
         {
-            for (int y = ChunkStore.SizeY - 1; y >= 0; y--)
-            {
-                ushort v = store.Get(x, y, z);
-                if (v < solid.Length && solid[v]) return y;
-            }
-            return -1;
+            return store.TopMatching(x, z, solid);
         }
 
         /// <summary>
