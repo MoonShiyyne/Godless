@@ -109,13 +109,13 @@ added Parts 16, 09 and 10. Do not file that material under `Culture/`.
     Tools/verify.sh         # guard + full suite, one exit code: commit only on this
     Tools/check-laws.sh     # L1 + L2 guard on its own
     dotnet test             # sim logic, no Editor needed
+    unity command recompile # only when touching Assets/Unity
+    unity status            # "ready" means the Editor is reachable
 
 Commit as `Tools/verify.sh && git commit ...` so a failing run cannot land.
 No wall-clock assertions in Sim.Tests: the suite runs in parallel and the
 same run has measured 15 s and 95 s, so a time limit measures machine load.
 Report timings through the test output or a `sim` command instead.
-    unity command recompile # only when touching Assets/Unity
-    unity status            # "ready" means the Editor is reachable
 
 The headless harness (S08) is the thing that lets you iterate without a
 human looking at a screen. Build once, then:
