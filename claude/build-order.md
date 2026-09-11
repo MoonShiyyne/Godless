@@ -33,9 +33,9 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15, S13.**
 
-Next, in dependency order toward G1: **S13** a simple pather and **S1A**
+Next, in dependency order toward G1: **S1A**
 physical construction — the first point at which houses stand on the island.
 Then **S1B** footprint claim and worn roads, **S1E** subsistence, **S1G** the
 separation metric and **S29** the screenshot harness, and G1 can be run.
@@ -64,6 +64,16 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S13 shipped
+
+- `World/ParcelPath.cs`: A* over parcels, with the climb between neighbours
+  as the thing that stops a walker — a wall of rock is impassable however
+  flat its top. Water blocks; the goal may be water, so a path can end at the
+  water's edge. Frontier ordered by cost then parcel, so two points always
+  give the same way.
+- The split the stage plan called for: flow fields wait for stratum 3, where
+  their tell (thousands of agents) can actually be seen.
+
 ### What S15 shipped
 
 - `Build/Siting.cs`: which ground a culture calls good is content, in the
