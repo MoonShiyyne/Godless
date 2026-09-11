@@ -1,0 +1,14 @@
+{
+  "type": "gene",
+  "id": "verticality",
+  "min": 0,
+  "max": 1,
+  "default": 0.3,
+
+  // The gene rule (CLAUDE.md): every gene declares what a stranger sees. A
+  // gene without a tell does not load — it is simulation nobody is buying.
+  "tell": "Houses either hug the ground at one storey or stack two and three storeys high.",
+
+  // Which system turns the number into voxels, and what bends it.
+  "reads": "S18 storey count. Divine events near a site push it up (Part 04)."
+}

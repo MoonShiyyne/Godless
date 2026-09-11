@@ -186,6 +186,20 @@ namespace Godless.Sim.Headless
                     + " apart in value; storey " + palette.FloorHeightMetres.ToString("0.0", c) + " m");
             }
 
+            // The gene rule, where a modder will see it (S17).
+            Godless.Sim.Culture.GeneTable genes = Godless.Sim.Culture.GeneTable.FromContent(result.Database);
+            if (genes.Problems.Count > 0)
+            {
+                Console.WriteLine("\ngenes (S17) — " + genes.Problems.Count.ToString(c) + " refused:");
+                foreach (string problem in genes.Problems) Console.WriteLine("  " + problem);
+            }
+            if (genes.Count > 0)
+            {
+                Console.WriteLine("\n" + genes.Count.ToString(c) + " gene(s), each with its tell:");
+                foreach (Godless.Sim.Culture.Gene g in genes.All)
+                    Console.WriteLine("  " + g.Name.PadRight(16) + g.Tell);
+            }
+
             Console.WriteLine("\ndigest " + result.Database.Digest().ToString("x16", c));
             if (result.ContainsCodeMod)
                 Console.WriteLine("a code mod is loaded — determinism is not guaranteed and the save records it");

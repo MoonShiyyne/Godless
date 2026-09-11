@@ -1,0 +1,14 @@
+{
+  "type": "gene",
+  "id": "aperture_ratio",
+  "min": 0,
+  "max": 1,
+  "default": 0.35,
+
+  // The gene rule (CLAUDE.md): every gene declares what a stranger sees. A
+  // gene without a tell does not load — it is simulation nobody is buying.
+  "tell": "Walls are pierced by wide doorways and windows, or closed down to slits.",
+
+  // Which system turns the number into voxels, and what bends it.
+  "reads": "S18 openings. Raids push it down (Part 04)."
+}

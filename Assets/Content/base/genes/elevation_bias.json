@@ -1,0 +1,14 @@
+{
+  "type": "gene",
+  "id": "elevation_bias",
+  "min": 0,
+  "max": 1,
+  "default": 0.15,
+
+  // The gene rule (CLAUDE.md): every gene declares what a stranger sees. A
+  // gene without a tell does not load — it is simulation nobody is buying.
+  "tell": "Floors sit on the earth, on a stone plinth, or up on stilts with open ground beneath.",
+
+  // Which system turns the number into voxels, and what bends it.
+  "reads": "S16 terrain negotiation and S18 floor height. Floods push it up (Part 04)."
+}

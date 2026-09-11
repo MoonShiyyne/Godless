@@ -1,0 +1,14 @@
+{
+  "type": "gene",
+  "id": "communal_ratio",
+  "min": 0,
+  "max": 1,
+  "default": 0.3,
+
+  // The gene rule (CLAUDE.md): every gene declares what a stranger sees. A
+  // gene without a tell does not load — it is simulation nobody is buying.
+  "tell": "A settlement is many small huts, or a few long houses sharing one hearth.",
+
+  // Which system turns the number into voxels, and what bends it.
+  "reads": "S14 intent sizing: one large shared shelter or several small ones. Hard winters push it up (Part 04)."
+}

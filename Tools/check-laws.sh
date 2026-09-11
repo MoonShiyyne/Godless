@@ -71,6 +71,12 @@ check "L2" "GetHashCode is randomised per process — use StableHash" \
 check "L2" "platform transcendental — use Godless.Sim.Core.SimMath" \
   '(^|[^A-Za-z0-9_])Math\.(Sin|Cos|Tan|Asin|Acos|Atan|Atan2|Sinh|Cosh|Tanh|Pow|Exp|Log|Log2|Log10|Cbrt)[[:space:]]*\('
 
+# Mono and CoreCLR implement number parsing separately; a content value read
+# one ulp apart on two machines is two different worlds. Use
+# JsonValue.AsDouble / DeterministicDecimal, which reduce to one IEEE division.
+check "L2" "runtime number parsing — use DeterministicDecimal" \
+  '(^|[^A-Za-z0-9_])(double|float|Double|Single|decimal)\.(Try)?Parse[[:space:]]*\(|Convert\.To(Double|Single)[[:space:]]*\('
+
 # foreach over a Dictionary/HashSet field: iteration order is not guaranteed.
 check "L2" "unordered collection iterated — sort the keys or use an ordered structure" \
   'foreach[[:space:]]*\([^)]*\bin[[:space:]]+_?[A-Za-z0-9_]*(Dict|Dictionary|Map|Set|Lookup)\b'

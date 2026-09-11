@@ -112,12 +112,27 @@ namespace Godless.Sim.Content
 
         public int AsInt32(int fallback) { return (int)AsInt64(fallback); }
 
-        /// <summary>
-        /// The raw lexeme, so a caller can decide how to interpret it. There
-        /// is deliberately no AsDouble until the sim's numeric representation
-        /// is settled — see claude/build-order.md.
-        /// </summary>
+        /// <summary>The raw lexeme, for a caller that wants to interpret it itself.</summary>
         public string NumberLexeme { get { return _kind == JsonKind.Number ? _text : null; } }
+
+        /// <summary>
+        /// The number as a double, parsed without the runtime's parser.
+        ///
+        /// double.Parse is implemented separately by Mono and CoreCLR, and a
+        /// content value read one ulp apart on two machines is the start of
+        /// two different worlds. Instead the lexeme becomes an integer
+        /// mantissa and a power of ten, combined by a single division — and
+        /// IEEE-754 division is correctly rounded, so every runtime produces
+        /// the same bits. Exact for mantissas up to 2^53 and exponents where
+        /// the power of ten is itself exact, which covers any number content
+        /// will actually contain.
+        /// </summary>
+        public double AsDouble(double fallback)
+        {
+            if (_kind != JsonKind.Number) return fallback;
+            double parsed;
+            return DeterministicDecimal.TryParse(_text, out parsed) ? parsed : fallback;
+        }
 
         public List<JsonValue> ItemsCopy()
         {
@@ -247,6 +262,82 @@ namespace Godless.Sim.Content
                 }
             }
             sb.Append('"');
+        }
+    }
+}
+
+namespace Godless.Sim.Content
+{
+    /// <summary>Exact, runtime-independent decimal parsing. See JsonValue.AsDouble.</summary>
+    public static class DeterministicDecimal
+    {
+        // Every power of ten up to 10^22 is exactly representable as a double.
+        static readonly double[] Pow10 =
+        {
+            1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11,
+            1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
+        };
+
+        public static bool TryParse(string s, out double value)
+        {
+            value = 0;
+            if (string.IsNullOrEmpty(s)) return false;
+
+            int i = 0;
+            bool negative = false;
+            if (s[i] == '-' || s[i] == '+') { negative = s[i] == '-'; i++; }
+
+            long mantissa = 0;
+            int digits = 0, scale = 0;
+            bool any = false;
+            for (; i < s.Length && s[i] >= '0' && s[i] <= '9'; i++)
+            {
+                if (digits < 17) { mantissa = mantissa * 10 + (s[i] - '0'); if (mantissa != 0) digits++; }
+                else scale--;          // beyond precision: drop digits, keep magnitude
+                any = true;
+            }
+            if (i < s.Length && s[i] == '.')
+            {
+                i++;
+                for (; i < s.Length && s[i] >= '0' && s[i] <= '9'; i++)
+                {
+                    if (digits < 17) { mantissa = mantissa * 10 + (s[i] - '0'); if (mantissa != 0) digits++; scale++; }
+                    any = true;
+                }
+            }
+            if (!any) return false;
+
+            int exponent = 0;
+            if (i < s.Length && (s[i] == 'e' || s[i] == 'E'))
+            {
+                i++;
+                bool expNegative = false;
+                if (i < s.Length && (s[i] == '-' || s[i] == '+')) { expNegative = s[i] == '-'; i++; }
+                int start = i;
+                for (; i < s.Length && s[i] >= '0' && s[i] <= '9'; i++)
+                    if (exponent < 10000) exponent = exponent * 10 + (s[i] - '0');
+                if (i == start) return false;
+                if (expNegative) exponent = -exponent;
+            }
+            if (i != s.Length) return false;
+
+            int power = exponent - scale;     // value = mantissa * 10^power
+            double m = mantissa;              // exact: mantissa < 10^17 < 2^57, and digits <= 17
+            if (power == 0) value = m;
+            else if (power > 0 && power <= 22) value = m * Pow10[power];
+            else if (power < 0 && power >= -22) value = m / Pow10[-power];
+            else
+            {
+                // Outside the exact range: still deterministic, since each
+                // step is a correctly rounded IEEE operation in a fixed order.
+                value = m;
+                int p = power;
+                while (p > 22) { value *= 1e22; p -= 22; }
+                while (p < -22) { value /= 1e22; p += 22; }
+                value = p >= 0 ? value * Pow10[p] : value / Pow10[-p];
+            }
+            if (negative) value = -value;
+            return true;
         }
     }
 }

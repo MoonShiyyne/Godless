@@ -127,19 +127,10 @@ namespace Godless.Sim.World
             return null;
         }
 
-        /// <summary>
-        /// Parses a decimal from its lexeme without going through the sim's
-        /// banned functions. Sizes are content, so they arrive as text.
-        /// </summary>
+        /// <summary>Sizes are content, so they arrive as text; parsed deterministically.</summary>
         static double ParseMetres(JsonValue v, double fallback)
         {
-            string lexeme = v.NumberLexeme;
-            if (string.IsNullOrEmpty(lexeme)) return fallback;
-
-            double parsed;
-            return double.TryParse(lexeme, System.Globalization.NumberStyles.Float,
-                                   System.Globalization.CultureInfo.InvariantCulture, out parsed)
-                ? parsed : fallback;
+            return v.AsDouble(fallback);
         }
     }
 }

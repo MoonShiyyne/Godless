@@ -1,0 +1,14 @@
+{
+  "type": "gene",
+  "id": "footprint_area",
+  "min": 0,
+  "max": 1,
+  "default": 0.4,
+
+  // The gene rule (CLAUDE.md): every gene declares what a stranger sees. A
+  // gene without a tell does not load — it is simulation nobody is buying.
+  "tell": "Dwellings shrink to tight single rooms or stretch into long halls.",
+
+  // Which system turns the number into voxels, and what bends it.
+  "reads": "S18 plan size. Floods push it down; surplus pushes it up (Part 04)."
+}

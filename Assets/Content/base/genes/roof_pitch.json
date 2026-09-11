@@ -1,0 +1,14 @@
+{
+  "type": "gene",
+  "id": "roof_pitch",
+  "min": 0,
+  "max": 1,
+  "default": 0.45,
+
+  // The gene rule (CLAUDE.md): every gene declares what a stranger sees. A
+  // gene without a tell does not load — it is simulation nobody is buying.
+  "tell": "Roofs run from flat terraces you could walk on to steep gables that shed snow.",
+
+  // Which system turns the number into voxels, and what bends it.
+  "reads": "S18 roof profile. Winter mortality pushes it up (Part 04)."
+}
