@@ -278,6 +278,7 @@ namespace Godless.Sim.Headless
                 for (int x = 0; x < ChunkStore.SizeX; x += stepX)
                 {
                     if (!map.IsLand(x, z)) { sb.Append(map.HeightAt(x, z) > IslandMap.SeaLevel - 6 ? '~' : ' '); continue; }
+                    if (AnyWater(map, x, z, stepX, stepZ, out bool lake)) { sb.Append(lake ? 'o' : '='); continue; }
                     int b = map.BiomeAt(x, z);
                     sb.Append(b < 0 ? '?' : glyphs[b]);
                 }
@@ -298,7 +299,17 @@ namespace Godless.Sim.Headless
                 }
 
             long total = (long)ChunkStore.SizeX * ChunkStore.SizeZ;
-            Console.WriteLine("\nseed " + seed.ToString(c) + "  ~ sea  ? unclaimed");
+            // S0B: the water on the land.
+            int riverCols = 0, lakeCols = 0, floodCols = 0;
+            for (int z = 0; z < ChunkStore.SizeZ; z++)
+                for (int x = 0; x < ChunkStore.SizeX; x++)
+                {
+                    if (map.IsRiver(x, z)) riverCols++;
+                    else if (map.IsLake(x, z)) lakeCols++;
+                    else if (map.IsLand(x, z) && map.WaterLevelAt(x, z) == 0 && map.HeightAboveWaterAt(x, z) <= 1) floodCols++;
+                }
+
+            Console.WriteLine("\nseed " + seed.ToString(c) + "  ~ sea  = river  o lake  ? unclaimed");
             for (int i = 0; i < biomes.Count; i++)
                 Console.WriteLine("  " + glyphs[i] + "  " + biomes.At(i).Id
                     + "  " + Pct(counts[i], land) + " of land");
@@ -306,7 +317,9 @@ namespace Godless.Sim.Headless
                 Console.WriteLine("  ?  no biome accepted these columns  " + Pct(counts[biomes.Count], land)
                     + " of land  <- a gap in the selection windows");
 
-            Console.WriteLine("\nland " + Pct(land, total) + " of the map, "
+            Console.WriteLine("\nwater (S0B): " + riverCols.ToString(c) + " river columns, " + lakeCols.ToString(c)
+                + " lake columns; " + Pct(floodCols, land) + " of land stands within a voxel of its water and floods first");
+            Console.WriteLine("land " + Pct(land, total) + " of the map, "
                 + (store.MemoryBytes / 1024).ToString(c) + " KB across "
                 + store.AllocatedChunks.ToString(c) + "/" + ChunkStore.ChunkCount.ToString(c)
                 + " chunks, generated in " + watch.Elapsed.TotalSeconds.ToString("0.00", c) + "s");
@@ -540,6 +553,21 @@ namespace Godless.Sim.Headless
                     if (grid.Slope[px, pz] < bestSlope) { bestSlope = grid.Slope[px, pz]; bestX = px; bestZ = pz; }
                 }
             return bestX >= 0;
+        }
+
+        /// <summary>Whether any column in a drawn cell holds river or lake water. Rivers are one column wide; sampling would miss them.</summary>
+        static bool AnyWater(IslandMap map, int x0, int z0, int w, int h, out bool lake)
+        {
+            bool river = false;
+            lake = false;
+            for (int z = z0; z < z0 + h && z < ChunkStore.SizeZ; z++)
+                for (int x = x0; x < x0 + w && x < ChunkStore.SizeX; x++)
+                {
+                    if (map.IsRiver(x, z)) river = true;
+                    else if (map.IsLake(x, z)) lake = true;
+                }
+            if (lake) return true;
+            return river;
         }
 
         static string Pct(long part, long whole)

@@ -41,7 +41,68 @@ namespace Godless.Sim.World
                     for (int x = 0; x < ChunkStore.SizeX; x += 4)
                         if (map.IsLand(x, z)) present.Add(map.BiomeAt(x, z));
                 into.Record("island.biomes-present", present.Count);
+
+                CollectWater(world, map, into);
             };
+        }
+
+        /// <summary>
+        /// S0B's claims, checked against the voxels rather than the map, so a
+        /// carving bug shows up as the thing a player would see: a river that
+        /// never reaches the sea, or water hanging over air.
+        /// </summary>
+        static void CollectWater(SimWorld world, IslandMap map, RunResult into)
+        {
+            ChunkStore store = world.Voxels.Store;
+            bool[] solid = TerrainBrush.SolidTable(world.Content, world.VoxelTypes);
+            ushort water;
+            bool hasWater = world.VoxelTypes.TryGetId(Core.Symbol.For("voxel.water"), out water);
+
+            long rivers = 0, lakes = 0, mouths = 0, misplaced = 0, overdeep = 0;
+            for (int z = 0; z < ChunkStore.SizeZ; z++)
+                for (int x = 0; x < ChunkStore.SizeX; x++)
+                {
+                    int level = map.WaterLevelAt(x, z);
+                    if (!map.IsLand(x, z) || level == 0) continue;
+
+                    int h = map.HeightAt(x, z);
+                    if (map.IsRiver(x, z))
+                    {
+                        rivers++;
+                        if (TouchesSea(map, x, z)) mouths++;
+                    }
+                    else
+                    {
+                        lakes++;
+                        if (level - h > Hydrology.MaxLakeDepth) overdeep++;
+                    }
+
+                    bool ok = hasWater && h > 0 && IsSolid(solid, store.Get(x, h - 1, z));
+                    for (int y = h; y < level && ok; y++) ok = store.Get(x, y, z) == water;
+                    ushort above = store.Get(x, level, z);
+                    if (above == water || IsSolid(solid, above)) ok = false;
+                    if (!ok) misplaced++;
+                }
+
+            into.Record("water.river-columns", rivers);
+            into.Record("water.lake-columns", lakes);
+            into.Record("water.river-mouths", mouths);
+            into.Record("water.misplaced-columns", misplaced);
+            into.Record("water.overdeep-lake-columns", overdeep);
+        }
+
+        static bool IsSolid(bool[] table, ushort id) { return id < table.Length && table[id]; }
+
+        static bool TouchesSea(IslandMap map, int x, int z)
+        {
+            for (int dz = -1; dz <= 1; dz++)
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    int nx = x + dx, nz = z + dz;
+                    if (nx < 0 || nz < 0 || nx >= ChunkStore.SizeX || nz >= ChunkStore.SizeZ) continue;
+                    if (!map.IsLand(nx, nz)) return true;
+                }
+            return false;
         }
 
         public static IReadOnlyList<Invariant> All()
@@ -70,6 +131,23 @@ namespace Godless.Sim.World
                 // leaves nothing to change.
                 Invariant.PerRun("S09", "at least three biomes appear on land",
                     run => run.Metric("island.biomes-present") >= 3.0),
+
+                // S0B. Floods, drainage in site scoring and every water verb
+                // read this. An island with no river reaching the sea has no
+                // crossing to settle at and nothing to flood.
+                Invariant.PerRun("S0B", "at least one river reaches the sea",
+                    run => run.Metric("water.river-mouths") >= 1.0),
+
+                // Water sits on ground and nothing sits on water. Checked
+                // against the voxels, so a carving bug fails here instead of
+                // hanging a sheet of water in the air for a player to find.
+                Invariant.PerRun("S0B", "every column of water rests on ground, under open air",
+                    run => run.Metric("water.misplaced-columns") == 0.0),
+
+                // Lakes stay in their basins: a closed basin holds a lake at
+                // its bottom rather than drowning a highland plateau.
+                Invariant.PerRun("S0B", "no lake stands deeper than its cap",
+                    run => run.Metric("water.overdeep-lake-columns") == 0.0),
             };
         }
     }

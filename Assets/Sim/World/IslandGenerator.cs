@@ -16,6 +16,11 @@ namespace Godless.Sim.World
         readonly byte[] _biome = new byte[ChunkStore.SizeX * ChunkStore.SizeZ];
         readonly byte[] _moisture = new byte[ChunkStore.SizeX * ChunkStore.SizeZ];
 
+        // S0B. Zero until hydrology runs.
+        readonly byte[] _water = new byte[ChunkStore.SizeX * ChunkStore.SizeZ];
+        readonly byte[] _aboveWater = new byte[ChunkStore.SizeX * ChunkStore.SizeZ];
+        readonly bool[] _river = new bool[ChunkStore.SizeX * ChunkStore.SizeZ];
+
         internal void Set(int x, int z, int height, int biomeIndex, int moisture)
         {
             int i = z * ChunkStore.SizeX + x;
@@ -24,6 +29,7 @@ namespace Godless.Sim.World
             _moisture[i] = (byte)moisture;
         }
 
+        /// <summary>Solid below this height. Under a river, the riverbed.</summary>
         public int HeightAt(int x, int z) { return _height[z * ChunkStore.SizeX + x]; }
         public int MoistureAt(int x, int z) { return _moisture[z * ChunkStore.SizeX + x]; }
 
@@ -31,6 +37,32 @@ namespace Godless.Sim.World
         public int BiomeAt(int x, int z) { return _biome[z * ChunkStore.SizeX + x] - 1; }
 
         public bool IsLand(int x, int z) { return HeightAt(x, z) > SeaLevel; }
+
+        /// <summary>Water stands here up to, not including, this height. Zero where the column is dry.</summary>
+        public int WaterLevelAt(int x, int z) { return _water[z * ChunkStore.SizeX + x]; }
+
+        public bool IsRiver(int x, int z) { return _river[z * ChunkStore.SizeX + x]; }
+
+        /// <summary>Standing water on land that is not a river: a lake.</summary>
+        public bool IsLake(int x, int z) { return IsLand(x, z) && WaterLevelAt(x, z) > 0 && !IsRiver(x, z); }
+
+        /// <summary>
+        /// How far this column stands above the water it drains to — its
+        /// depth to the water table, and how high a flood has to rise to
+        /// reach it. Zero on water and on low ground that already floods.
+        /// </summary>
+        public int HeightAboveWaterAt(int x, int z) { return _aboveWater[z * ChunkStore.SizeX + x]; }
+
+        internal void SetWater(int[] ground, int[] level, int[] above, bool[] river)
+        {
+            for (int i = 0; i < _height.Length; i++)
+            {
+                _height[i] = (byte)ground[i];
+                _water[i] = (byte)level[i];
+                _aboveWater[i] = (byte)(above[i] > 255 ? 255 : above[i]);
+                _river[i] = river[i];
+            }
+        }
 
         public ulong Digest()
         {
@@ -40,6 +72,8 @@ namespace Godless.Sim.World
                 d.Add(_height[i]);
                 d.Add(_biome[i]);
                 d.Add(_moisture[i]);
+                d.Add(_water[i]);
+                d.Add(_aboveWater[i]);
             }
             return d.Value;
         }
@@ -136,6 +170,8 @@ namespace Godless.Sim.World
                     FillColumn(store, voxelTypes, biome, x, z, height, water);
                 }
 
+            // S0B: rivers, lakes and the water table, from the heights above.
+            Hydrology.Apply(map, store, biomes, water);
             return map;
         }
 

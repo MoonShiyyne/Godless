@@ -161,8 +161,10 @@ namespace Godless.Sim.Tests
                 {
                     int h = g.Map.HeightAt(x, z);
                     Assert.NotEqual(air, g.Store.Get(x, h - 1, z));
+                    // Above the ground, or above a river or lake on it (S0B).
+                    int top = System.Math.Max(h, g.Map.WaterLevelAt(x, z));
                     if (h > IslandMap.SeaLevel)
-                        Assert.Equal(air, g.Store.Get(x, h + 1, z));
+                        Assert.Equal(air, g.Store.Get(x, top + 1, z));
                 }
         }
 

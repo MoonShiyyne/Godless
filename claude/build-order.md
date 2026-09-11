@@ -9,11 +9,10 @@ disagree, the doc wins and this file gets re-synced.
 
 ## Current position
 
-**G0 passed on 2026-09-11.** Stratum 0 is complete **except S0B** (water table
-+ flow accumulation), which was skipped and not noticed until S14: none of
-G0's conditions reads it, so the gate result stands, but S15 site scoring and
-S20 floods both depend on it. It is next in the queue. Stratum 1 ends at
-**G1 — the go/no-go gate that can cancel the project.**
+**G0 passed on 2026-09-11. Stratum 0 is complete**, S0B included — it was
+skipped first time round and not noticed until S14 (none of G0's conditions
+reads it), then built after S14. Stratum 1 ends at **G1 — the go/no-go gate
+that can cancel the project.**
 
 | G0 condition | Evidence |
 |---|---|
@@ -36,10 +35,9 @@ middle column):
 
 **Done in stratum 1: S10, S17, S12, S14.**
 
-Next, in dependency order toward G1: **S0B** hydrology (owed from stratum 0;
-S15 needs it), **S11** material stock and **S1D** the base tileset (S19 needs
-both), **S1C** response-threshold task allocation (now unblocked by S12 and
-S14). S18 split grammar is the first system that can turn a gene into a
+Next, in dependency order toward G1: **S11** material stock and **S1D** the
+base tileset (S19 needs both), **S1C** response-threshold task allocation
+(unblocked by S12 and S14), **S1F** constraint fields (S15 needs them). S18 split grammar is the first system that can turn a gene into a
 visible shape — S17's tell only becomes testable there, and it needs only
 S17 and S14, both done.
 
@@ -63,6 +61,26 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S0B shipped
+
+- Priority-flood drainage over every column (`World/Drainage.cs`): each
+  column's way to the sea, rain gathered from upstream (biome rainfall), and
+  pits filled to their spill height. A bucket queue with FIFO inside a level
+  and a fixed neighbour order, so flats drain identically everywhere. ~8 ms.
+- Worldgen now ends by carving it (`World/Hydrology.cs`): rivers where flow
+  passes `RiverFlow`, broad where it passes six times that; lakes in basins,
+  **capped at three voxels over the floor** so a highland caldera holds a
+  tarn instead of drowning the biome G1 needs. Every caller of
+  `IslandGenerator.Generate` — saves, the Editor, the harness — gets it.
+- `IslandMap` gains `WaterLevelAt`, `IsRiver`, `IsLake` and
+  `HeightAboveWaterAt` (height above nearest drainage — the water table, and
+  how high a flood must rise to reach a column). Site scoring and floods read
+  that. `sim island` draws rivers `=` and lakes `o`.
+- Three S0B invariants over the voxels themselves: a river reaches the sea,
+  water rests on ground under open air, no lake exceeds its cap.
+- Static after worldgen. A god who parts a river needs drainage recomputed
+  from the live terrain; the pass is cheap, and S2J is where it is called.
+
 ### What S14 shipped
 
 - Intent kinds are content (`Assets/Content/base/intents`); stratum 1 has one,
