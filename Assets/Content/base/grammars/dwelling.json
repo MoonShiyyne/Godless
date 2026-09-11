@@ -1,0 +1,102 @@
+{
+  "type": "grammar",
+  "id": "dwelling",
+  "builds": "shelter",
+  "tell": "Every house on the island is cut from one shape language; the genome decides how steep, how tall, how raised, how open and how long.",
+
+  // S18. Sizes are in voxels (half a metre). palette.floor is a storey,
+  // palette.bay a structural bay, palette.door.w/.h a door. Genes run 0..1.
+  // Axes are box-relative: u along a box's length, w across it, v up.
+  "axiom": "Lot",
+
+  "let": {
+    // communal_ratio: many small huts, or a few long houses round one hearth.
+    "capacity": "round(lerp(3, 14, gene.communal_ratio))",
+    "aspect": "lerp(1.0, 2.8, gene.communal_ratio)",
+
+    // Floor area against sleeping capacity, then footprint_area loosens or
+    // tightens it, and verticality stacks it: the same area on three storeys
+    // is a tower, on one a sprawl.
+    "area": "capacity * 9 + 12",
+    "spread": "lerp(0.6, 2.2, gene.footprint_area)",
+    "storeys": "1 + round(gene.verticality * 2)",
+    "groundArea": "area * spread / storeys",
+    "width": "max(6, round(sqrt(groundArea * aspect)))",
+    "depth": "max(5, round(groundArea / width))",
+
+    // elevation_bias: on the ground, then on a plinth, then up on stilts.
+    "raise": "round(max(0, gene.elevation_bias - 0.2) * 11)",
+    "stilts": "gene.elevation_bias > 0.6",
+
+    // roof_pitch: from a flat terrace to a steep gable, cells up per cell in.
+    "pitch": "lerp(0, 1.6, gene.roof_pitch)",
+    "overhang": "1",
+    "roofRise": "floor((floor((depth - 1) / 2) + overhang) * pitch) + 1",
+
+    // aperture_ratio: slits, or openings a bay wide.
+    "windowWidth": "round(lerp(1, 6, gene.aperture_ratio))",
+    "windowHeight": "round(lerp(1, 3, gene.aperture_ratio))",
+    "sill": "2",
+
+    "bodyHeight": "storeys * palette.floor + 1",
+    "height": "raise + bodyHeight + roofRise"
+  },
+
+  "rules": {
+    "Lot": { "op": "split", "axis": "v", "parts": [
+      { "size": "raise", "rule": "Base" },
+      { "size": "bodyHeight", "rule": "Body" },
+      { "size": "roofRise", "rule": "Roof" }
+    ] },
+
+    "Base": { "op": "choose", "if": "stilts", "then": "Stilts", "else": "Plinth" },
+    "Stilts": { "op": "posts", "spacing": "palette.bay / 2", "role": "post" },
+    "Plinth": { "op": "fill", "role": "plinth" },
+
+    "Body": { "op": "split", "axis": "v", "parts": [
+      { "size": 1, "rule": "Floor" },
+      { "size": "~1", "rule": { "op": "repeat", "axis": "v", "count": "storeys", "rule": "Storey" } }
+    ] },
+
+    // A storey: four walls, the hearth on the ground floor, and a floor slab
+    // on top of every storey but the last.
+    "Storey": [
+      { "op": "comp", "front": "Front", "back": "Facade", "ends": "Facade" },
+      { "op": "choose", "if": "index == 0", "then": "Hearth" },
+      { "op": "choose", "if": "index < count - 1", "then": "UpperFloor" }
+    ],
+    "UpperFloor": { "op": "split", "axis": "v", "parts": [
+      { "size": "~1", "rule": null },
+      { "size": 1, "rule": "Floor" }
+    ] },
+    "Hearth": { "op": "centre", "u": 2, "w": 2, "v": 1, "rule": { "op": "fill", "role": "hearth" } },
+
+    // The front of the ground storey has the door; every other face is bays.
+    "Front": { "op": "choose", "if": "index == 0", "then": "DoorFacade", "else": "Facade" },
+    "DoorFacade": { "op": "split", "axis": "u", "parts": [
+      { "size": "~1", "rule": "Facade" },
+      { "size": "palette.door.w", "rule": "DoorBay" },
+      { "size": "~1", "rule": "Facade" }
+    ] },
+    "DoorBay": { "op": "split", "axis": "v", "parts": [
+      { "size": "palette.door.h", "rule": { "op": "fill", "role": "door" } },
+      { "size": "~1", "rule": "Wall" }
+    ] },
+
+    "Facade": { "op": "repeat", "axis": "u", "size": "palette.bay", "rule": "Bay" },
+    "Bay": { "op": "split", "axis": "v", "parts": [
+      { "size": "sill", "rule": "Wall" },
+      { "size": "windowHeight", "rule": "WindowBand" },
+      { "size": "~1", "rule": "Wall" }
+    ] },
+    "WindowBand": { "op": "split", "axis": "u", "parts": [
+      { "size": "~1", "rule": "Wall" },
+      { "size": "min(windowWidth, max(1, scope.u - 2))", "rule": { "op": "fill", "role": "window" } },
+      { "size": "~1", "rule": "Wall" }
+    ] },
+
+    "Wall": { "op": "fill", "role": "wall" },
+    "Floor": { "op": "fill", "role": "floor" },
+    "Roof": { "op": "roof", "pitch": "pitch", "overhang": "overhang", "role": "roof", "gable": "wall" }
+  }
+}

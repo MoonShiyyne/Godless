@@ -44,6 +44,7 @@ namespace Godless.Sim.Headless
                 case "island": return Island(cli);
                 case "parcels": return Parcels(cli);
                 case "settle": return Settle(cli);
+                case "blueprint": return BlueprintCmd(cli);
                 case "help": Help(); return 0;
                 default:
                     Console.Error.WriteLine("unknown command '" + command + "'");
@@ -222,6 +223,12 @@ namespace Godless.Sim.Headless
                 Console.WriteLine("\n" + mats.Count.ToString(c) + " building material(s), gathered within "
                     + mats.HaulRangeVoxels.ToString(c) + " voxels of a hearth: " + string.Join(", ", names));
             }
+
+            // Grammars (S18): every name and rule checked at load.
+            GrammarTable grammarTable = GrammarTable.FromContent(result.Database, genes);
+            foreach (string problem in grammarTable.Problems) Console.WriteLine("\ngrammar (S18) refused: " + problem);
+            foreach (Grammar g in grammarTable.All)
+                Console.WriteLine("\ngrammar '" + g.Name + "' builds " + g.Builds + ": " + g.Tell);
 
             // Needs and activities (S12), with anything refused and why.
             DriveRules drives = DriveRules.FromContent(result.Database);
@@ -410,6 +417,91 @@ namespace Godless.Sim.Headless
             Console.WriteLine("128 x 128 parcels of 4 x 4 columns, built in " + first.ToString("0", c)
                 + " ms cold, " + watch.Elapsed.TotalMilliseconds.ToString("0", c) + " ms warm");
             return 0;
+        }
+
+        // ── sim blueprint ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Runs a grammar for a genome and draws the result from the front and
+        /// the side. Any gene can be set by name: --roof_pitch 0.9. Genes not
+        /// named stay at their defaults, so moving one number and looking is
+        /// the whole of the gene rule's test, done by hand.
+        /// </summary>
+        static int BlueprintCmd(Args cli)
+        {
+            var c = CultureInfo.InvariantCulture;
+            LoadResult content;
+            try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
+            catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
+
+            ContentDatabase db = content.Database;
+            var genes = Godless.Sim.Culture.GeneTable.FromContent(db);
+            GrammarTable grammars = GrammarTable.FromContent(db, genes);
+            foreach (string problem in grammars.Problems) Console.WriteLine("refused: " + problem);
+            string name = cli.Text("grammar", "dwelling");
+            Grammar grammar = null;
+            foreach (Grammar g in grammars.All) if (g.Name == name) grammar = g;
+            if (grammar == null) { Console.Error.WriteLine("no grammar called '" + name + "'"); return 1; }
+
+            var genome = new Godless.Sim.Culture.Genome(genes);
+            var set = new List<string>();
+            foreach (Godless.Sim.Culture.Gene g in genes.All)
+            {
+                string v = cli.Text(g.Name, null);
+                double value;
+                if (v == null || !double.TryParse(v, NumberStyles.Float, c, out value)) continue;
+                genome.Mutate(g.Id, value, 0, Symbol.None, RecordId.None, new Annalist());
+                set.Add(g.Name + " " + genome[g.Id].ToString("0.##", c));
+            }
+
+            int lot = cli.Int("lot", 60);
+            Blueprint bp = grammar.Build(genome, Palette.FromContent(db), lot, lot, 700);
+
+            Console.WriteLine("grammar " + grammar.Name + (set.Count == 0 ? ", every gene at its default" : ", " + string.Join(", ", set)));
+            Console.WriteLine("\nfront (looking north)" + new string(' ', Math.Max(1, bp.Width - 20)) + "   side (looking east)");
+            for (int y = bp.Height - 1; y >= 0; y--)
+            {
+                var row = new StringBuilder();
+                for (int x = 0; x < bp.Width; x++) row.Append(Glyph(bp, x, y, 0, 0, 1));
+                row.Append("   ");
+                for (int z = bp.Depth - 1; z >= 0; z--) row.Append(Glyph(bp, 0, y, z, 1, 0));
+                Console.WriteLine(row.ToString().TrimEnd());
+            }
+            Console.WriteLine(new string('~', bp.Width) + "   " + new string('~', bp.Depth));
+
+            Godless.Sim.Core.Symbol Role(string r) { return Symbol.For("role." + r); }
+            bp.Span(Role("roof"), out int roofLo, out int roofHi);
+            bp.Span(Role("floor"), out int floorLo, out _);
+            int walls = bp.Count(Role("wall")), openings = bp.Count(Role("window")) + bp.Count(Role("door"));
+            Console.WriteLine("\nsleeps " + bp.Capacity.ToString(c) + ", " + bp.Volume.ToString(c) + " voxels, " + bp.OccupiedHeight.ToString(c)
+                + " high, footprint " + bp.Footprint(Role("floor")).ToString(c) + " columns, roof rises " + (roofHi - roofLo).ToString(c)
+                + ", floor raised " + floorLo.ToString(c) + ", " + Pct(openings, walls + openings) + " of the walls open");
+            Console.WriteLine("# wall  o window  D door  ^ roof  | post  = plinth  _ floor  * hearth");
+            return 0;
+        }
+
+        /// <summary>The first thing seen from outside along a line of sight.</summary>
+        static char Glyph(Blueprint bp, int x, int y, int z, int dx, int dz)
+        {
+            for (; bp.InBounds(x, y, z); x += dx, z += dz)
+            {
+                Symbol r = bp.At(x, y, z);
+                if (r.IsNone) continue;
+                string n = r.ToString();
+                switch (n)
+                {
+                    case "role.wall": return '#';
+                    case "role.window": return 'o';
+                    case "role.door": return 'D';
+                    case "role.roof": return '^';
+                    case "role.post": return '|';
+                    case "role.plinth": return '=';
+                    case "role.floor": return '_';
+                    case "role.hearth": return '*';
+                    default: return '?';
+                }
+            }
+            return ' ';
         }
 
         // ── sim settle ──────────────────────────────────────────────────────
@@ -671,6 +763,8 @@ namespace Godless.Sim.Headless
   sim content  [--path P]                   load Assets/Content and report what it holds
   sim island   [--seed N] [--width W]       generate an island and draw it
   sim parcels  [--seed N] [--field F]       draw a planning field: height, slope, water-distance
+  sim blueprint [--grammar G] [--<gene> V ...] [--lot N]
+                                            run a grammar for a genome and draw the house (S18)
   sim settle   [--seed N] [--days D] [--people P] [--roofs R] [--biome B]
                                             found a settlement and print its days (S12, S14)
 

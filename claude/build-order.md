@@ -33,11 +33,12 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11, S1C.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18.**
 
-Next, in dependency order toward G1: **S1D** the base tileset (S19 needs it),
-**S1F** constraint fields (S15 needs them), **S18** split grammar (S17 and
-S14 are done — the first system that turns a gene into a shape). S18 split grammar is the first system that can turn a gene into a
+Next, in dependency order toward G1: **S1D** the base tileset and **S19** WFC
+realization (a blueprint becomes voxels in the stock's materials), **S1F**
+constraint fields then **S15** site scoring, then **S1A** construction.
+`sim blueprint --roof_pitch 0.9` draws a house for any genome. S18 split grammar is the first system that can turn a gene into a
 visible shape — S17's tell only becomes testable there, and it needs only
 S17 and S14, both done.
 
@@ -61,6 +62,26 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S18 shipped
+
+- A split-grammar interpreter (`Build/Grammar.cs`) over boxes with
+  box-relative axes: split, repeat, comp (faces keep their storey's index and
+  add `face`), roof (stepped gable), posts, centre, fill, choose. Every size
+  is an expression (`Build/Expr.cs`) over genes, palette modules, the lot,
+  the intent and the current box, evaluated with + - * / and Sqrt only.
+- Grammars are content and are checked whole at load: unknown genes or names,
+  missing rules, cycles among lets, box names inside lets, broken expressions
+  and unknown operations are refused with the reason.
+- `base/grammars/dwelling.json` answers shelter. The output is a `Blueprint`
+  of roles — wall, window, door, floor, roof, post, plinth, hearth — and no
+  materials; S19 decides those against stock.
+- **S17's tell is now tested**: each of the six genes moves its own feature
+  (roof rise, height, footprint, raised floor, openness, capacity) by a
+  visible margin and changes the outline (`EveryGeneMovesTheSilhouette`).
+  Footprint failed it first time — 7x5 to 9x6 columns is not something a
+  stranger sees — and its range was widened to 0.6-2.2x.
+- Shelter's budget is 650 voxels: the median house over random genomes.
+
 ### What S1C shipped
 
 - `Collective/`: task kinds are content; stratum 1 has one, `gather`, which

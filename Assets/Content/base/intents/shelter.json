@@ -19,6 +19,8 @@
   // thin and may never cross the threshold — which is how people live.
   "halfLifeDays": 20,
 
-  // A volume. Which materials fill it is S19's call, against stock.
-  "budgetVoxels": 160
+  // A volume. Which materials fill it is S19's call, against stock. The
+  // median house the dwelling grammar builds over random genomes is 640
+  // voxels, from 422 to 1056 across the middle 80% (S18).
+  "budgetVoxels": 650
 }
