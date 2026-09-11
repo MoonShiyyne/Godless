@@ -29,6 +29,7 @@ namespace Godless.Sim.Annals
         readonly SortedDictionary<ulong, List<int>> _bySubject = new SortedDictionary<ulong, List<int>>();
 
         static readonly IReadOnlyList<Symbol> NoParticipants = new Symbol[0];
+        static readonly IReadOnlyList<RecordId> NoContributors = new RecordId[0];
         static readonly IReadOnlyList<AnnalRecord> NoRecords = new AnnalRecord[0];
 
         public int Count { get { return _records.Count; } }
@@ -43,7 +44,8 @@ namespace Godless.Sim.Annals
 
         public RecordId Write(long tick, Symbol kind, Symbol subject, Int3 place,
                               RecordId cause, long valueA = 0, long valueB = 0,
-                              IReadOnlyList<Symbol> participants = null)
+                              IReadOnlyList<Symbol> participants = null,
+                              IReadOnlyList<RecordId> contributors = null)
         {
             if (kind.IsNone)
                 throw new System.ArgumentException("a record must have a kind", nameof(kind));
@@ -51,6 +53,10 @@ namespace Godless.Sim.Annals
                 throw new System.ArgumentException("a record cannot be caused by one that does not exist yet", nameof(cause));
             if (_records.Count > 0 && tick < _records[_records.Count - 1].Tick)
                 throw new System.ArgumentException("records are written in tick order", nameof(tick));
+            if (contributors != null)
+                for (int i = 0; i < contributors.Count; i++)
+                    if (!contributors[i].Exists || contributors[i].Index >= _records.Count)
+                        throw new System.ArgumentException("a contributor must be a record that already exists", nameof(contributors));
 
             var record = new AnnalRecord
             {
@@ -61,6 +67,8 @@ namespace Godless.Sim.Annals
                 Place = place,
                 Cause = cause,
                 Participants = participants ?? NoParticipants,
+                Contributors = contributors == null || contributors.Count == 0
+                    ? NoContributors : new List<RecordId>(contributors).ToArray(),
                 ValueA = valueA,
                 ValueB = valueB,
             };
@@ -156,12 +164,21 @@ namespace Godless.Sim.Annals
             return chain;
         }
 
-        /// <summary>Records directly caused by this one, in write order.</summary>
+        /// <summary>
+        /// Records this one caused or helped cause, in write order. A night in
+        /// the open that contributed to a shelter intent is one of that
+        /// intent's causes even when a wetter night was the strongest.
+        /// </summary>
         public IReadOnlyList<AnnalRecord> Consequences(RecordId id)
         {
             var hits = new List<AnnalRecord>();
             if (!id.Exists) return hits;
-            foreach (AnnalRecord r in _records) if (r.Cause == id) hits.Add(r);
+            foreach (AnnalRecord r in _records)
+            {
+                bool caused = r.Cause == id;
+                for (int i = 0; i < r.Contributors.Count && !caused; i++) caused = r.Contributors[i] == id;
+                if (caused) hits.Add(r);
+            }
             return hits;
         }
 
@@ -180,7 +197,10 @@ namespace Godless.Sim.Annals
                 digest.Add(r.Place.X); digest.Add(r.Place.Y); digest.Add(r.Place.Z);
                 digest.Add(r.Cause.Index);
                 digest.Add(r.ValueA); digest.Add(r.ValueB);
+                digest.Add(r.Participants.Count);
                 for (int i = 0; i < r.Participants.Count; i++) digest.Add(r.Participants[i].Hash);
+                digest.Add(r.Contributors.Count);
+                for (int i = 0; i < r.Contributors.Count; i++) digest.Add(r.Contributors[i].Index);
             }
             return digest.Value;
         }

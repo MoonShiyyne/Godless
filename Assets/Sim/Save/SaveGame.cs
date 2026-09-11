@@ -40,7 +40,7 @@ namespace Godless.Sim.Save
     public static class SaveGame
     {
         const uint Magic = 0x534C4447; // "GDLS" little-endian
-        const uint Version = 1;
+        const uint Version = 2;   // 2 added annal contributors (S14); 1 still reads
 
         public static void Write(Stream stream, SimWorld world, bool containsCodeMod = false)
         {
@@ -73,6 +73,8 @@ namespace Godless.Sim.Save
                 w.Write(r.ValueA); w.Write(r.ValueB);
                 w.Write((ushort)r.Participants.Count);
                 for (int i = 0; i < r.Participants.Count; i++) w.Write(r.Participants[i].Hash);
+                w.Write((ushort)r.Contributors.Count);
+                for (int i = 0; i < r.Contributors.Count; i++) w.Write(r.Contributors[i].Index);
             }
 
             IReadOnlyList<VoxelDelta> deltas = world.Voxels.Log.All();
@@ -103,8 +105,8 @@ namespace Godless.Sim.Save
             if (r.ReadUInt32() != Magic) throw new SaveException("not a Godless save");
 
             uint version = r.ReadUInt32();
-            if (version != Version)
-                throw new SaveException("save is version " + version + " and this build reads version " + Version);
+            if (version != Version && version != 1)
+                throw new SaveException("save is version " + version + " and this build reads versions 1 and " + Version);
 
             ulong seed = r.ReadUInt64();
             long tick = r.ReadInt64();
@@ -155,7 +157,15 @@ namespace Godless.Sim.Save
                 var participants = new Symbol[participantCount];
                 for (int p = 0; p < participantCount; p++) participants[p] = Symbol.FromHash(r.ReadUInt64());
 
-                world.Annals.Write(rTick, kind, subject, place, new RecordId(cause), a, b, participants);
+                RecordId[] contributors = null;
+                if (version >= 2)
+                {
+                    int contributorCount = r.ReadUInt16();
+                    contributors = new RecordId[contributorCount];
+                    for (int k = 0; k < contributorCount; k++) contributors[k] = new RecordId(r.ReadInt32());
+                }
+
+                world.Annals.Write(rTick, kind, subject, place, new RecordId(cause), a, b, participants, contributors);
             }
 
             int deltaCount = r.ReadInt32();

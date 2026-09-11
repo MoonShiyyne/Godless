@@ -1,0 +1,24 @@
+{
+  "type": "intent",
+  "id": "shelter",
+
+  // Stratum 1's one building type. What a stranger sees once it is built.
+  "tell": "Roofs go up where people have been sleeping in the open, and the chronicle can say which nights asked for each one.",
+
+  // Which need's pressure raises it. Pressure is agent-ticks over the need's
+  // threshold: twenty people with no roof put about 45 a day on this.
+  "answers": "shelter",
+  "threshold": 60,
+
+  // Pressure beyond this many outstanding makes them heavier, not more.
+  "maxOpen": 2,
+
+  // Unanswered pressure halves in this many days, so a run of bad nights
+  // commissions a roof and one wet night a year never does. Roofs rotate to
+  // whoever needs one most, so a settlement one bed short spreads the misery
+  // thin and may never cross the threshold — which is how people live.
+  "halfLifeDays": 20,
+
+  // A volume. Which materials fill it is S19's call, against stock.
+  "budgetVoxels": 160
+}

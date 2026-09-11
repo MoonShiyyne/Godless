@@ -56,6 +56,15 @@ namespace Godless.Sim.Annals
         /// <summary>The record that caused this one, or RecordId.None at a root.</summary>
         public RecordId Cause { get; internal set; }
 
+        /// <summary>
+        /// Other records that helped cause this one, strongest first. Most
+        /// records have one cause and this is empty. A build intent is the
+        /// exception the field exists for: it is raised by months of pressure,
+        /// and "the events that produced it" (Part 03) is a plural. Cause is
+        /// the strongest of them, so a causal chain still walks one line.
+        /// </summary>
+        public IReadOnlyList<RecordId> Contributors { get; internal set; }
+
         /// <summary>Others involved. Usually empty, occasionally one or two.</summary>
         public IReadOnlyList<Symbol> Participants { get; internal set; }
 

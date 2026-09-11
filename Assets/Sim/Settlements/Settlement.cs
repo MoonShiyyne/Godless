@@ -46,8 +46,18 @@ namespace Godless.Sim.Settlements
         /// </summary>
         public int ShelterCapacity { get; set; }
 
-        /// <summary>Where unmet needs go. A tally until S14's bus replaces it.</summary>
+        /// <summary>Where unmet needs go: the intent bus once attached, a plain tally before.</summary>
         public IPressureSink Pressure { get; set; }
+
+        /// <summary>The settlement's build intents (S14), or null in a settlement that cannot ask for anything.</summary>
+        public Build.IntentBus Intents { get; private set; }
+
+        /// <summary>Routes this settlement's pressure into an intent bus. From now on unmet needs can commission.</summary>
+        public void AttachIntents(Build.IntentBus bus)
+        {
+            Intents = bus;
+            Pressure = bus;
+        }
 
         /// <summary>Agent-ticks spent on each activity, ever. Indexed like the ActivityTable.</summary>
         public long[] ActivityTicks { get; private set; }

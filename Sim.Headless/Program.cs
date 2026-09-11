@@ -6,6 +6,7 @@ using System.IO;
 using System.Text;
 using Godless.Sim.Content;
 using Godless.Sim.Annals;
+using Godless.Sim.Build;
 using Godless.Sim.Core;
 using Godless.Sim.Drives;
 using Activity = Godless.Sim.Drives.Activity;
@@ -431,10 +432,12 @@ namespace Godless.Sim.Headless
 
             Settlement s = Settlement.Found("first", hearth, biome, people, rules, 0, world.Annals, RecordId.None);
             s.ShelterCapacity = roofs;
-            var tally = new PressureTally(rules.Needs.Count);
-            s.Pressure = tally;
+            IntentKindTable kinds = IntentKindTable.FromContent(db, rules.Needs);
+            var bus = new IntentBus(kinds, rules.Needs.Count);
+            s.AttachIntents(bus);
+            PressureTally tally = bus.Tally;
             world.Settlements.Add(s);
-            world.Add(new DriveSystem(rules));
+            world.Add(new DriveSystem(rules)).Add(new IntentSystem());
 
             Console.WriteLine("seed " + seed.ToString(c) + ": " + people.ToString(c) + " people found a settlement at parcel ("
                 + px.ToString(c) + ", " + pz.ToString(c) + ") in " + (biome == null ? "no biome" : biome.Id.ToString())
@@ -445,15 +448,19 @@ namespace Godless.Sim.Headless
             foreach (Activity a in rules.Activities.All) if (a.Name != "sleep") header.Append(a.Name.PadLeft(11));
             header.Append("   pressure:");
             foreach (Need n in rules.Needs.All) header.Append(n.Name.PadLeft(9));
+            header.Append("   asks for");
             Console.WriteLine(header.ToString());
 
+            int lastIntents = 0;
             var lastTicks = new long[rules.Activities.Count];
             var lastPressure = new double[rules.Needs.Count];
             for (int d = 0; d < days; d++)
             {
-                for (int t = 0; t < world.Clock.TicksPerDay; t++) world.Tick();
+                // One row is dawn to night of one day, so an intent raised at
+                // dawn lands on the row of the day it was raised.
+                do world.Tick(); while (world.Clock.TickOfDay != world.Clock.TicksPerDay - 1);
 
-                long day = world.Clock.TotalDays - 1;
+                long day = world.Clock.TotalDays;
                 Sky sky = Weather.On(world.Streams, biome, day, world.Clock.DaysPerYear);
                 int inOpen = 0;
                 foreach (Agent a in s.People) if (!a.ShelteredLastNight) inOpen++;
@@ -474,6 +481,8 @@ namespace Godless.Sim.Headless
                     lastPressure[n] = tally.Total(n);
                     line.Append(p.ToString("0.0", c).PadLeft(9));
                 }
+                line.Append("   ");
+                for (; lastIntents < bus.Intents.Count; lastIntents++) line.Append(bus.Intents[lastIntents].Kind.Name + " ");
                 Console.WriteLine(line.ToString());
             }
 
@@ -485,6 +494,24 @@ namespace Godless.Sim.Headless
                 if (total <= 0.0) continue;
                 Console.WriteLine("  " + rules.Needs[n].Name.PadRight(10) + total.ToString("0.0", c).PadLeft(9)
                     + "   " + Pct((long)(tally.Caused(n) * 1000), (long)(total * 1000)) + " traced to a record");
+            }
+            // S14's tell: every intent names the records that produced it.
+            if (bus.Intents.Count > 0)
+                Console.WriteLine("\n" + bus.Intents.Count.ToString(c) + " build intent(s), each with the records that asked for it:");
+            foreach (BuildIntent i in bus.Intents)
+            {
+                Console.WriteLine("  " + i.Record + "  day " + (i.RaisedTick / world.Clock.TicksPerDay).ToString(c) + "  "
+                    + i.Kind.Name + " near parcel (" + i.ParcelX.ToString(c) + ", " + i.ParcelZ.ToString(c) + "), weight "
+                    + i.Weight.ToString("0", c) + ", budget " + i.BudgetVoxels.ToString(c) + " voxels, " + i.Status.ToString().ToLowerInvariant());
+                foreach (RecordId cause in i.Causes)
+                {
+                    AnnalRecord r = world.Annals.Get(cause);
+                    string weather = r.Participants.Count == 0 ? "dry" : string.Join(" and ", r.Participants).Replace("condition.", "");
+                    Console.WriteLine("      because " + r.Id + ": from day " + (r.Tick / world.Clock.TicksPerDay).ToString(c) + ", "
+                        + (r.Kind == DriveSystem.ExposedKind
+                            ? r.ValueA.ToString(c) + " slept in the open, " + weather
+                            : r.Kind.ToString()));
+                }
             }
             Console.WriteLine("\nactivity ticks are agent-ticks: " + people.ToString(c) + " people x 3 daylight ticks a day.");
             return 0;
@@ -556,7 +583,7 @@ namespace Godless.Sim.Headless
   sim island   [--seed N] [--width W]       generate an island and draw it
   sim parcels  [--seed N] [--field F]       draw a planning field: height, slope, water-distance
   sim settle   [--seed N] [--days D] [--people P] [--roofs R] [--biome B]
-                                            found a settlement and print its days (S12)
+                                            found a settlement and print its days (S12, S14)
 
 Defaults: run 0..200 x 300 years (0..20 with --island), verify 0..20 x 100 years.
 --island generates real terrain from Assets/Content for every seed, which is

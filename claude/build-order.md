@@ -9,8 +9,11 @@ disagree, the doc wins and this file gets re-synced.
 
 ## Current position
 
-**Stratum 0 is complete. G0 passed on 2026-09-11.** Next is stratum 1, which
-ends at **G1 — the go/no-go gate that can cancel the project.**
+**G0 passed on 2026-09-11.** Stratum 0 is complete **except S0B** (water table
++ flow accumulation), which was skipped and not noticed until S14: none of
+G0's conditions reads it, so the gate result stands, but S15 site scoring and
+S20 floods both depend on it. It is next in the queue. Stratum 1 ends at
+**G1 — the go/no-go gate that can cancel the project.**
 
 | G0 condition | Evidence |
 |---|---|
@@ -31,12 +34,14 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12.**
+**Done in stratum 1: S10, S17, S12, S14.**
 
-Next, in dependency order toward G1: **S14** the BuildIntent bus (S18 and S1C
-need it), **S11** material stock and **S1D** the base tileset (S19 needs
-both). S18 split grammar is the first system that can turn a gene into a
-visible shape — S17's tell only becomes testable there.
+Next, in dependency order toward G1: **S0B** hydrology (owed from stratum 0;
+S15 needs it), **S11** material stock and **S1D** the base tileset (S19 needs
+both), **S1C** response-threshold task allocation (now unblocked by S12 and
+S14). S18 split grammar is the first system that can turn a gene into a
+visible shape — S17's tell only becomes testable there, and it needs only
+S17 and S14, both done.
 
 `sim content` lists every gene and need with its tell. `sim parcels --field
 water-distance|slope|height` draws the planning fields. `sim settle` founds a
@@ -58,6 +63,24 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S14 shipped
+
+- Intent kinds are content (`Assets/Content/base/intents`); stratum 1 has one,
+  shelter. One kind per need, refused by name otherwise.
+- Pressure piles up per kind in a sparse demand field and a table of the
+  records behind it, decays with a half-life, and is weighed once a day. Past
+  threshold it becomes a `BuildIntent` leaning toward the heaviest parcel,
+  carrying the four strongest contributing records, and the pile is spent.
+  Beyond `maxOpen`, pressure makes the newest intent heavier instead.
+- **Annal records gained `Contributors`**: the causes after the strongest.
+  `Consequences` follows them, the digest covers them, and the save is v2
+  (v1 still reads).
+- Lifecycle on record: raised, claimed, resolved, abandoned, each caused by
+  the raising, so a structure's chronicle walks back through its intent.
+- Nothing claims or resolves an intent yet. That is S15 and S1A. Part 27's
+  "no build intent unresolved for > 3 years" cannot hold until they exist,
+  so it is not in the harness yet — `OldestOutstandingAge` is there for it.
+
 - **Debt: settlement state is not in the save.** S0C saves seed, deltas and
   annals; agents' needs are sim state that replay does not rebuild. Extend
   the save before G1's scenario, not after.
