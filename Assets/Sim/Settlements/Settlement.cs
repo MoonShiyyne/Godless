@@ -117,7 +117,11 @@ namespace Godless.Sim.Settlements
             };
             s.Founded = annals.Write(tick, FoundedKind, s.Id, hearth, cause, people);
             for (int i = 0; i < people; i++)
-                s._people.Add(new Agent(Symbol.For(id + ".person." + i.ToString(System.Globalization.CultureInfo.InvariantCulture)), i, rules.Needs));
+            {
+                var person = new Agent(Symbol.For(id + ".person." + i.ToString(System.Globalization.CultureInfo.InvariantCulture)), i, rules.Needs);
+                person.PlaceAt(s.HearthParcelX, s.HearthParcelZ);
+                s._people.Add(person);
+            }
             s.Pressure = new PressureTally(rules.Needs.Count);
             return s;
         }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Godless.Sim.Annals;
 using Godless.Sim.Build;
 using Godless.Sim.Core;
 using Godless.Sim.Drives;
@@ -27,6 +28,15 @@ namespace Godless.Sim.Collective
     /// how readily the land gives each material up, so the stock comes to
     /// look like the land around it.
     /// </summary>
+    /// <summary>What a builder needs to do a tick of building: the site, the ground and the record.</summary>
+    public sealed class WorkSite
+    {
+        public Construction Builder;
+        public World.ParcelGrid Grid;
+        public Annalist Annals;
+        public long Tick;
+    }
+
     public sealed class TaskBoard
     {
         public const string ThresholdStream = "collective.threshold";
@@ -53,6 +63,7 @@ namespace Godless.Sim.Collective
             foreach (TaskKind k in kinds.All)
             {
                 if (k.Verb == "gather" && (materials == null || s.Catchment == null)) continue;
+                if (k.Verb == "build") { kind.Add(k); material.Add(-1); id.Add(k.Id); continue; }
                 if (k.Verb == "gather" && k.PerMaterial)
                 {
                     for (int m = 0; m < materials.Count; m++)
@@ -133,7 +144,7 @@ namespace Godless.Sim.Collective
         /// available; <paramref name="absent"/> removes people from that pool,
         /// which is what a death or a departure will do.
         /// </summary>
-        public void Step(Settlement s, RngStream rng, System.Func<int, bool> absent = null)
+        public void Step(Settlement s, RngStream rng, WorkSite work = null, System.Func<int, bool> absent = null)
         {
             int tasks = _kind.Length;
             if (tasks == 0) return;
@@ -163,10 +174,10 @@ namespace Godless.Sim.Collective
                         if (Roll(rng) < p) { j = t; break; }
                     }
                 }
+                if (j >= 0 && !Do(s, j, a, work, rng)) j = -1;   // nothing to do after all
                 _current[i] = j;
-
-                if (j >= 0) { Do(s, j); workers[j]++; _work[i][j]++; }
-                else _idle++;
+                if (j >= 0) { workers[j]++; _work[i][j]++; }
+                if (j < 0) _idle++;
 
                 for (int t = 0; t < tasks; t++)
                 {
@@ -185,16 +196,24 @@ namespace Godless.Sim.Collective
 
         static double Roll(RngStream rng) { return rng.NextInt(1000000) / 1000000.0; }
 
-        void Do(Settlement s, int task)
+        /// <summary>A tick of the task. False when there turned out to be nothing to do.</summary>
+        bool Do(Settlement s, int task, Agent agent, WorkSite work, RngStream rng)
         {
+            if (_kind[task].Verb == "build")
+            {
+                if (work == null || work.Builder == null) return false;
+                return work.Builder.Work(s, agent, work.Grid, work.Tick, work.Annals, rng);
+            }
+
             int m = _material[task];
-            if (m >= 0) { s.Stock.Gather(m, 1.0, s.Catchment); return; }
+            if (m >= 0) { s.Stock.Gather(m, 1.0, s.Catchment); return true; }
 
             // A mixed gathering task spends the tick on whatever the land gives most readily.
             int best = -1;
             for (int k = 0; k < s.Stock.Materials.Count; k++)
                 if (best < 0 || s.Catchment.YieldPerLabourTick(k) > s.Catchment.YieldPerLabourTick(best)) best = k;
             if (best >= 0) s.Stock.Gather(best, 1.0, s.Catchment);
+            return true;
         }
 
         /// <summary>
@@ -214,6 +233,8 @@ namespace Godless.Sim.Collective
 
             for (int t = 0; t < _kind.Length; t++)
             {
+                if (_kind[t].Verb == "build") { _demand[t] = Construction.Remaining(s); continue; }
+
                 double want = _kind[t].ReserveVoxels + commissioned;
                 int m = _material[t];
                 double d = m >= 0
@@ -247,13 +268,24 @@ namespace Godless.Sim.Collective
         public static readonly Symbol SystemId = Symbol.For("system.tasks");
         public const string StreamId = "collective.tasks";
 
+        readonly Construction _builder;
+        readonly World.ParcelGrid _grid;
+
+        /// <param name="builder">What a build task does, or null in a world with nothing to build.</param>
+        public TaskSystem(Construction builder = null, World.ParcelGrid grid = null)
+        {
+            _builder = builder;
+            _grid = grid;
+        }
+
         public Symbol Id { get { return SystemId; } }
 
         public void Tick(SimWorld world)
         {
             RngStream rng = world.Streams.Get(StreamId);
+            var work = new WorkSite { Builder = _builder, Grid = _grid, Annals = world.Annals, Tick = world.Clock.Tick };
             foreach (Settlement s in world.Settlements)
-                if (s.Tasks != null) s.Tasks.Step(s, rng);
+                if (s.Tasks != null) s.Tasks.Step(s, rng, work);
         }
     }
 }

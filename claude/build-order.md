@@ -33,12 +33,17 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15, S13.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15, S13, S1A.**
 
-Next, in dependency order toward G1: **S1A**
-physical construction — the first point at which houses stand on the island.
-Then **S1B** footprint claim and worn roads, **S1E** subsistence, **S1G** the
-separation metric and **S29** the screenshot harness, and G1 can be run.
+**The stratum-1 loop is closed:** nights in the open raise pressure, pressure
+raises an intent, the genome plans a house, the ground is chosen and claimed,
+self-appointed gatherers bring the material in, and builders lay it course by
+course until there are roofs. `sim settle --days 400` walks it end to end.
+
+Next, toward G1: the **Unity side** (a settlement in the Island scene, so the
+village can be watched), then **S1B** footprint claim and worn roads, **S1E**
+subsistence and population, **S1G** the separation metric and **S29** the
+screenshot harness. Then G1 can be run.
 `sim settle --elevation_bias 0.9` runs the whole chain: nights in the open,
 intents, gathering, a plan, a site and a costed house. S18 split grammar is the first system that can turn a gene into a
 visible shape — S17's tell only becomes testable there, and it needs only
@@ -64,6 +69,30 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S1A shipped
+
+- `Build/Construction.cs`: a builder walks to the site (S13) and lays four
+  voxels a tick, bottom up, taking each from stock. Run out of oak and the
+  wall stops at the height the oak reached; a half-built house is a house to
+  that height. Every voxel goes through `VoxelWorld.Set` with the structure's
+  record as its cause, so the chain runs voxel → structure → site → intent →
+  the nights in the open → the founding.
+- Building is a task like any other (S1C's second verb), so who builds is
+  decided the same way as who gathers.
+- A house is not started until a quarter of its materials are in the yard,
+  and a plan made against an empty yard is remade from what is actually
+  there — otherwise houses were planned in slate the island could not supply.
+  A plan with nothing at all in stock now falls back to what the catchment
+  offers rather than to whatever is first in the table.
+- **The bug the provenance test caught:** `RecordId`'s default is record
+  zero, not "no record", so every project read as already begun — no
+  `structure.begun` record, voxels blamed on the founding, and the
+  yard check skipped. `Project` now says so explicitly.
+- Measured: seed 7, twenty people, no roofs. First house standing inside a
+  year, three by day 400, eighteen sleeping places for twenty people — and
+  the first is sand and thatch while the later two are oak and reed, because
+  the yard held different things when each was begun.
+
 ### What S13 shipped
 
 - `World/ParcelPath.cs`: A* over parcels, with the climb between neighbours

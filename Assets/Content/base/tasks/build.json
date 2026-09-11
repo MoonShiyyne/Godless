@@ -1,0 +1,20 @@
+{
+  "type": "task",
+  "id": "build",
+  "tell": "A house goes up course by course over days, and the ones still going up are as much a part of the settlement as the ones finished.",
+
+  // S1A. Demand is the voxels still to lay across everything commissioned,
+  // so a settlement with a house half up has a standing call for hands and
+  // the same few people answer it (S1C).
+  "verb": "build",
+
+  // Building pulls harder than gathering: the thresholds start lower and a
+  // builder stays at it.
+  "threshold": { "min": 0.03, "max": 0.7 },
+  "learn": 0.03,
+  "forget": 0.004,
+  "quitChance": 0.03,
+
+  "stimulusGrowth": 0.0006,
+  "workDone": 0.03
+}

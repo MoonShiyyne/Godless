@@ -79,7 +79,7 @@ namespace Godless.Sim.Tests
                     for (int t = 0; t < 4; t++, _tick++)
                     {
                         DriveSystem.Step(S, Rules, _tick, t == 3, Sky.Fair, Annals);
-                        Board.Step(S, Rng, absent);
+                        Board.Step(S, Rng, null, absent);
                     }
             }
 

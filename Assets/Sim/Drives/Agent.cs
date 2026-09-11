@@ -41,6 +41,12 @@ namespace Godless.Sim.Drives
 
         public bool ShelteredLastNight { get; internal set; }
 
+        /// <summary>Where this person is, on the planning grid (S13). Everyone starts at the hearth.</summary>
+        public int ParcelX { get; internal set; }
+        public int ParcelZ { get; internal set; }
+
+        public void PlaceAt(int px, int pz) { ParcelX = px; ParcelZ = pz; }
+
         /// <summary>Ticks spent on productive activity, ever.</summary>
         public long ProductiveTicks { get; internal set; }
 
@@ -61,6 +67,7 @@ namespace Godless.Sim.Drives
             }
             d.Add(Activity);
             d.Add(ShelteredLastNight ? 1 : 0);
+            d.Add(ParcelX); d.Add(ParcelZ);
             d.Add(ProductiveTicks);
         }
     }

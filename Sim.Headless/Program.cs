@@ -637,7 +637,7 @@ namespace Godless.Sim.Headless
             s.AttachIntents(bus);
             PressureTally tally = bus.Tally;
             world.Settlements.Add(s);
-            world.Add(new DriveSystem(rules)).Add(new TaskSystem()).Add(new IntentSystem());
+            world.Add(new DriveSystem(rules)).Add(new IntentSystem());
 
             Console.WriteLine("seed " + seed.ToString(c) + ": " + people.ToString(c) + " people found a settlement at parcel ("
                 + px.ToString(c) + ", " + pz.ToString(c) + ") in " + (biome == null ? "no biome" : biome.Id.ToString())
@@ -672,16 +672,22 @@ namespace Godless.Sim.Headless
             if (named.Count > 0) Console.WriteLine("culture: " + string.Join(", ", named));
 
             ConstraintFields constraints = ConstraintFields.Compute(island, grid, biomes);
+            TileSet tileset = TileSet.FromContent(db, materials);
+            Palette palette = Palette.FromContent(db);
             world.Add(new SiteSystem(GrammarTable.FromContent(db, genes),
                                      SitingTable.FromContent(db, genes, kinds),
-                                     TileSet.FromContent(db, materials), materials,
-                                     Palette.FromContent(db), grid, constraints));
+                                     tileset, materials, palette, grid, constraints));
+
+            // S1A: hands that lay the voxels, allocated like any other work.
+            var construction = new Construction(world.Voxels, materials, types, tileset, palette);
+            world.Add(new TaskSystem(construction, grid));
+            world.BeginHistory();
 
             var header = new StringBuilder("  day  weather     in open ");
             foreach (Activity a in rules.Activities.All) if (a.Name != "sleep") header.Append(a.Name.PadLeft(11));
             header.Append("   pressure:");
             foreach (Need n in rules.Needs.All) header.Append(n.Name.PadLeft(9));
-            header.Append("   stock");
+            header.Append("   stock    built");
             Console.WriteLine(header.ToString());
 
             int lastIntents = 0, lastProjects = 0;
@@ -716,7 +722,10 @@ namespace Godless.Sim.Headless
                 }
                 long held = 0;
                 for (int m = 0; m < s.Stock.Materials.Count; m++) held += s.Stock.Of(m);
-                line.Append(held.ToString(c).PadLeft(8)).Append("   ");
+                long placed = 0, wanted = 0;
+                foreach (Project project in s.Projects) { placed += project.Placed; wanted += project.Built.TotalVoxels; }
+                line.Append(held.ToString(c).PadLeft(8))
+                    .Append((wanted == 0 ? "" : placed.ToString(c) + "/" + wanted.ToString(c)).PadLeft(9)).Append("   ");
                 for (; lastIntents < bus.Intents.Count; lastIntents++) line.Append("+" + bus.Intents[lastIntents].Kind.Name + " ");
                 for (; lastProjects < s.Projects.Count; lastProjects++)
                 {
@@ -762,7 +771,8 @@ namespace Godless.Sim.Headless
                     if (project.Built.Cost[m] > 0) of.Add(project.Built.Cost[m].ToString(c) + " " + materials[m].Name);
                 Console.WriteLine("  " + project.Site.Record + " parcel (" + project.Site.ParcelX.ToString(c) + ", "
                     + project.Site.ParcelZ.ToString(c) + ") score " + project.Site.Score.ToString("0.0", c)
-                    + ", sleeps " + project.Plan.Capacity.ToString(c) + ", " + string.Join(" + ", of));
+                    + ", sleeps " + project.Plan.Capacity.ToString(c) + ", " + string.Join(" + ", of)
+                    + "   " + (project.Complete ? "standing" : project.Placed + " of " + project.Built.TotalVoxels + " laid"));
                 foreach (string note in project.Built.Compromises) Console.WriteLine("      " + note);
             }
 
@@ -797,7 +807,8 @@ namespace Godless.Sim.Headless
                         + "% of each one's gathering was their own main material");
                 Console.WriteLine("  " + s.Tasks.IdleTicks.ToString(c) + " working ticks found nothing that needed doing");
             }
-            Console.WriteLine("\nactivity ticks are agent-ticks: " + people.ToString(c) + " people x 3 daylight ticks a day.");
+            Console.WriteLine("\nroofs now: " + s.ShelterCapacity.ToString(c) + " sleeping places for " + people.ToString(c) + " people.");
+            Console.WriteLine("activity ticks are agent-ticks: " + people.ToString(c) + " people x 3 daylight ticks a day.");
             return 0;
         }
 

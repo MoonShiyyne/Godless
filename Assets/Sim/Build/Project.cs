@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Godless.Sim.Annals;
 using Godless.Sim.Core;
 using Godless.Sim.Culture;
 using Godless.Sim.Harness;
@@ -20,6 +21,13 @@ namespace Godless.Sim.Build
     /// </summary>
     public sealed class Project
     {
+        // RecordId's default is record zero, not "no record", so a project
+        // that has not begun has to say so explicitly. Missing this made
+        // every house look already begun: no structure.begun record, its
+        // voxels blamed on the settlement's founding, and the "enough in the
+        // yard to start" check skipped.
+        public Project() { Begun = RecordId.None; }
+
         public BuildIntent Intent { get; internal set; }
         public Blueprint Plan { get; internal set; }
         public Site Site { get; internal set; }
@@ -27,6 +35,12 @@ namespace Godless.Sim.Build
 
         /// <summary>Voxels placed so far. S1A raises it a day at a time.</summary>
         public int Placed { get; internal set; }
+
+        /// <summary>The structure.begun record: the cause every one of its voxels carries.</summary>
+        public RecordId Begun { get; internal set; }
+
+        /// <summary>The cells to lay, bottom up. Built once, when building starts.</summary>
+        internal List<int> Order;
 
         public bool Complete { get; internal set; }
     }
@@ -95,7 +109,7 @@ namespace Godless.Sim.Build
             Site site = SiteScorer.Choose(s, intent, plan, rule, _grid, _fields, s.Genome, world.Clock.Tick, world.Annals);
             if (site == null) return null;
 
-            Structure built = Realizer.Realize(plan, _tiles, _materials, s.Stock, _palette, world.VoxelTypes, rng);
+            Structure built = Realizer.Realize(plan, _tiles, _materials, s.Stock, _palette, world.VoxelTypes, rng, s.Catchment);
             return new Project { Intent = intent, Plan = plan, Site = site, Built = built };
         }
     }

@@ -98,8 +98,14 @@ namespace Godless.Sim.Build
     /// </summary>
     public static class Realizer
     {
+        /// <param name="catchment">
+        /// What the land round the settlement offers, when known. Used only
+        /// where the stock has nothing at all: a plan made in an empty yard
+        /// should still name something the place can actually supply.
+        /// </param>
         public static Structure Realize(Blueprint plan, TileSet tiles, MaterialTable materials,
-                                        MaterialStock stock, Palette palette, VoxelTypes types, RngStream rng)
+                                        MaterialStock stock, Palette palette, VoxelTypes types, RngStream rng,
+                                        Catchment catchment = null)
         {
             var structure = new Structure(plan, materials);
             var missing = new List<Symbol>();
@@ -127,7 +133,7 @@ namespace Godless.Sim.Build
             {
                 RoleTile tile = tiles.Find(role);
                 int need = plan.Count(role);
-                int pick = Choose(tile, need, tiles, materials, stock, palette, chosen, role, wallMaterial, structure);
+                int pick = Choose(tile, need, tiles, materials, stock, palette, chosen, role, wallMaterial, structure, catchment);
                 if (pick < 0) { missing.Add(role); continue; }
                 roleMaterial[role.Hash] = pick;
                 structure.Chose(role, pick);
@@ -159,7 +165,8 @@ namespace Godless.Sim.Build
         /// and — for a roof — something that reads against the walls.
         /// </summary>
         static int Choose(RoleTile tile, int need, TileSet tiles, MaterialTable materials, MaterialStock stock,
-                          Palette palette, List<int> chosen, Symbol role, int wallMaterial, Structure structure)
+                          Palette palette, List<int> chosen, Symbol role, int wallMaterial, Structure structure,
+                          Catchment catchment)
         {
             // Enough of it first, across every class the role allows; only
             // then whatever there is any of. A handful of stone is a footing,
@@ -176,12 +183,19 @@ namespace Godless.Sim.Build
                 return pick;
             }
 
+            // Nothing in hand at all: plan in something the land can give,
+            // rather than in the first material that happens to be listed.
+            int last = -1;
             foreach (Symbol cls in tile.Classes)
+                foreach (int m in tiles.MaterialsOf(materials, cls))
+                {
+                    if (last < 0) last = m;
+                    if (catchment != null && catchment.Offers(m)) { last = m; break; }
+                }
+            if (last >= 0)
             {
-                List<int> candidates = tiles.MaterialsOf(materials, cls);
-                if (candidates.Count == 0) continue;
-                structure.Note(role + " has nothing in stock; planned in " + materials[candidates[0]].Name);
-                return candidates[0];
+                structure.Note(role + " has nothing in stock; planned in " + materials[last].Name);
+                return last;
             }
             return -1;
         }
