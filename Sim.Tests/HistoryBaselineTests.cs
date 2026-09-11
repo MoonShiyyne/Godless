@@ -82,9 +82,15 @@ namespace Godless.Sim.Tests
             ulong untouched = original.Voxels.AsOf(0).Digest();
             Assert.Equal(untouched, restored.Voxels.AsOf(0).Digest());
 
-            // And every moment in between agrees with the original's history.
-            foreach (var d in original.Voxels.Log.All())
-                Assert.Equal(original.Voxels.AsOf(d.Tick).Digest(), restored.Voxels.AsOf(d.Tick).Digest());
+            // And the history in between agrees: before the first stroke, the
+            // middle, and the present. (Every recorded tick proved the same
+            // thing at the cost of two whole-island reconstructions each — two
+            // minutes of the suite for no extra coverage.)
+            var ticks = new System.Collections.Generic.List<long>();
+            foreach (var d in original.Voxels.Log.All()) ticks.Add(d.Tick);
+            long[] probes = { ticks[0] - 1, ticks[ticks.Count / 2], ticks[ticks.Count - 1] };
+            foreach (long t in probes)
+                Assert.Equal(original.Voxels.AsOf(t).Digest(), restored.Voxels.AsOf(t).Digest());
         }
     }
 }

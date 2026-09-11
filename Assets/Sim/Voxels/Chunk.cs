@@ -168,6 +168,34 @@ namespace Godless.Sim.Voxels
             _data[word] = (_data[word] & ~(mask << shift)) | (((ulong)value & mask) << shift);
         }
 
+        /// <summary>
+        /// Every voxel's type, in index order, into <paramref name="dest"/>
+        /// (length Volume). Decodes the packed words sequentially rather than
+        /// voxel by voxel through Get — the difference that makes a
+        /// whole-world digest affordable.
+        /// </summary>
+        public void CopyTypesTo(ushort[] dest)
+        {
+            if (_bits == 0)
+            {
+                ushort t = _palette[0];
+                for (int i = 0; i < Volume; i++) dest[i] = t;
+                return;
+            }
+            int per = 64 / _bits;
+            ulong mask = (1UL << _bits) - 1UL;
+            int n = 0;
+            for (int w = 0; w < _data.Length; w++)
+            {
+                ulong word = _data[w];
+                for (int k = 0; k < per; k++)
+                {
+                    dest[n++] = _palette[(int)(word & mask)];
+                    word >>= _bits;
+                }
+            }
+        }
+
         /// <summary>A deep copy, for snapshots.</summary>
         public Chunk Clone()
         {

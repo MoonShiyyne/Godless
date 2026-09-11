@@ -29,6 +29,21 @@ namespace Godless.Sim.Core
             }
         }
 
+        /// <summary>
+        /// Folds two bytes rather than eight. Named rather than overloaded so
+        /// that no existing Add(ushort-typed-expression) call silently changes
+        /// which overload it binds to.
+        /// </summary>
+        public void AddShort(ushort value)
+        {
+            unchecked
+            {
+                if (!_started) { _hash = Offset; _started = true; }
+                _hash = (_hash ^ (byte)value) * Prime;
+                _hash = (_hash ^ (byte)(value >> 8)) * Prime;
+            }
+        }
+
         public void Add(long value) { Add(unchecked((ulong)value)); }
         public void Add(int value) { Add(unchecked((ulong)(long)value)); }
     }

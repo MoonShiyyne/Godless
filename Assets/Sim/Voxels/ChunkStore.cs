@@ -189,6 +189,7 @@ namespace Godless.Sim.Voxels
         public ulong Digest()
         {
             var digest = new Digest();
+            ushort[] buffer = null;
             for (int ci = 0; ci < _chunks.Length; ci++)
             {
                 Chunk chunk = _chunks[ci];
@@ -198,12 +199,11 @@ namespace Godless.Sim.Voxels
                 if (chunk == null || (chunk.IsUniform && chunk.UniformType == VoxelTypes.AirId)) continue;
 
                 digest.Add(ci);
-                if (chunk.IsUniform) { digest.Add(chunk.UniformType); continue; }
+                if (chunk.IsUniform) { digest.AddShort(chunk.UniformType); continue; }
 
-                for (int y = 0; y < Chunk.Size; y++)
-                    for (int z = 0; z < Chunk.Size; z++)
-                        for (int x = 0; x < Chunk.Size; x++)
-                            digest.Add(chunk.Get(x, y, z));
+                if (buffer == null) buffer = new ushort[Chunk.Volume];
+                chunk.CopyTypesTo(buffer);
+                for (int i = 0; i < buffer.Length; i++) digest.AddShort(buffer[i]);
             }
             return digest.Value;
         }
