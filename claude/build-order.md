@@ -33,11 +33,14 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15.**
 
-Next, in dependency order toward G1: **S1F**
-constraint fields then **S15** site scoring, then **S1A** construction.
-`sim blueprint --roof_pitch 0.9` draws a house for any genome. S18 split grammar is the first system that can turn a gene into a
+Next, in dependency order toward G1: **S13** a simple pather and **S1A**
+physical construction — the first point at which houses stand on the island.
+Then **S1B** footprint claim and worn roads, **S1E** subsistence, **S1G** the
+separation metric and **S29** the screenshot harness, and G1 can be run.
+`sim settle --elevation_bias 0.9` runs the whole chain: nights in the open,
+intents, gathering, a plan, a site and a costed house. S18 split grammar is the first system that can turn a gene into a
 visible shape — S17's tell only becomes testable there, and it needs only
 S17 and S14, both done.
 
@@ -61,6 +64,25 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S15 shipped
+
+- `Build/Siting.cs`: which ground a culture calls good is content, in the
+  grammar's expression language — an `allow` expression (land, not a bog, not
+  a cliff) and a `score` over S1F's fields, the parcel facts and the genome.
+  Refused at load if it reads a field or gene that does not exist.
+- A site is scored by its **worst** parcel, not its best: a house is only as
+  well sited as its poorest corner. The settlement claims the ground it takes.
+- `Build/Project.cs` and `SiteSystem`: once a day, an open intent becomes a
+  plan (S18), a site (S15) and a costed structure (S19), and the intent is
+  claimed. Everything is frozen at commissioning, which is what makes a
+  street a stratigraphy.
+- Tell: from the same island, a culture that builds high takes the dry
+  exposed ridge, one that builds low takes the sheltered hollow
+  (`TwoCulturesTakeDifferentGroundFromTheSameIsland`).
+- **Known wrinkle for S1A:** a settlement commissions before it has gathered,
+  so a structure is often costed against an empty stock and says so in its
+  compromises. S1A should re-realize when construction actually starts.
+
 ### What S1F shipped
 
 - `World/ConstraintFields.cs`: sun, snow load, damp, exposure and flood risk

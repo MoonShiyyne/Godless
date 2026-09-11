@@ -65,6 +65,26 @@ namespace Godless.Sim.Settlements
         /// <summary>What the land within hauling range offers (S11). Surveyed at founding.</summary>
         public Catchment Catchment { get; set; }
 
+        // Parcels this settlement has taken for its buildings (S15). S1B
+        // turns this into a claim with streets between the claims.
+        readonly List<int> _claims = new List<int>();
+
+        public void ClaimParcel(int px, int pz)
+        {
+            int key = pz * World.ParcelGrid.Width + px;
+            if (!_claims.Contains(key)) _claims.Add(key);
+        }
+
+        public bool IsClaimed(int px, int pz) { return _claims.Contains(pz * World.ParcelGrid.Width + px); }
+
+        public IReadOnlyList<int> Claims { get { return _claims; } }
+
+        /// <summary>The culture's dispositions (S17). What the grammar and the siting read.</summary>
+        public Culture.Genome Genome { get; set; }
+
+        /// <summary>Buildings commissioned and not yet standing (S15, S1A).</summary>
+        public List<Build.Project> Projects { get; } = new List<Build.Project>();
+
         /// <summary>Who does what (S1C). Null in a settlement with nothing to do.</summary>
         public Collective.TaskBoard Tasks { get; set; }
 
@@ -113,6 +133,14 @@ namespace Godless.Sim.Settlements
             foreach (Agent a in _people) a.AddTo(ref d);
             if (Stock != null) d.Add(Stock.Digest());
             if (Tasks != null) d.Add(Tasks.Digest());
+            foreach (int claim in _claims) d.Add(claim);
+            if (Genome != null) d.Add(Genome.Digest());
+            foreach (Build.Project p in Projects)
+            {
+                d.Add(p.Site.Record.Index);
+                d.Add(p.Placed);
+                d.Add(p.Built.Digest());
+            }
             for (int i = 0; i < ActivityTicks.Length; i++) d.Add(ActivityTicks[i]);
             return d.Value;
         }

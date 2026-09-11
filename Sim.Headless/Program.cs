@@ -656,6 +656,27 @@ namespace Godless.Sim.Headless
                 + (offered.Count == 0 ? "nothing" : string.Join(", ", offered)) + "\n");
             s.Tasks = new TaskBoard(TaskKindTable.FromContent(db), s, rules, world.Streams);
 
+            // S15: the culture, and what it calls good ground.
+            var genes = Godless.Sim.Culture.GeneTable.FromContent(db);
+            var genome = new Godless.Sim.Culture.Genome(genes);
+            var named = new List<string>();
+            foreach (Godless.Sim.Culture.Gene gene in genes.All)
+            {
+                string text = cli.Text(gene.Name, null);
+                double value;
+                if (text == null || !double.TryParse(text, NumberStyles.Float, c, out value)) continue;
+                genome.Mutate(gene.Id, value, 0, s.Id, s.Founded, world.Annals);
+                named.Add(gene.Name + " " + genome[gene.Id].ToString("0.##", c));
+            }
+            s.Genome = genome;
+            if (named.Count > 0) Console.WriteLine("culture: " + string.Join(", ", named));
+
+            ConstraintFields constraints = ConstraintFields.Compute(island, grid, biomes);
+            world.Add(new SiteSystem(GrammarTable.FromContent(db, genes),
+                                     SitingTable.FromContent(db, genes, kinds),
+                                     TileSet.FromContent(db, materials), materials,
+                                     Palette.FromContent(db), grid, constraints));
+
             var header = new StringBuilder("  day  weather     in open ");
             foreach (Activity a in rules.Activities.All) if (a.Name != "sleep") header.Append(a.Name.PadLeft(11));
             header.Append("   pressure:");
@@ -663,7 +684,7 @@ namespace Godless.Sim.Headless
             header.Append("   stock");
             Console.WriteLine(header.ToString());
 
-            int lastIntents = 0;
+            int lastIntents = 0, lastProjects = 0;
             var lastTicks = new long[rules.Activities.Count];
             var lastPressure = new double[rules.Needs.Count];
             for (int d = 0; d < days; d++)
@@ -697,6 +718,11 @@ namespace Godless.Sim.Headless
                 for (int m = 0; m < s.Stock.Materials.Count; m++) held += s.Stock.Of(m);
                 line.Append(held.ToString(c).PadLeft(8)).Append("   ");
                 for (; lastIntents < bus.Intents.Count; lastIntents++) line.Append("+" + bus.Intents[lastIntents].Kind.Name + " ");
+                for (; lastProjects < s.Projects.Count; lastProjects++)
+                {
+                    Site site = s.Projects[lastProjects].Site;
+                    line.Append("sited (" + site.ParcelX.ToString(c) + "," + site.ParcelZ.ToString(c) + ") ");
+                }
                 Console.WriteLine(line.ToString());
             }
 
@@ -727,6 +753,19 @@ namespace Godless.Sim.Headless
                             : r.Kind.ToString()));
                 }
             }
+            // S15 and S19: where each house went, and what it is made of.
+            if (s.Projects.Count > 0) Console.WriteLine("\n" + s.Projects.Count.ToString(c) + " house(s) planned, sited and costed:");
+            foreach (Project project in s.Projects)
+            {
+                var of = new List<string>();
+                for (int m = 0; m < materials.Count; m++)
+                    if (project.Built.Cost[m] > 0) of.Add(project.Built.Cost[m].ToString(c) + " " + materials[m].Name);
+                Console.WriteLine("  " + project.Site.Record + " parcel (" + project.Site.ParcelX.ToString(c) + ", "
+                    + project.Site.ParcelZ.ToString(c) + ") score " + project.Site.Score.ToString("0.0", c)
+                    + ", sleeps " + project.Plan.Capacity.ToString(c) + ", " + string.Join(" + ", of));
+                foreach (string note in project.Built.Compromises) Console.WriteLine("      " + note);
+            }
+
             // S1C's tell: nobody was assigned anything, and yet.
             if (s.Tasks.Count > 0)
             {
@@ -845,7 +884,7 @@ namespace Godless.Sim.Headless
                                             sun, snow-load, damp, exposure, flood-risk
   sim blueprint [--grammar G] [--<gene> V ...] [--stock a,b,c] [--lot N]
                                             run a grammar for a genome and draw the house (S18)
-  sim settle   [--seed N] [--days D] [--people P] [--roofs R] [--biome B]
+  sim settle   [--seed N] [--days D] [--people P] [--roofs R] [--biome B] [--<gene> V ...]
                                             found a settlement and print its days (S12, S14)
 
 Defaults: run 0..200 x 300 years (0..20 with --island), verify 0..20 x 100 years.
