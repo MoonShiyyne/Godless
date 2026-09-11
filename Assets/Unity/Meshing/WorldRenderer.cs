@@ -121,6 +121,16 @@ namespace Godless.Unity
                     }
         }
 
+        /// <summary>
+        /// Draws a different store — the live world, or a HistoryView of the
+        /// past — without remeshing anything. The caller marks whatever
+        /// differs between the two, which for a timeline scrub is only what
+        /// changed between the two ticks.
+        /// </summary>
+        public void Show(ChunkStore store) { _store = store; }
+
+        public ChunkStore Shown { get { return _store; } }
+
         /// <summary>Remesh everything — after a scrub rebuilds the store wholesale.</summary>
         public void Rebind(ChunkStore store)
         {

@@ -72,6 +72,7 @@ namespace Godless.Unity
         {
             Camera cam = Camera.main;
             if (cam == null) return;
+            if (cam.GetComponent<GodCamera>() != null) return;   // it frames itself
 
             var centre = new Vector3(ChunkStore.SizeX * 0.5f, IslandMap.SeaLevel, ChunkStore.SizeZ * 0.5f);
             cam.transform.position = centre + new Vector3(0f, 250f, -330f);
@@ -99,7 +100,10 @@ namespace Godless.Unity
                 + View.WorstFrameMs.ToString("0.00") + " ms\n" +
                 "island generated in " + _loadSeconds.ToString("0.00") + "s, seed " + seed;
 
-            GUI.Label(new Rect(12, 10, 520, 110), text);
+            TerrainEditor editor = GetComponent<TerrainEditor>();
+            if (editor != null) text += "\n" + editor.Status + "\nstrokes " + editor.Strokes;
+
+            GUI.Label(new Rect(12, 10, 620, 150), text);
         }
     }
 }

@@ -1,7 +1,7 @@
 {
     "name": "Godless.Unity",
     "rootNamespace": "Godless.Unity",
-    "references": ["Godless.Sim", "Godless.Meshing"],
+    "references": ["Godless.Sim", "Godless.Meshing", "Unity.InputSystem"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
