@@ -1,0 +1,14 @@
+{
+    "name": "Godless.Unity",
+    "rootNamespace": "Godless.Unity",
+    "references": ["Godless.Sim", "Godless.Meshing"],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

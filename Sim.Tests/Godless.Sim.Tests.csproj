@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Sim/Godless.Sim.csproj" />
+    <ProjectReference Include="../Sim.Meshing/Godless.Meshing.csproj" />
   </ItemGroup>
 
 </Project>

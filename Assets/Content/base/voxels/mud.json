@@ -9,5 +9,9 @@
   // checked against it, because two materials that read as the same value at
   // camera distance are one material as far as the player is concerned.
   "value": 43,
+  // Hue and saturation are presentation; lightness is `value` above, so the
+  // contrast rule and the rendered colour cannot disagree about it.
+  "hue": 24,
+  "saturation": 32,
   "class": "earth"
 }

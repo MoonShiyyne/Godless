@@ -122,3 +122,7 @@ Sim/obj/
 !Sim.Headless/Godless.Sim.Headless.csproj
 !Sim.Tests/Godless.Sim.Tests.csproj
 !Godless.Sim.slnx
+!Sim.Meshing/Godless.Meshing.csproj
+
+Sim.Meshing/bin/
+Sim.Meshing/obj/

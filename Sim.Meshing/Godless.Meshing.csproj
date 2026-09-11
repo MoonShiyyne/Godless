@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The mesher core, compiled for tooling. Same arrangement as Sim/: Unity
+       compiles Assets/Unity/Meshing/Core through Godless.Meshing.asmdef, this
+       project compiles the same files so dotnet test can prove the meshes are
+       right without an Editor. netstandard2.1 and C# 9 for the same reasons. -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <RootNamespace>Godless.Meshing</RootNamespace>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Assets/Unity/Meshing/Core/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Sim/Godless.Sim.csproj" />
+  </ItemGroup>
+
+</Project>
