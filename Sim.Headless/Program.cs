@@ -474,7 +474,8 @@ namespace Godless.Sim.Headless
             }
 
             int lot = cli.Int("lot", 60);
-            Blueprint bp = grammar.Build(genome, Palette.FromContent(db), lot, lot, 700);
+            Palette palette = Palette.FromContent(db);
+            Blueprint bp = grammar.Build(genome, palette, lot, lot, 650);
 
             Console.WriteLine("grammar " + grammar.Name + (set.Count == 0 ? ", every gene at its default" : ", " + string.Join(", ", set)));
             Console.WriteLine("\nfront (looking north)" + new string(' ', Math.Max(1, bp.Width - 20)) + "   side (looking east)");
@@ -496,7 +497,61 @@ namespace Godless.Sim.Headless
                 + " high, footprint " + bp.Footprint(Role("floor")).ToString(c) + " columns, roof rises " + (roofHi - roofLo).ToString(c)
                 + ", floor raised " + floorLo.ToString(c) + ", " + Pct(openings, walls + openings) + " of the walls open");
             Console.WriteLine("# wall  o window  D door  ^ roof  | post  = plinth  _ floor  * hearth");
+
+            // S19: the same house, built from what a settlement holds.
+            string held = cli.Text("stock", null);
+            if (held == null) return 0;
+
+            MaterialTable materials = MaterialTable.FromContent(db, BiomeTable.FromContent(db));
+            TileSet tiles = TileSet.FromContent(db, materials);
+            VoxelTypes types = VoxelTypes.FromContent(db);
+            var stock = new MaterialStock(materials);
+            foreach (string material in held.Split(','))
+            {
+                int m = materials.IndexOf(material.Trim());
+                if (m < 0) { Console.Error.WriteLine("no material called '" + material.Trim() + "'"); return 1; }
+                stock.Add(m, 100000);
+            }
+
+            Structure built = Realizer.Realize(bp, tiles, materials, stock, palette, types, new RngStream((ulong)cli.Int("seed", 1)));
+            var letters = new Dictionary<ushort, char>();
+            var legend = new List<string>();
+            const string alphabet = "abcdefghijklmnopqrstuvwxyz";
+            for (int m = 0; m < materials.Count; m++)
+            {
+                if (built.Cost[m] == 0) continue;
+                ushort id = types.IdOf(materials[m].Voxel);
+                letters[id] = alphabet[legend.Count % alphabet.Length];
+                legend.Add(alphabet[legend.Count % alphabet.Length] + " " + materials[m].Name + " " + built.Cost[m].ToString(c));
+            }
+
+            Console.WriteLine("\nbuilt from " + held + ":");
+            for (int y = bp.Height - 1; y >= 0; y--)
+            {
+                var row = new StringBuilder();
+                for (int x = 0; x < bp.Width; x++) row.Append(Material(built, letters, x, y, 0, 0, 1, bp.Depth));
+                row.Append("   ");
+                for (int z = bp.Depth - 1; z >= 0; z--) row.Append(Material(built, letters, 0, y, z, 1, 0, bp.Width));
+                Console.WriteLine(row.ToString().TrimEnd());
+            }
+            Console.WriteLine(string.Join("  ", legend) + "   (" + built.TotalVoxels.ToString(c) + " voxels, "
+                + built.MaterialCount.ToString(c) + " materials)");
+            foreach (string note in built.Compromises) Console.WriteLine("  compromise: " + note);
+            foreach (Symbol role in built.Missing) Console.WriteLine("  nothing can build " + role);
             return 0;
+        }
+
+        /// <summary>The first material seen from outside along a line of sight.</summary>
+        static char Material(Structure s, Dictionary<ushort, char> letters, int x, int y, int z, int dx, int dz, int steps)
+        {
+            for (int k = 0; k < steps; k++, x += dx, z += dz)
+            {
+                ushort id = s.At(x, y, z);
+                if (id == VoxelTypes.AirId) continue;
+                char ch;
+                return letters.TryGetValue(id, out ch) ? ch : '?';
+            }
+            return ' ';
         }
 
         /// <summary>The first thing seen from outside along a line of sight.</summary>
@@ -782,7 +837,7 @@ namespace Godless.Sim.Headless
   sim content  [--path P]                   load Assets/Content and report what it holds
   sim island   [--seed N] [--width W]       generate an island and draw it
   sim parcels  [--seed N] [--field F]       draw a planning field: height, slope, water-distance
-  sim blueprint [--grammar G] [--<gene> V ...] [--lot N]
+  sim blueprint [--grammar G] [--<gene> V ...] [--stock a,b,c] [--lot N]
                                             run a grammar for a genome and draw the house (S18)
   sim settle   [--seed N] [--days D] [--people P] [--roofs R] [--biome B]
                                             found a settlement and print its days (S12, S14)

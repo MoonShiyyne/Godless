@@ -33,10 +33,9 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19.**
 
-Next, in dependency order toward G1: **S19** WFC realization (a blueprint
-becomes voxels in the stock's materials), **S1F**
+Next, in dependency order toward G1: **S1F**
 constraint fields then **S15** site scoring, then **S1A** construction.
 `sim blueprint --roof_pitch 0.9` draws a house for any genome. S18 split grammar is the first system that can turn a gene into a
 visible shape — S17's tell only becomes testable there, and it needs only
@@ -62,6 +61,26 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S19 shipped
+
+- `Build/Realizer.cs` turns a blueprint into voxels. First the building's own
+  palette: each role takes the first class the stock can supply **in
+  quantity**, and when nothing is enough, whatever there is most of — a
+  handful of stone is a footing, not a wall. Materials already chosen are
+  reused before a new one, so the tileset's cap of three holds, and the roof
+  is held to a real contrast against the walls.
+- Then the cells: each starts with every material its role allows and the
+  settlement holds, the tileset's rules cut the domains down (nothing rests
+  on thatch; earth gets a hard course under it), and what is left collapses
+  fewest-choices-first, weighted toward the role's material and its
+  neighbours' — so variation reads as runs, not speckle.
+- Tell: the same house against two stocks is two buildings — oak, granite and
+  thatch in the woods, slate and granite in the uplands, over half the cells
+  different, each keeping the silhouette rules
+  (`SameHouseDifferentStockDifferentBuilding`; `sim blueprint --stock a,b,c`).
+- Nothing places these in the world yet. S15 picks the site and S1A builds it
+  over days, taking from stock as it goes.
+
 ### What S1D shipped
 
 - `base/tilesets/base.json`: which material classes may serve each role
