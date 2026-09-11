@@ -11,7 +11,9 @@
   "saturation": 30,
   "class": "timber",
 
-  // S11: what a tick of labour brings in when the land within hauling range
-  // offers it in full. Fewer source columns, proportionally less.
-  "gather": { "perLabourTick": 0.4 }
+  // S11: voxels a tick of labour brings in when the land within hauling
+  // range offers it in full; fewer source columns, proportionally less. A
+  // voxel is an eighth of a cubic metre, a tick a quarter of a day, so 1.5
+  // is roughly what one person fells, trims and carries.
+  "gather": { "perLabourTick": 1.5 }
 }

@@ -1,0 +1,29 @@
+{
+  "type": "task",
+  "id": "gather",
+  "tell": "Nobody is told what to do, yet the same few are always at the quarry and the same few always in the woods.",
+
+  // One task per building material the land within hauling range offers:
+  // gather.oak, gather.granite ... Demand for each is what the settlement
+  // has commissioned but does not hold, split by how readily the land gives
+  // each material up. Nobody takes up, or stays on, a task with no demand.
+  "verb": "gather",
+  "perMaterial": true,
+
+  // Part 16's response-threshold model. A free worker takes a task up with
+  // probability s^2 / (s^2 + threshold^2). Thresholds start spread across
+  // this range; each tick on a task lowers the worker's threshold for it by
+  // `learn`, and each working tick on anything else raises it by `forget`.
+  "threshold": { "min": 0.05, "max": 1.0 },
+  "learn": 0.03,
+  "forget": 0.004,
+  "quitChance": 0.05,
+
+  // Stimulus gained per tick per voxel of unmet demand, and lost per
+  // worker-tick. The ratio sets how many hands a shortfall draws.
+  "stimulusGrowth": 0.0005,
+  "workDone": 0.03,
+
+  // Kept in hand even when nothing is commissioned.
+  "reserveVoxels": 40
+}

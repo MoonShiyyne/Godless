@@ -14,5 +14,5 @@
   "hue": 24,
   "saturation": 32,
   "class": "earth",
-  "gather": { "perLabourTick": 0.9 }
+  "gather": { "perLabourTick": 3.0 }
 }

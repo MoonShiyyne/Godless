@@ -131,6 +131,28 @@ namespace Godless.Sim.Settlements
 
         public bool Offers(int material) { return _sources[material] > 0; }
 
+        /// <summary>
+        /// A catchment from source counts directly. For tests, and for the
+        /// systems that will change what the land offers — depletion (S2F), a
+        /// god seeding an ore vein.
+        /// </summary>
+        public static Catchment FromSources(MaterialTable materials, long[] sources)
+        {
+            if (sources.Length != materials.Count) throw new System.ArgumentException("one source count per material", nameof(sources));
+            return new Catchment((long[])sources.Clone(), Yields(materials, sources), materials.HaulRangeVoxels);
+        }
+
+        static double[] Yields(MaterialTable materials, long[] sources)
+        {
+            var yield = new double[materials.Count];
+            for (int m = 0; m < materials.Count; m++)
+            {
+                double share = sources[m] >= materials.FullYieldColumns ? 1.0 : (double)sources[m] / materials.FullYieldColumns;
+                yield[m] = materials[m].PerLabourTick * share;
+            }
+            return yield;
+        }
+
         public static Catchment Survey(IslandMap map, BiomeTable biomes, MaterialTable materials, int hearthX, int hearthZ)
         {
             int r = materials.HaulRangeVoxels;
@@ -161,13 +183,7 @@ namespace Godless.Sim.Settlements
                     foreach (int m in offered[b]) sources[m]++;
                 }
 
-            var yield = new double[materials.Count];
-            for (int m = 0; m < materials.Count; m++)
-            {
-                double share = sources[m] >= materials.FullYieldColumns ? 1.0 : (double)sources[m] / materials.FullYieldColumns;
-                yield[m] = materials[m].PerLabourTick * share;
-            }
-            return new Catchment(sources, yield, r);
+            return new Catchment(sources, Yields(materials, sources), r);
         }
     }
 }

@@ -65,6 +65,9 @@ namespace Godless.Sim.Settlements
         /// <summary>What the land within hauling range offers (S11). Surveyed at founding.</summary>
         public Catchment Catchment { get; set; }
 
+        /// <summary>Who does what (S1C). Null in a settlement with nothing to do.</summary>
+        public Collective.TaskBoard Tasks { get; set; }
+
         /// <summary>Agent-ticks spent on each activity, ever. Indexed like the ActivityTable.</summary>
         public long[] ActivityTicks { get; private set; }
 
@@ -109,6 +112,7 @@ namespace Godless.Sim.Settlements
             d.Add(SpellSignature);
             foreach (Agent a in _people) a.AddTo(ref d);
             if (Stock != null) d.Add(Stock.Digest());
+            if (Tasks != null) d.Add(Tasks.Digest());
             for (int i = 0; i < ActivityTicks.Length; i++) d.Add(ActivityTicks[i]);
             return d.Value;
         }

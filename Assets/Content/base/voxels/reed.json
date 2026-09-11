@@ -10,5 +10,5 @@
   "hue": 75,
   "saturation": 24,
   "class": "thatch",
-  "gather": { "perLabourTick": 0.8 }
+  "gather": { "perLabourTick": 2.5 }
 }

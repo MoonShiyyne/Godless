@@ -7,6 +7,7 @@ using System.Text;
 using Godless.Sim.Content;
 using Godless.Sim.Annals;
 using Godless.Sim.Build;
+using Godless.Sim.Collective;
 using Godless.Sim.Core;
 using Godless.Sim.Drives;
 using Activity = Godless.Sim.Drives.Activity;
@@ -465,7 +466,7 @@ namespace Godless.Sim.Headless
             s.AttachIntents(bus);
             PressureTally tally = bus.Tally;
             world.Settlements.Add(s);
-            world.Add(new DriveSystem(rules)).Add(new IntentSystem());
+            world.Add(new DriveSystem(rules)).Add(new TaskSystem()).Add(new IntentSystem());
 
             Console.WriteLine("seed " + seed.ToString(c) + ": " + people.ToString(c) + " people found a settlement at parcel ("
                 + px.ToString(c) + ", " + pz.ToString(c) + ") in " + (biome == null ? "no biome" : biome.Id.ToString())
@@ -482,12 +483,13 @@ namespace Godless.Sim.Headless
                     offered.Add(materials[m].Name + " " + (s.Catchment.YieldPerLabourTick(m) / materials[m].PerLabourTick * 100).ToString("0", c) + "%");
             Console.WriteLine("within " + materials.HaulRangeVoxels.ToString(c) + " voxels the land offers, at this share of full yield: "
                 + (offered.Count == 0 ? "nothing" : string.Join(", ", offered)) + "\n");
+            s.Tasks = new TaskBoard(TaskKindTable.FromContent(db), s, rules, world.Streams);
 
             var header = new StringBuilder("  day  weather     in open ");
             foreach (Activity a in rules.Activities.All) if (a.Name != "sleep") header.Append(a.Name.PadLeft(11));
             header.Append("   pressure:");
             foreach (Need n in rules.Needs.All) header.Append(n.Name.PadLeft(9));
-            header.Append("   asks for");
+            header.Append("   stock");
             Console.WriteLine(header.ToString());
 
             int lastIntents = 0;
@@ -520,8 +522,10 @@ namespace Godless.Sim.Headless
                     lastPressure[n] = tally.Total(n);
                     line.Append(p.ToString("0.0", c).PadLeft(9));
                 }
-                line.Append("   ");
-                for (; lastIntents < bus.Intents.Count; lastIntents++) line.Append(bus.Intents[lastIntents].Kind.Name + " ");
+                long held = 0;
+                for (int m = 0; m < s.Stock.Materials.Count; m++) held += s.Stock.Of(m);
+                line.Append(held.ToString(c).PadLeft(8)).Append("   ");
+                for (; lastIntents < bus.Intents.Count; lastIntents++) line.Append("+" + bus.Intents[lastIntents].Kind.Name + " ");
                 Console.WriteLine(line.ToString());
             }
 
@@ -551,6 +555,37 @@ namespace Godless.Sim.Headless
                             ? r.ValueA.ToString(c) + " slept in the open, " + weather
                             : r.Kind.ToString()));
                 }
+            }
+            // S1C's tell: nobody was assigned anything, and yet.
+            if (s.Tasks.Count > 0)
+            {
+                Console.WriteLine("\nwho did the gathering (nobody was assigned anything):");
+                for (int j = 0; j < s.Tasks.Count; j++)
+                {
+                    long total = s.Tasks.TotalWork(j);
+                    if (total == 0) continue;
+                    // The regulars: everyone who did at least a tenth of it.
+                    var regulars = new List<string>();
+                    long byRegulars = 0;
+                    for (int i = 0; i < people; i++)
+                        if (s.Tasks.WorkBy(i, j) * 10 >= total) { regulars.Add("#" + i.ToString(c)); byRegulars += s.Tasks.WorkBy(i, j); }
+                    int m = s.Tasks.MaterialOf(j);
+                    Console.WriteLine("  " + s.Tasks.TaskId(j).ToString().Replace("task.", "").PadRight(16) + total.ToString(c).PadLeft(6)
+                        + " ticks, " + Pct(byRegulars, total) + " by " + (regulars.Count == 0 ? "nobody in particular" : string.Join(" ", regulars))
+                        + (m >= 0 ? "   holding " + s.Stock.Of(m).ToString(c) : ""));
+                }
+                double sum = 0.0; int gatherers = 0;
+                for (int i = 0; i < people; i++)
+                {
+                    long all = 0, main = 0;
+                    for (int j = 0; j < s.Tasks.Count; j++) { all += s.Tasks.WorkBy(i, j); main = Math.Max(main, s.Tasks.WorkBy(i, j)); }
+                    if (all < 20) continue;
+                    sum += (double)main / all; gatherers++;
+                }
+                if (gatherers > 0)
+                    Console.WriteLine("  " + gatherers.ToString(c) + " people gathered; on average " + (sum / gatherers * 100).ToString("0", c)
+                        + "% of each one's gathering was their own main material");
+                Console.WriteLine("  " + s.Tasks.IdleTicks.ToString(c) + " working ticks found nothing that needed doing");
             }
             Console.WriteLine("\nactivity ticks are agent-ticks: " + people.ToString(c) + " people x 3 daylight ticks a day.");
             return 0;

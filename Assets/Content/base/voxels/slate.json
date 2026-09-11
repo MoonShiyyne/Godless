@@ -7,5 +7,5 @@
   "hue": 225,
   "saturation": 14,
   "class": "stone",
-  "gather": { "perLabourTick": 0.25 }
+  "gather": { "perLabourTick": 1.0 }
 }

@@ -33,12 +33,11 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C.**
 
 Next, in dependency order toward G1: **S1D** the base tileset (S19 needs it),
-**S1C** response-threshold task allocation (unblocked by S12 and S14; it is
-what turns labour into gathered stock), **S1F** constraint fields (S15 needs
-them). S18 split grammar is the first system that can turn a gene into a
+**S1F** constraint fields (S15 needs them), **S18** split grammar (S17 and
+S14 are done — the first system that turns a gene into a shape). S18 split grammar is the first system that can turn a gene into a
 visible shape — S17's tell only becomes testable there, and it needs only
 S17 and S14, both done.
 
@@ -62,6 +61,25 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S1C shipped
+
+- `Collective/`: task kinds are content; stratum 1 has one, `gather`, which
+  expands to a task per material the catchment offers. Each person gets a
+  threshold per task, drawn from the pair of stable ids; a free worker takes a
+  task up with probability s²/(s²+θ²); doing it lowers θ, not doing it raises
+  it. Stimulus grows with demand (commissioned budget plus a reserve, split by
+  yield, less stock) and falls with work.
+- Measured as "each gatherer's share of their gathering on their own main
+  material": 0.93 with learning, against 0.58–0.74 for the same flat
+  population without it. The busiest-few share is the wrong measure — a task
+  that needs six hands at once cannot be done mostly by four.
+- Nobody takes up or stays on a task nothing wants; without that the stock
+  overshot its target twofold.
+- Gather rates rose about fourfold (oak 1.5 voxels a labour tick at full
+  yield): a voxel is an eighth of a cubic metre, a tick a quarter day.
+- With no roofs, people spend half their daylight at the fire, so labour is
+  thin until S1A builds. That is the pressure working, not a bug.
+
 ### What S11 shipped
 
 - The biomes had promised oak, slate, reed and thatch since S09 and no voxel
