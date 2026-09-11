@@ -78,6 +78,17 @@ namespace Godless.Sim.Harness
 
         public IReadOnlyList<ISimSystem> Systems { get { return _systems; } }
 
+        /// <summary>
+        /// Call once worldgen is finished: snapshots the world as it stands,
+        /// which is the baseline every later reconstruction replays from. A
+        /// world with no baseline can be played but not scrubbed back — the
+        /// timeline would rebuild tick 0 from an empty map.
+        /// </summary>
+        public void BeginHistory()
+        {
+            Voxels.Log.Snapshot(Clock.Tick, Voxels.Store);
+        }
+
         public void Tick()
         {
             Clock.Advance();

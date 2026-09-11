@@ -136,6 +136,11 @@ namespace Godless.Sim.Save
             if (hasIsland)
                 world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, voxelTypes);
 
+            // The regenerated island is history's baseline. Without this the
+            // loaded world plays correctly and cannot be scrubbed back: the
+            // timeline would rebuild tick 0 from an empty map.
+            world.BeginHistory();
+
             int recordCount = r.ReadInt32();
             for (int i = 0; i < recordCount; i++)
             {
@@ -154,9 +159,17 @@ namespace Godless.Sim.Save
             }
 
             int deltaCount = r.ReadInt32();
+            long lastTick = long.MinValue;
             for (int i = 0; i < deltaCount; i++)
             {
                 long dTick = r.ReadInt64();
+
+                // Rebuild snapshots at the same end-of-tick boundaries the
+                // live world uses, so seeking a long history stays cheap.
+                if (lastTick != long.MinValue && dTick != lastTick)
+                    world.Voxels.Log.MaybeSnapshot(lastTick, world.Voxels.Store);
+                lastTick = dTick;
+
                 ushort chunk = r.ReadUInt16();
                 ushort voxel = r.ReadUInt16();
                 ushort oldType = r.ReadUInt16();

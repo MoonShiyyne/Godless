@@ -55,9 +55,9 @@ namespace Godless.Unity
             World = new SimWorld((ulong)seed, content.Database, types);
             World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types);
 
-            // Snapshot the untouched island, so history has a baseline to
-            // scrub back to (S04) before anything has happened.
-            World.Voxels.EndTick(0);
+            // The untouched island is history's baseline (S04): everything the
+            // player does is replayed forward from here when scrubbing back.
+            World.BeginHistory();
 
             View = GetComponent<WorldRenderer>();
             View.Bind(World.Voxels.Store, VoxelVisuals.FromContent(content.Database, types));

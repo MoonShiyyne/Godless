@@ -47,10 +47,39 @@ namespace Godless.Sim.Deltas
         public int SnapshotCount { get { return _snapshots.Count; } }
         public IReadOnlyList<VoxelDelta> All() { return _deltas; }
 
+        /// <summary>Tick of the newest snapshot, or long.MinValue before the first.</summary>
+        public long LastSnapshotTick
+        {
+            get { return _snapshotTicks.Count > 0 ? _snapshotTicks[_snapshotTicks.Count - 1] : long.MinValue; }
+        }
+
+        /// <summary>
+        /// Throws if a change at this tick could not be recorded. Writers call
+        /// it before touching the store: checking after would leave the voxel
+        /// changed in the world and absent from its history, which is the exact
+        /// failure this exists to prevent.
+        /// </summary>
+        public void EnsureCanRecord(long tick)
+        {
+            if (_deltas.Count > 0 && tick < _deltas[_deltas.Count - 1].Tick)
+                throw new System.ArgumentException(
+                    "a voxel changed at tick " + tick + ", before the newest recorded change at tick "
+                    + _deltas[_deltas.Count - 1].Tick + ". Deltas are recorded in tick order.");
+
+            // Snapshots are taken at the end of a tick, so reconstruction treats
+            // everything at or before a snapshot's tick as already baked in. A
+            // change landing on such a tick would be in the world and missing
+            // from its history — silently, until someone scrubs back and finds
+            // the past disagreeing with itself.
+            if (_snapshotTicks.Count > 0 && tick <= LastSnapshotTick)
+                throw new System.ArgumentException(
+                    "a voxel changed at tick " + tick + ", but tick " + LastSnapshotTick
+                    + " has already been snapshotted. History would lose this change: advance the clock before writing.");
+        }
+
         internal void Append(VoxelDelta delta)
         {
-            if (_deltas.Count > 0 && delta.Tick < _deltas[_deltas.Count - 1].Tick)
-                throw new System.ArgumentException("deltas are appended in tick order");
+            EnsureCanRecord(delta.Tick);
             _deltas.Add(delta);
         }
 

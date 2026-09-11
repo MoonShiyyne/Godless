@@ -45,6 +45,8 @@ namespace Godless.Sim.Deltas
             ushort previous = _store.Get(at);
             if (previous == type) return false;
 
+            // Validate first. A refused write must leave the world untouched.
+            _log.EnsureCanRecord(tick);
             _store.SetRaw(at, type);
 
             _log.Append(new VoxelDelta(
