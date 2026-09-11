@@ -39,6 +39,7 @@ namespace Godless.Sim.Build
         const int MaxSteps = 200000;
 
         internal Dictionary<string, Op> Rules;
+        internal List<Symbol> RolesWritten;
         internal Dictionary<string, Expr> Lets;
         internal List<string> LetOrder;
 
@@ -49,6 +50,9 @@ namespace Godless.Sim.Build
         public string Builds { get; internal set; }
         public string Tell { get; internal set; }
         public string Axiom { get; internal set; }
+
+        /// <summary>Every role this grammar can write, in stable-hash order. What a tileset has to answer for.</summary>
+        public IReadOnlyList<Symbol> Roles { get { return RolesWritten; } }
 
         /// <summary>
         /// Runs the grammar for one genome on a lot. The lot is the most room

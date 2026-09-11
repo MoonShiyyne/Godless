@@ -33,10 +33,10 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D.**
 
-Next, in dependency order toward G1: **S1D** the base tileset and **S19** WFC
-realization (a blueprint becomes voxels in the stock's materials), **S1F**
+Next, in dependency order toward G1: **S19** WFC realization (a blueprint
+becomes voxels in the stock's materials), **S1F**
 constraint fields then **S15** site scoring, then **S1A** construction.
 `sim blueprint --roof_pitch 0.9` draws a house for any genome. S18 split grammar is the first system that can turn a gene into a
 visible shape — S17's tell only becomes testable there, and it needs only
@@ -62,6 +62,15 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S1D shipped
+
+- `base/tilesets/base.json`: which material classes may serve each role
+  (best first), what carries weight (nothing rests on thatch), what needs a
+  footing (earth), and the silhouette rules — at most three materials a
+  building, roof and wall at least 12 apart in value, and a banded base.
+- The cross-check S1D exists for: a tileset must answer for every role its
+  grammar writes, or `sim content` names the gap.
+
 ### What S18 shipped
 
 - A split-grammar interpreter (`Build/Grammar.cs`) over boxes with

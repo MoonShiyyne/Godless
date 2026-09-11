@@ -1,0 +1,39 @@
+{
+  "type": "tileset",
+  "id": "base",
+  "tell": "Every building reads at a distance: its roof contrasts with its walls, its base is a band of something harder, and no house wears more than three materials.",
+
+  // S1D. Which material classes may play which part of a building. Best
+  // first: S19 takes the first class the settlement's stock can actually
+  // supply, so what a place is made of follows what its land offers.
+  "roles": {
+    "wall":   { "classes": ["stone", "earth", "timber"] },
+    "floor":  { "classes": ["timber", "stone", "earth"] },
+    "roof":   { "classes": ["thatch", "timber", "stone"] },
+    "post":   { "classes": ["timber", "stone"] },
+    "plinth": { "classes": ["stone", "earth"] },
+    "hearth": { "classes": ["stone"] },
+
+    // A doorway and a window are holes. Shutters and doors are a later
+    // system's business; what matters for the silhouette is the hole.
+    "door":   { "classes": [], "open": true, "optional": true },
+    "window": { "classes": [], "open": true, "optional": true }
+  },
+
+  // What can bear weight. Nothing rests on thatch — a roof is the top of a
+  // building, and a rule that says so is what stops a second storey growing
+  // out of a reed roof.
+  "carries": { "thatch": false, "earth": true, "stone": true, "timber": true },
+
+  // Earth walls standing straight on the ground wash out from below. Given a
+  // harder material, S19 puts a course of it under them.
+  "needsFooting": ["earth"],
+
+  // The hard rules. Part 22: a tight palette and real contrast are what keep
+  // generated architecture from reading as mush.
+  "silhouette": {
+    "maxMaterials": 3,
+    "minRoofWallContrast": 12,
+    "bandTheBase": true
+  }
+}

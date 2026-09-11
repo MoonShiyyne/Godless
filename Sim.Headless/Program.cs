@@ -224,11 +224,30 @@ namespace Godless.Sim.Headless
                     + mats.HaulRangeVoxels.ToString(c) + " voxels of a hearth: " + string.Join(", ", names));
             }
 
+            // The tileset (S1D), and whether it can answer every grammar role.
+            MaterialTable tileMaterials = MaterialTable.FromContent(result.Database, BiomeTable.FromContent(result.Database));
+            TileSet tiles = TileSet.FromContent(result.Database, tileMaterials);
+            foreach (string problem in tiles.Problems) Console.WriteLine("\ntileset (S1D) problem: " + problem);
+            if (tiles.Count > 0)
+            {
+                Console.WriteLine("\ntileset: " + tiles.Count.ToString(c) + " role(s), at most " + tiles.MaxMaterials.ToString(c)
+                    + " materials a building, roof and wall at least " + tiles.MinRoofWallContrast.ToString(c) + " apart in value");
+                foreach (RoleTile t in tiles.Roles)
+                {
+                    var classes = new List<string>();
+                    foreach (Symbol cl in t.Classes) classes.Add(cl.ToString().Replace("class.", ""));
+                    Console.WriteLine("  " + t.Name.PadRight(10) + (t.Open ? "an opening" : string.Join(" then ", classes)));
+                }
+            }
+
             // Grammars (S18): every name and rule checked at load.
             GrammarTable grammarTable = GrammarTable.FromContent(result.Database, genes);
             foreach (string problem in grammarTable.Problems) Console.WriteLine("\ngrammar (S18) refused: " + problem);
             foreach (Grammar g in grammarTable.All)
+            {
                 Console.WriteLine("\ngrammar '" + g.Name + "' builds " + g.Builds + ": " + g.Tell);
+                foreach (string gap in tiles.Answers(g)) Console.WriteLine("  gap: " + gap);
+            }
 
             // Needs and activities (S12), with anything refused and why.
             DriveRules drives = DriveRules.FromContent(result.Database);

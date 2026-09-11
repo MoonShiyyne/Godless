@@ -64,6 +64,7 @@ namespace Godless.Sim.Build
             readonly GeneTable _genes;
             readonly List<string> _ruleRefs = new List<string>();
             readonly List<string> _ruleNames = new List<string>();   // names read inside rules
+            readonly List<Symbol> _roles = new List<Symbol>();       // roles the rules can write
             public string Fault;
 
             public Loader(string id, GeneTable genes) { _id = id; _genes = genes; }
@@ -82,6 +83,7 @@ namespace Godless.Sim.Build
                     Rules = new Dictionary<string, Grammar.Op>(),
                     Lets = new Dictionary<string, Expr>(),
                     LetOrder = new List<string>(),
+                    RolesWritten = new List<Symbol>(),
                 };
 
                 if (g.Tell.Length == 0) Fail("declares no tell");
@@ -115,6 +117,8 @@ namespace Godless.Sim.Build
                     foreach (string n in names) CheckName(n, g, false);
                 }
                 CheckCycles(g);
+                _roles.Sort((a, b) => a.CompareTo(b));
+                g.RolesWritten = _roles;
                 return g;
             }
 
@@ -281,7 +285,13 @@ namespace Godless.Sim.Build
                 return 'u';
             }
 
-            static Symbol RoleOf(string name) { return string.IsNullOrEmpty(name) ? Symbol.None : Symbol.For("role." + name); }
+            Symbol RoleOf(string name)
+            {
+                if (string.IsNullOrEmpty(name)) return Symbol.None;
+                Symbol role = Symbol.For("role." + name);
+                if (!_roles.Contains(role)) _roles.Add(role);
+                return role;
+            }
         }
     }
 }
