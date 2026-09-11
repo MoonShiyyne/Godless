@@ -1,0 +1,11 @@
+{
+  "type": "voxel",
+  "id": "thatch",
+  "solid": true,
+  "hardness": 1,
+  "value": 86,
+  "hue": 45,
+  "saturation": 42,
+  "class": "thatch",
+  "gather": { "perLabourTick": 0.6 }
+}

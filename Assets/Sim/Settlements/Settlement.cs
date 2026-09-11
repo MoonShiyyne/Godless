@@ -59,6 +59,12 @@ namespace Godless.Sim.Settlements
             Pressure = bus;
         }
 
+        /// <summary>What the settlement holds to build with (S11). Null where nothing can be gathered.</summary>
+        public MaterialStock Stock { get; set; }
+
+        /// <summary>What the land within hauling range offers (S11). Surveyed at founding.</summary>
+        public Catchment Catchment { get; set; }
+
         /// <summary>Agent-ticks spent on each activity, ever. Indexed like the ActivityTable.</summary>
         public long[] ActivityTicks { get; private set; }
 
@@ -102,6 +108,7 @@ namespace Godless.Sim.Settlements
             d.Add(SpellRecord.Index);
             d.Add(SpellSignature);
             foreach (Agent a in _people) a.AddTo(ref d);
+            if (Stock != null) d.Add(Stock.Digest());
             for (int i = 0; i < ActivityTicks.Length; i++) d.Add(ActivityTicks[i]);
             return d.Value;
         }

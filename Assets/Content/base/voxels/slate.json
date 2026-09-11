@@ -1,0 +1,11 @@
+{
+  "type": "voxel",
+  "id": "slate",
+  "solid": true,
+  "hardness": 6,
+  "value": 22,
+  "hue": 225,
+  "saturation": 14,
+  "class": "stone",
+  "gather": { "perLabourTick": 0.25 }
+}

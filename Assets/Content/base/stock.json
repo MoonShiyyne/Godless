@@ -1,0 +1,17 @@
+{
+  "type": "stock",
+  "id": "base",
+
+  // S11. How far people will carry building material, in voxels from the
+  // hearth — under a tenth of the island's width. Short on purpose: biomes
+  // interleave, and a longer haul reaches the forest from the mountain,
+  // which erases the one thing the stock is for — two biomes, two stocks.
+  // What lies outside might as well not exist until trade (S38) or a new
+  // settlement reaches it.
+  "haulRangeVoxels": 40,
+
+  // Source columns within range (of about 5000) at which a material gathers
+  // at its full rate. A settlement beside a copse gathers timber slowly; one
+  // in the forest, at full speed.
+  "fullYieldColumns": 3000
+}

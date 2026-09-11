@@ -28,6 +28,18 @@ namespace Godless.Sim.World
         /// <summary>Materials the settlement can build with here (Part 05).</summary>
         public IReadOnlyList<Symbol> Materials { get; private set; }
 
+        /// <summary>
+        /// The same materials as the voxel types they are built from, which
+        /// is what a settlement's stock counts (S11). Derived from the names in
+        /// the file, never from a Symbol's printed name (L2).
+        /// </summary>
+        public IReadOnlyList<Symbol> Offers { get; private set; }
+
+        /// <summary>The material names as the file spells them, for refusal messages.</summary>
+        public IReadOnlyList<string> MaterialNames { get; private set; }
+
+        public string Name { get; private set; }
+
         public bool Accepts(int elevation, int moisture)
         {
             return elevation >= MinElevation && elevation <= MaxElevation
@@ -39,11 +51,16 @@ namespace Godless.Sim.World
             JsonValue select = doc["select"];
 
             var materials = new List<Symbol>();
+            var offers = new List<Symbol>();
+            var names = new List<string>();
             JsonValue list = doc["materials"];
             for (int i = 0; i < list.Count; i++)
             {
                 string name = list[i].AsString(null);
-                if (!string.IsNullOrEmpty(name)) materials.Add(Symbol.For("material." + name));
+                if (string.IsNullOrEmpty(name)) continue;
+                materials.Add(Symbol.For("material." + name));
+                offers.Add(Symbol.For("voxel." + name));
+                names.Add(name);
             }
 
             return new Biome
@@ -59,6 +76,9 @@ namespace Godless.Sim.World
                 MinMoisture = select["minMoisture"].AsInt32(0),
                 MaxMoisture = select["maxMoisture"].AsInt32(int.MaxValue),
                 Materials = materials,
+                Offers = offers,
+                MaterialNames = names,
+                Name = id,
             };
         }
     }

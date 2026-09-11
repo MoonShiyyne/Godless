@@ -13,5 +13,6 @@
   // contrast rule and the rendered colour cannot disagree about it.
   "hue": 215,
   "saturation": 8,
-  "class": "stone"
+  "class": "stone",
+  "gather": { "perLabourTick": 0.2 }
 }

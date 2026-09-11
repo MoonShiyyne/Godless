@@ -33,11 +33,12 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14.**
+**Done in stratum 1: S10, S17, S12, S14, S11.**
 
-Next, in dependency order toward G1: **S11** material stock and **S1D** the
-base tileset (S19 needs both), **S1C** response-threshold task allocation
-(unblocked by S12 and S14), **S1F** constraint fields (S15 needs them). S18 split grammar is the first system that can turn a gene into a
+Next, in dependency order toward G1: **S1D** the base tileset (S19 needs it),
+**S1C** response-threshold task allocation (unblocked by S12 and S14; it is
+what turns labour into gathered stock), **S1F** constraint fields (S15 needs
+them). S18 split grammar is the first system that can turn a gene into a
 visible shape — S17's tell only becomes testable there, and it needs only
 S17 and S14, both done.
 
@@ -61,6 +62,21 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S11 shipped
+
+- The biomes had promised oak, slate, reed and thatch since S09 and no voxel
+  declared them. They exist now, placed in the palette so the contrast rule
+  still holds (values 12, 22, 70, 86 around the existing 34-78).
+- A material is a voxel with a `gather` rate. A settlement's `Catchment` is
+  what the land within `haulRangeVoxels` (40) offers, per material, and so how
+  fast a tick of labour gathers it. The range is short on purpose: at 64 a
+  highland hearth gathered timber at full speed and every biome had every
+  lowland material.
+- `MaterialStock` holds whole voxels. Takes are all or nothing; the first
+  failed take in a run is a `stock.short` record, caused by whatever wanted
+  the material. That is the moment S19's substitution will read.
+- Nothing gathers yet. Labour becomes stock through S1C's tasks.
+
 ### What S0B shipped
 
 - Priority-flood drainage over every column (`World/Drainage.cs`): each

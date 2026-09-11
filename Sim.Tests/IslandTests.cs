@@ -64,7 +64,7 @@ namespace Godless.Sim.Tests
         {
             ContentDatabase content = RealContent();
             Assert.Equal(4, content.Ids("biome").Count);
-            Assert.Equal(5, content.Ids("voxel").Count);
+            Assert.Equal(9, content.Ids("voxel").Count);
 
             BiomeTable biomes = BiomeTable.FromContent(content);
             Assert.Equal(4, biomes.Count);

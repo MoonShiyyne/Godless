@@ -13,5 +13,6 @@
   // contrast rule and the rendered colour cannot disagree about it.
   "hue": 42,
   "saturation": 46,
-  "class": "earth"
+  "class": "earth",
+  "gather": { "perLabourTick": 0.9 }
 }

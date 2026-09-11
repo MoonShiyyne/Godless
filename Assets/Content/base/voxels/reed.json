@@ -1,0 +1,14 @@
+{
+  "type": "voxel",
+  "id": "reed",
+  "solid": true,
+  "hardness": 1,
+
+  // Green-grey bundled reed: the delta's roofing and walling. Kept apart from
+  // thatch, which is dried straw and a full value step paler.
+  "value": 70,
+  "hue": 75,
+  "saturation": 24,
+  "class": "thatch",
+  "gather": { "perLabourTick": 0.8 }
+}

@@ -1,0 +1,17 @@
+{
+  "type": "voxel",
+  "id": "oak",
+  "solid": true,
+  "hardness": 4,
+
+  // Tarred timber, near-black. Sits at the dark end so a timber frame reads
+  // against pale infill and thatch at camera distance (palette contrast rule).
+  "value": 12,
+  "hue": 28,
+  "saturation": 30,
+  "class": "timber",
+
+  // S11: what a tick of labour brings in when the land within hauling range
+  // offers it in full. Fewer source columns, proportionally less.
+  "gather": { "perLabourTick": 0.4 }
+}

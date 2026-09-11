@@ -207,6 +207,21 @@ namespace Godless.Sim.Headless
                     Console.WriteLine("  " + g.Name.PadRight(16) + g.Tell);
             }
 
+            // Building materials (S11): every biome's offer must be gatherable.
+            MaterialTable mats = MaterialTable.FromContent(result.Database, BiomeTable.FromContent(result.Database));
+            if (mats.Problems.Count > 0)
+            {
+                Console.WriteLine("\nmaterials (S11) — " + mats.Problems.Count.ToString(c) + " problem(s):");
+                foreach (string problem in mats.Problems) Console.WriteLine("  " + problem);
+            }
+            else if (mats.Count > 0)
+            {
+                var names = new List<string>();
+                foreach (BuildingMaterial m in mats.All) names.Add(m.Name);
+                Console.WriteLine("\n" + mats.Count.ToString(c) + " building material(s), gathered within "
+                    + mats.HaulRangeVoxels.ToString(c) + " voxels of a hearth: " + string.Join(", ", names));
+            }
+
             // Needs and activities (S12), with anything refused and why.
             DriveRules drives = DriveRules.FromContent(result.Database);
             IReadOnlyList<string> refused = drives.Problems();
@@ -455,7 +470,18 @@ namespace Godless.Sim.Headless
             Console.WriteLine("seed " + seed.ToString(c) + ": " + people.ToString(c) + " people found a settlement at parcel ("
                 + px.ToString(c) + ", " + pz.ToString(c) + ") in " + (biome == null ? "no biome" : biome.Id.ToString())
                 + ", with " + roofs.ToString(c) + " roof(s)");
-            Console.WriteLine("site is a stand-in: the flattest dry parcel within four of water. S15 and S30 replace it.\n");
+            Console.WriteLine("site is a stand-in: the flattest dry parcel within four of water. S15 and S30 replace it.");
+
+            // S11: what the land within hauling range offers to build with.
+            MaterialTable materials = MaterialTable.FromContent(db, biomes);
+            s.Catchment = Catchment.Survey(island, biomes, materials, hx, hz);
+            s.Stock = new MaterialStock(materials);
+            var offered = new List<string>();
+            for (int m = 0; m < materials.Count; m++)
+                if (s.Catchment.Offers(m))
+                    offered.Add(materials[m].Name + " " + (s.Catchment.YieldPerLabourTick(m) / materials[m].PerLabourTick * 100).ToString("0", c) + "%");
+            Console.WriteLine("within " + materials.HaulRangeVoxels.ToString(c) + " voxels the land offers, at this share of full yield: "
+                + (offered.Count == 0 ? "nothing" : string.Join(", ", offered)) + "\n");
 
             var header = new StringBuilder("  day  weather     in open ");
             foreach (Activity a in rules.Activities.All) if (a.Name != "sleep") header.Append(a.Name.PadLeft(11));
