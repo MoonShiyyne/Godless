@@ -388,7 +388,7 @@ namespace Godless.Sim.Headless
             VoxelTypes types = VoxelTypes.FromContent(content.Database);
             BiomeTable biomes = BiomeTable.FromContent(content.Database);
             var store = new ChunkStore();
-            IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types);
+            IslandMap island = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types);
 
             bool[] solid = TerrainBrush.SolidTable(content.Database, types);
             var wet = new bool[types.Count];
@@ -403,14 +403,19 @@ namespace Godless.Sim.Headless
             ParcelGrid.Build(store, solid, wet);
             watch.Stop();
 
-            InfluenceMap map;
-            switch (field)
-            {
-                case "height": map = grid.Height; break;
-                case "slope": map = grid.Slope; break;
-                case "water-distance": map = grid.WaterDistance; break;
-                default: Console.Error.WriteLine("unknown field '" + field + "' — try height, slope or water-distance"); return 2;
-            }
+            ConstraintFields fields = ConstraintFields.Compute(island, grid, biomes);
+            InfluenceMap map = fields.Find(Symbol.For("field." + field));
+            if (map == null)
+                switch (field)
+                {
+                    case "height": map = grid.Height; break;
+                    case "slope": map = grid.Slope; break;
+                    case "water-distance": map = grid.WaterDistance; break;
+                    default:
+                        Console.Error.WriteLine("unknown field '" + field + "' — try height, slope, water-distance, "
+                                                + "sun, snow-load, damp, exposure or flood-risk");
+                        return 2;
+                }
 
             // Ramp over land only; the sea is drawn as blank so the coast reads.
             const string ramp = " .:-=+*#%@";
@@ -836,7 +841,8 @@ namespace Godless.Sim.Headless
   sim verify   [--seeds A..B] [--years N]   run each seed twice, compare byte for byte
   sim content  [--path P]                   load Assets/Content and report what it holds
   sim island   [--seed N] [--width W]       generate an island and draw it
-  sim parcels  [--seed N] [--field F]       draw a planning field: height, slope, water-distance
+  sim parcels  [--seed N] [--field F]       draw a planning field: height, slope, water-distance,
+                                            sun, snow-load, damp, exposure, flood-risk
   sim blueprint [--grammar G] [--<gene> V ...] [--stock a,b,c] [--lot N]
                                             run a grammar for a genome and draw the house (S18)
   sim settle   [--seed N] [--days D] [--people P] [--roofs R] [--biome B]

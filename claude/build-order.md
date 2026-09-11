@@ -33,7 +33,7 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F.**
 
 Next, in dependency order toward G1: **S1F**
 constraint fields then **S15** site scoring, then **S1A** construction.
@@ -61,6 +61,16 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S1F shipped
+
+- `World/ConstraintFields.cs`: sun, snow load, damp, exposure and flood risk
+  per parcel, each 0..1 so a genome can weigh them against each other. Read
+  from the island's biomes and S0B's height above water.
+- `sim parcels --field sun|snow-load|damp|exposure|flood-risk` draws them.
+- Measured against the island rather than asserted by construction: snow is
+  worst in the highlands, the delta is the damp one, the shore is what
+  floods, sunward slopes average over 0.6 and shaded ones under 0.4.
+
 ### What S19 shipped
 
 - `Build/Realizer.cs` turns a blueprint into voxels. First the building's own
