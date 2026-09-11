@@ -204,6 +204,38 @@ namespace Godless.Sim.Tests
             Assert.NotEqual(BuildWorld().Digest(), changed.Digest());
         }
 
+        /// <summary>
+        /// Found through S07's history view: two worlds with identical
+        /// contents digested differently, because one had allocated a chunk,
+        /// emptied it and kept it. "Byte-identical" is G0's promise and the
+        /// save loader's integrity check, so it has to mean the contents.
+        /// </summary>
+        [Fact]
+        public void TheSameContentsDigestTheSameWhateverTheirHistory()
+        {
+            var untouched = new ChunkStore();
+            untouched.SetRaw(1, 1, 1, 3);
+
+            var dugAndRefilled = new ChunkStore();
+            dugAndRefilled.SetRaw(1, 1, 1, 3);
+            dugAndRefilled.SetRaw(300, 100, 300, 5);      // allocate a far chunk...
+            dugAndRefilled.SetRaw(300, 100, 300, VoxelTypes.AirId); // ...and empty it
+
+            Assert.Equal(untouched.Digest(), dugAndRefilled.Digest());
+            Assert.Equal(untouched.AllocatedChunks, dugAndRefilled.AllocatedChunks);
+        }
+
+        [Fact]
+        public void AChunkEmptiedBackToAirReturnsItsMemory()
+        {
+            var store = new ChunkStore();
+            store.SetRaw(40, 40, 40, 2);
+            Assert.Equal(1, store.AllocatedChunks);
+            store.SetRaw(40, 40, 40, VoxelTypes.AirId);
+            Assert.Equal(0, store.AllocatedChunks);
+            Assert.Equal(VoxelTypes.AirId, store.Get(40, 40, 40));
+        }
+
         static ChunkStore BuildWorld()
         {
             var store = new ChunkStore();

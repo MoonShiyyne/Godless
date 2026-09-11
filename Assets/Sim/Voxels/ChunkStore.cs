@@ -75,7 +75,20 @@ namespace Godless.Sim.Voxels
             }
 
             chunk.Set(x & 31, y & 31, z & 31, type);
+            ReleaseIfEmpty(ci, chunk);
             return true;
+        }
+
+        /// <summary>
+        /// A chunk emptied back to nothing but air is freed. That returns its
+        /// memory, and it keeps "the same world" meaning the same contents: a
+        /// region that was dug out and filled back in is indistinguishable
+        /// from one that was never touched, which is what a digest, a save
+        /// check and a scrubbed timeline all assume.
+        /// </summary>
+        void ReleaseIfEmpty(int chunkIndex, Chunk chunk)
+        {
+            if (chunk.IsUniform && chunk.UniformType == VoxelTypes.AirId) _chunks[chunkIndex] = null;
         }
 
         public bool SetRaw(Int3 at, ushort type) { return SetRaw(at.X, at.Y, at.Z, type); }
@@ -131,6 +144,7 @@ namespace Godless.Sim.Voxels
                 _chunks[chunkIndex] = chunk;
             }
             chunk.Set(voxelIndex & 31, (voxelIndex >> 10) & 31, (voxelIndex >> 5) & 31, type);
+            ReleaseIfEmpty(chunkIndex, chunk);
         }
 
         /// <summary>
@@ -143,7 +157,10 @@ namespace Godless.Sim.Voxels
             for (int ci = 0; ci < _chunks.Length; ci++)
             {
                 Chunk chunk = _chunks[ci];
-                if (chunk == null) continue;
+
+                // Content, not allocation: an all-air chunk and a missing one
+                // are the same world and must digest the same.
+                if (chunk == null || (chunk.IsUniform && chunk.UniformType == VoxelTypes.AirId)) continue;
 
                 digest.Add(ci);
                 if (chunk.IsUniform) { digest.Add(chunk.UniformType); continue; }
