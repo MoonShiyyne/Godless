@@ -34,7 +34,9 @@ middle column):
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
 **Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15,
-S13, S1A, S1B, S1E, S1G, S16.**
+S13, S1A, S1B, S1E, S1G, S16, S29.**
+
+**Stratum 1 is complete.** What remains before G1 is running the gate.
 
 **The stratum-1 loop is closed:** nights in the open raise pressure, pressure
 raises an intent, the genome plans a house, the ground is chosen and claimed,
@@ -43,15 +45,18 @@ course until there are roofs. Food decides how many people there are to do
 it. `sim settle --days 400` walks it end to end, and the Island scene shows
 the same thing happening while you watch.
 
-**Next, toward G1: S29** the screenshot harness, and then the gate itself.
-Worn roads and the paving threshold stay at S2K, in stratum 2.
+**Next: G1 itself.** Two tests, and the plan asks for three strangers rather
+than one person and one seed. Worn roads and the paving threshold stay at
+S2K, in stratum 2.
 
 **Where G1's numbers stand** (`sim separate`, 30-40 seeds): the six genes at
-88-100%, biomes at 77.5%. The biome number is carried by materials and by how
-a building meets its ground; it is not higher because cultures pick the
-flattest ground they can find in any biome, so the terrain response is muted
-by their own good sense. Nothing yet makes the *genome* answer to the biome —
-that is S25, at stratum 2, mutation from scar mass.
+85-98%, biomes at 77.5%. The biome number is carried by materials and by how
+a building meets its ground. Nothing yet makes the *genome* answer to the
+biome — that is S25, at stratum 2, mutation from scar mass — so 77.5% is
+what stratum 1 can honestly produce.
+
+**A settlement on seed 7:** twenty people, thirty-one by day 1800, none lost,
+thirty sleeping places in five houses.
 
 **The instruments:** `sim separate [--gene G]` is G1's two tests as numbers.
 `sim settle [--<gene> V]` runs a settlement and prints its days, its houses
@@ -89,6 +94,21 @@ constraint fields; `sim island` draws the island with its rivers and lakes.
 - Measured: a highland settlement terraces (27 voxels of earth moved), a
   culture with a high elevation bias stilts on flat ground where a plain one
   levels, and land that floods is built over rather than filled.
+
+### What S29 shipped, and what looking at it changed
+
+- A fixed camera on a fixed seed at fixed years, written to `Screenshots/`
+  and committed, so a diff of the plate is a diff of the style.
+  `Tools/style-plate.sh` runs it against an open Editor.
+- The first plate showed the houses were towers the width of a phone box:
+  six people in sixteen square metres over two floors. No number in the suite
+  objected; one picture settled it. Houses are about 37 m2 now.
+- The rescale broke the settlement five times over, and each breakage was a
+  real fault the tests had not reached: demands measured in different units
+  (voxels against meals), stimuli that saturated and spread the hands evenly,
+  stimulus that accumulated into a record of history rather than state,
+  intents nobody could site blocking the ones behind them, and a siting tell
+  that only held when houses were small enough to fit the waterside.
 
 ### What S1G shipped
 
