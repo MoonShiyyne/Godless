@@ -33,24 +33,28 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15, S13, S1A, S1B, S1E.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15,
+S13, S1A, S1B, S1E, S1G.**
 
 **The stratum-1 loop is closed:** nights in the open raise pressure, pressure
 raises an intent, the genome plans a house, the ground is chosen and claimed,
 self-appointed gatherers bring the material in, and builders lay it course by
-course until there are roofs. `sim settle --days 400` walks it end to end.
+course until there are roofs. Food decides how many people there are to do
+it. `sim settle --days 400` walks it end to end, and the Island scene shows
+the same thing happening while you watch.
 
-Next, toward G1: **S1G** the separation metric and **S29** the screenshot
-harness. Then G1 can be run. Worn roads and
-the paving threshold are S2K, at stratum 2.
-`sim settle --elevation_bias 0.9` runs the whole chain: nights in the open,
-intents, gathering, a plan, a site and a costed house. S18 split grammar is the first system that can turn a gene into a
-visible shape — S17's tell only becomes testable there, and it needs only
-S17 and S14, both done.
+**Next, toward G1: S16 terrain negotiation**, then **S29** the screenshot
+harness. S1G measured why S16 comes first: nothing yet makes the *shape* of a
+building answer to its ground, so two biomes differ only in what they are made
+of, and the biome test sits at 77.5% where the gene tests are at 88-100%.
+Worn roads and the paving threshold stay at S2K, in stratum 2.
 
-`sim content` lists every gene and need with its tell. `sim parcels --field
-water-distance|slope|height` draws the planning fields. `sim settle` founds a
-settlement and prints its days — S12's tell, readable without a renderer.
+**The instruments:** `sim separate [--gene G]` is G1's two tests as numbers.
+`sim settle [--<gene> V]` runs a settlement and prints its days, its houses
+and who did the work. `sim blueprint --<gene> V --stock a,b,c` draws one
+house. `sim content` lists every gene, need, material, role and grammar with
+its tell and anything refused. `sim parcels --field F` draws the planning and
+constraint fields; `sim island` draws the island with its rivers and lakes.
 
 ### What S12 shipped, and what it deliberately did not
 
@@ -68,6 +72,28 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S1G shipped
+
+- `Build/Silhouette.cs`: what a stranger can see of a building as ten numbers
+  — height, footprint, aspect, roof rise, raised floor, openness and the share
+  of each material class. Capacity and cost are deliberately absent.
+- `Separation.Between`: a nearest-centroid rule, each building left out of its
+  own side's centroid. Blunt on purpose — if a rule this crude can tell two
+  piles of buildings apart, so can a stranger.
+
+**What it measured, and what changed because of it**
+
+- Genes, 30 seeds, everything else held: roof_pitch 100%, communal_ratio 98%,
+  elevation_bias 98%, footprint_area 98%, verticality 93%, aperture_ratio 88%.
+- Biomes were at **55%**, a coin. One cause fixed: S19 took the first class
+  that could supply a role, and granite is in every biome, so every settlement
+  built in granite and the stock stopped mattering. Abundance decides now, the
+  tileset's order only breaks ties, and separation is **77.5%**.
+- The other cause is **S16, never built**. Next system.
+- The metric's own flaw, now tested: a feature identical within each set and
+  different between them has no within-set spread, and scaling by that spread
+  threw the strongest evidence away — the gene test first read 46%.
+
 ### What S1E shipped
 
 - Food is a settlement store: foraging (a third task verb) fills it, a meal a
