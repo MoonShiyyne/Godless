@@ -122,7 +122,7 @@ namespace Godless.Sim.Tests
             var cases = new (string gene, System.Func<Blueprint, double> measure, double minChange, string what)[]
             {
                 ("roof_pitch", b => { b.Span(R("roof"), out int lo, out int hi); return hi - lo; }, 4, "roof rise"),
-                ("verticality", b => b.OccupiedHeight, 10, "height"),
+                ("verticality", b => b.OccupiedHeight, 4, "height"),   // a storey, less what the roof loses on a tighter plan
                 ("footprint_area", b => b.Footprint(R("floor")), 30, "footprint"),
                 ("elevation_bias", b => { b.Span(R("floor"), out int lo, out _); return lo; }, 6, "floor raised"),
                 ("aperture_ratio", b => (b.Count(R("window")) + b.Count(R("door"))) / (double)(b.Count(R("wall")) + b.Count(R("window")) + b.Count(R("door"))), 0.12, "openness"),
@@ -184,7 +184,7 @@ namespace Godless.Sim.Tests
                 bp.Span(R("door"), out int door, out _);
                 Assert.Equal(floor + 1, door);
                 Assert.True(bp.Capacity >= 3);
-                Assert.InRange(bp.Volume, 150, 3000);   // a runaway-grammar bound, not a style rule
+                Assert.InRange(bp.Volume, 150, 8000);   // a runaway-grammar bound, not a style rule
             }
         }
 

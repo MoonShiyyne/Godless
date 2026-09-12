@@ -16,11 +16,11 @@ namespace Godless.Sim.Settlements
     /// and has roofs takes in children, and one that cannot feed itself loses
     /// people.
     ///
-    /// The tell is the second half, and it turned out grimmer than the stage
-    /// plan guessed: a settlement on thin ground does not stop building, it
-    /// stops being there. Twenty people on land that feeds nobody put up four
-    /// houses and then dwindle to three, and what stands afterwards is a
-    /// village of empty roofs.
+    /// The tell is the second half, and once the task board weighed a meal
+    /// against a house properly (S29's tuning) it came out exactly as the
+    /// stage plan said: on thin ground every hand stays on the food, the
+    /// houses never go up at all, and the settlement dwindles in the open.
+    /// On good ground the same twenty people roof themselves and grow.
     /// </summary>
     public sealed class Subsistence : ISimSystem
     {

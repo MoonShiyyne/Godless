@@ -76,10 +76,11 @@ namespace Godless.Sim.Settlements
             settlement.Stock = new MaterialStock(materials);
             settlement.Catchment = Catchment.Survey(world.Island, biomes, materials, hx, hz);
 
-            // People arrive with food and nothing else: a fortnight to find
-            // their feet, which is the difference between a hard first season
-            // and a settlement that starves before it can forage (S1E).
-            settlement.Food = people * Subsistence.MealsADay * 14;
+            // People arrive with food and nothing else: a season and a half of
+            // it, which is what stands between a hard first year and a
+            // settlement that starves while it is still building its first
+            // house (S1E).
+            settlement.Food = people * Subsistence.MealsADay * 45;
             settlement.Genome = genome ?? new Genome(GeneTable.FromContent(content));
             settlement.AttachIntents(new IntentBus(IntentKindTable.FromContent(content, rules.Needs), rules.Needs.Count));
             settlement.Tasks = new TaskBoard(TaskKindTable.FromContent(content), settlement, rules, world.Streams);

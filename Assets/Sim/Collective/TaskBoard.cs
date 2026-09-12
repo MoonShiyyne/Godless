@@ -41,6 +41,9 @@ namespace Godless.Sim.Collective
     {
         public const string ThresholdStream = "collective.threshold";
 
+        /// <summary>How fast a task's stimulus follows its demand. A day or two of lag.</summary>
+        public const double Smoothing = 0.15;
+
         readonly TaskKind[] _kind;          // per task
         readonly int[] _material;           // per task; -1 = every material, by yield
         readonly Symbol[] _id;              // per task
@@ -206,11 +209,16 @@ namespace Godless.Sim.Collective
                 if (j >= 0 && (_demand[j] <= 0.0 || Roll(rng) < _kind[j].QuitChance)) j = -1;
                 if (j < 0)
                 {
-                    int start = rng.NextInt(tasks);
+                    // Tasks are considered in the order they press on this
+                    // person — the loudest call against their own threshold
+                    // first — and they take up the first that fires. Scanning
+                    // in a random order instead spreads the hands evenly over
+                    // everything that is wanted at all, which is how a
+                    // settlement starves beside a full timber yard.
                     for (int k = 0; k < tasks; k++)
                     {
-                        int t = (start + k) % tasks;
-                        if (_demand[t] <= 0.0) continue;   // nothing of it is wanted
+                        int t = Loudest(i, k);
+                        if (t < 0) break;
                         double st = _stimulus[t], th = _threshold[i][t];
                         double p = st * st / (st * st + th * th);
                         if (Roll(rng) < p) { j = t; break; }
@@ -229,14 +237,47 @@ namespace Godless.Sim.Collective
                 }
             }
 
+            // Stimulus follows what is wanted now, smoothed, rather than
+            // accumulating what was ever wanted. Letting it pile up made it a
+            // record of the settlement's history instead of its state: a
+            // village that went hungry once kept foraging for years while the
+            // houses it needed went unbuilt.
             for (int t = 0; t < tasks; t++)
             {
-                double st = _stimulus[t] + _kind[t].StimulusGrowth * _demand[t] - _kind[t].WorkDone * workers[t];
-                _stimulus[t] = st > 0.0 ? st : 0.0;
+                double target = _kind[t].StimulusGrowth * _demand[t] - _kind[t].WorkDone * workers[t];
+                if (target < 0.0) target = 0.0;
+                _stimulus[t] += (target - _stimulus[t]) * Smoothing;
+                if (_stimulus[t] < 0.0) _stimulus[t] = 0.0;
             }
         }
 
         static double Roll(RngStream rng) { return rng.NextInt(1000000) / 1000000.0; }
+
+        /// <summary>
+        /// The task with the kth loudest call for this person: its stimulus
+        /// against their own threshold for it. Tasks nothing wants are silent.
+        /// </summary>
+        int Loudest(int agent, int rank)
+        {
+            double ceiling = double.PositiveInfinity;
+            int found = -1;
+            for (int pass = 0; pass <= rank; pass++)
+            {
+                int at = -1;
+                double best = double.NegativeInfinity;
+                for (int t = 0; t < _kind.Length; t++)
+                {
+                    if (_demand[t] <= 0.0) continue;
+                    double loud = _stimulus[t] / _threshold[agent][t];
+                    if (loud >= ceiling) continue;      // taken by an earlier pass
+                    if (loud > best) { best = loud; at = t; }
+                }
+                if (at < 0) return -1;
+                found = at;
+                ceiling = best;
+            }
+            return found;
+        }
 
         /// <summary>A tick of the task. False when there turned out to be nothing to do.</summary>
         bool Do(Settlement s, int task, Agent agent, WorkSite work, RngStream rng)
@@ -282,11 +323,23 @@ namespace Godless.Sim.Collective
 
             for (int t = 0; t < _kind.Length; t++)
             {
-                if (_kind[t].Verb == "build") { _demand[t] = Construction.Remaining(s); continue; }
+                // Every demand in the same unit — ticks of work it would take
+                // — so a settlement can weigh a house against a meal.
+                if (_kind[t].Verb == "build") { _demand[t] = Construction.Remaining(s) / 4.0; continue; }
                 if (_kind[t].Verb == "forage")
                 {
+                    // Demand for food and demand for timber are both numbers,
+                    // and they are not the same number: a settlement asking
+                    // for three thousand voxels of house will outvote an empty
+                    // store and starve beside a full yard, which is what
+                    // happened. An emptying store multiplies its own demand,
+                    // so hunger takes the hands it needs and gives them back.
                     double shortfall = Subsistence.Wanted(s) - s.Food;
-                    _demand[t] = shortfall > 0.0 ? shortfall : 0.0;
+                    if (shortfall <= 0.0) { _demand[t] = 0.0; continue; }
+                    double days = s.People.Count > 0 ? s.Food / (s.People.Count * Subsistence.MealsADay) : 30.0;
+                    double urgency = days >= 30.0 ? 1.0 : 1.0 + 9.0 * (30.0 - days) / 30.0;
+                    double rate = s.Catchment != null && s.Catchment.FoodPerLabourTick > 0.0 ? s.Catchment.FoodPerLabourTick : 1.0;
+                    _demand[t] = shortfall / rate * urgency;
                     continue;
                 }
 
@@ -295,7 +348,9 @@ namespace Godless.Sim.Collective
                 double d = m >= 0
                     ? (yieldSum > 0.0 ? want * s.Catchment.YieldPerLabourTick(m) / yieldSum : 0.0) - s.Stock.Of(m)
                     : want - held;
-                _demand[t] = d > 0.0 ? d : 0.0;
+                double per = m >= 0 ? s.Catchment.YieldPerLabourTick(m) : 1.0;
+                if (per <= 0.0) per = 1.0;
+                _demand[t] = d > 0.0 ? d / per : 0.0;
             }
         }
 

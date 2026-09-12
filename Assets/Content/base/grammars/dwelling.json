@@ -17,9 +17,15 @@
     // Floor area against sleeping capacity, then footprint_area loosens or
     // tightens it, and verticality stacks it: the same area on three storeys
     // is a tower, on one a sprawl.
-    "area": "capacity * 9 + 12",
+    // Floor area in voxels squared; a voxel is half a metre, so 4 is a
+    // square metre. Twenty a head plus a hearth and room to move puts six
+    // people in about 37 m2, which is a house — and a house a settlement can
+    // actually finish. The first numbers here gave them 16 m2 over two
+    // floors, and the style plate (S29) showed what that is: a tower the
+    // width of a phone box.
+    "area": "capacity * 20 + 30",
     "spread": "lerp(0.6, 2.2, gene.footprint_area)",
-    "storeys": "1 + round(gene.verticality * 2)",
+    "storeys": "1 + round(gene.verticality * 1.6)",
     "groundArea": "area * spread / storeys",
     "width": "max(6, round(sqrt(groundArea * aspect)))",
     "depth": "max(5, round(groundArea / width))",

@@ -203,9 +203,10 @@ namespace Godless.Sim.Settlements
                     columns++;
                 }
 
-            // A full catchment of the best land feeds a forager about two
-            // meals a tick; thin land much less.
-            double yieldPerTick = columns > 0 ? 2.0 * food / columns : 0.0;
+            // A full catchment of the best land feeds a forager about three
+            // meals a tick — four a day, so five foragers feed twenty and the
+            // rest of the settlement can build. Thin land much less.
+            double yieldPerTick = columns > 0 ? 3.0 * food / columns : 0.0;
             return new Catchment(sources, Yields(materials, sources), r, yieldPerTick);
         }
     }

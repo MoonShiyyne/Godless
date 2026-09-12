@@ -61,6 +61,15 @@ namespace Godless.Sim.Build
         public static readonly Symbol SystemId = Symbol.For("system.siting");
         public const string StreamId = "build.realization";
 
+        /// <summary>
+        /// Days a settlement will go on looking for somewhere to put a
+        /// building before giving up on it. An intent nobody can site blocks
+        /// the ones behind it, and a settlement with nowhere left to build
+        /// should be a settlement with a reason to leave (S30), not one that
+        /// stands for ever holding a request it cannot answer.
+        /// </summary>
+        public const int GivesUpAfterDays = 240;
+
         readonly GrammarTable _grammars;
         readonly SitingTable _siting;
         readonly TileSet _tiles;
@@ -92,7 +101,13 @@ namespace Godless.Sim.Build
                 {
                     if (intent.Status != IntentStatus.Open) continue;
                     Project project = Plan(s, intent, world, rng);
-                    if (project == null) continue;
+                    if (project == null)
+                    {
+                        long waited = world.Clock.Tick - intent.RaisedTick;
+                        if (waited > GivesUpAfterDays * world.Clock.TicksPerDay)
+                            s.Intents.Abandon(intent, world.Clock.Tick, world.Annals, s.Founded);
+                        continue;
+                    }
                     s.Projects.Add(project);
                     s.Intents.Claim(intent, world.Clock.Tick, world.Annals, project.Site.Record);
                 }

@@ -97,8 +97,8 @@ namespace Godless.Sim.Tests
             // finding food is labour that does not go to building.
             var fed = new Village(1.2, stocked: 0);
             var starving = new Village(0.05, stocked: 0);
-            fed.Live(700);
-            starving.Live(700);
+            fed.Live(1400);
+            starving.Live(1400);
 
             Assert.True(fed.Town.Born > 0, "nobody was born on good ground");
             Assert.True(fed.Town.People.Count > 20, "the fed village did not grow: " + fed.Town.People.Count);
@@ -108,11 +108,13 @@ namespace Godless.Sim.Tests
             Assert.True(starving.Town.People.Count < fed.Town.People.Count,
                         starving.Town.People.Count + " on bad ground against " + fed.Town.People.Count + " on good");
 
-            // The houses it managed to build outlive the people who built
-            // them: a village of standing, empty roofs.
-            Assert.True(starving.Houses > 0, "it built nothing at all");
-            Assert.True(starving.Town.ShelterCapacity > starving.Town.People.Count * 2,
-                        starving.Town.ShelterCapacity + " sleeping places for " + starving.Town.People.Count + " people");
+            // And the hands never leave the food: on thin ground the houses
+            // do not go up at all, which is the stage plan's tell arriving
+            // from the other direction.
+            Assert.True(fed.Houses > starving.Houses,
+                        "good ground built " + fed.Houses + " houses, thin ground " + starving.Houses);
+            Assert.True(starving.Town.ShelterCapacity < 6,
+                        starving.Town.ShelterCapacity + " sleeping places on ground that cannot feed anyone");
 
             // And the going hungry is on record, so the chronicle can say when.
             Assert.NotEmpty(starving.World.Annals.OfKind(Subsistence.HungerKind));
@@ -125,7 +127,7 @@ namespace Godless.Sim.Tests
         public void GrowingAsksForAnotherHouse()
         {
             var village = new Village(1.2);
-            village.Live(700);
+            village.Live(1400);
             Assert.True(village.Houses >= 3, village.Houses + " houses");
             Assert.True(village.Town.ShelterCapacity >= 20, village.Town.ShelterCapacity + " sleeping places");
         }

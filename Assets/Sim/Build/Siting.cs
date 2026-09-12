@@ -235,7 +235,9 @@ namespace Godless.Sim.Build
                 for (int dx = 0; dx < wide; dx++)
                 {
                     int x = px + dx, z = pz + dz;
-                    if (!ParcelGrid.InBounds(x, z) || !grid.IsLand(x, z) || grid.WetColumns(x, z) > 0) return false;
+                    // A parcel with a puddle in it is still ground you can
+                    // build on; a parcel that is a quarter water is not.
+                    if (!ParcelGrid.InBounds(x, z) || !grid.IsLand(x, z) || grid.WetColumns(x, z) > 4) return false;
                 }
 
             // The footprint and the ring round it: unclaimed, so houses do not

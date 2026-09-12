@@ -15,6 +15,6 @@
   "forget": 0.004,
   "quitChance": 0.03,
 
-  "stimulusGrowth": 0.0006,
+  "stimulusGrowth": 0.0008,
   "workDone": 0.03
 }

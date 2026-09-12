@@ -21,7 +21,7 @@
 
   // Stimulus gained per tick per voxel of unmet demand, and lost per
   // worker-tick. The ratio sets how many hands a shortfall draws.
-  "stimulusGrowth": 0.0005,
+  "stimulusGrowth": 0.0006,
   "workDone": 0.03,
 
   // Kept in hand even when nothing is commissioned.
