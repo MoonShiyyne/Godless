@@ -173,12 +173,16 @@ namespace Godless.Sim.Build
             scope.HearthX = settlement.HearthParcelX;
             scope.HearthZ = settlement.HearthParcelZ;
 
+            // Ground you can still walk to from the fire without crossing
+            // somebody's house. Flooded once, rather than pathed per candidate.
+            bool[] reachable = Reachable(settlement, grid);
+
             Site best = null;
             double bestScore = double.NegativeInfinity;
             for (int pz = hz - rule.SearchRadius; pz <= hz + rule.SearchRadius; pz++)
                 for (int px = hx - rule.SearchRadius; px <= hx + rule.SearchRadius; px++)
                 {
-                    if (!Fits(settlement, grid, px, pz, wide, deep)) continue;
+                    if (!Fits(settlement, grid, px, pz, wide, deep, reachable)) continue;
 
                     scope.X = px; scope.Z = pz;
                     if (rule.Allow.Eval(scope) <= 0.0) continue;
@@ -208,27 +212,83 @@ namespace Godless.Sim.Build
                 }
             best.Ground = ground + 1;
 
-            for (int dz = 0; dz < deep; dz++)
-                for (int dx = 0; dx < wide; dx++) settlement.ClaimParcel(best.ParcelX + dx, best.ParcelZ + dz);
-
             var place = new Int3(best.ParcelX * ParcelGrid.Size + wide * ParcelGrid.Size / 2, best.Ground,
                                  best.ParcelZ * ParcelGrid.Size + deep * ParcelGrid.Size / 2);
             best.Record = annals.Write(tick, ChosenKind, settlement.Id, place, intent.Record,
                                        (long)(best.Score * 1000.0), wide * deep, new[] { intent.Kind.Id });
+
+            for (int dz = 0; dz < deep; dz++)
+                for (int dx = 0; dx < wide; dx++) settlement.ClaimParcel(best.ParcelX + dx, best.ParcelZ + dz, best.Record);
             return best;
         }
 
         static int Parcels(int voxels) { return (voxels + ParcelGrid.Size - 1) / ParcelGrid.Size; }
 
-        static bool Fits(Settlement settlement, ParcelGrid grid, int px, int pz, int wide, int deep)
+        /// <summary>
+        /// S1B: a building needs ground of its own, a parcel of daylight
+        /// between it and its neighbours, and a way to the fire that does not
+        /// go through somebody else's house.
+        /// </summary>
+        static bool Fits(Settlement settlement, ParcelGrid grid, int px, int pz, int wide, int deep, bool[] reachable)
         {
             for (int dz = 0; dz < deep; dz++)
                 for (int dx = 0; dx < wide; dx++)
                 {
                     int x = px + dx, z = pz + dz;
-                    if (!ParcelGrid.InBounds(x, z) || !grid.IsLand(x, z) || settlement.IsClaimed(x, z)) return false;
+                    if (!ParcelGrid.InBounds(x, z) || !grid.IsLand(x, z) || grid.WetColumns(x, z) > 0) return false;
                 }
-            return true;
+
+            // The footprint and the ring round it: unclaimed, so houses do not
+            // grow into each other and the gaps between them stay walkable.
+            for (int dz = -1; dz <= deep; dz++)
+                for (int dx = -1; dx <= wide; dx++)
+                    if (settlement.IsClaimed(px + dx, pz + dz)) return false;
+
+            for (int dz = -1; dz <= deep; dz++)
+                for (int dx = -1; dx <= wide; dx++)
+                {
+                    int x = px + dx, z = pz + dz;
+                    bool inside = dx >= 0 && dz >= 0 && dx < wide && dz < deep;
+                    if (inside || !ParcelGrid.InBounds(x, z)) continue;
+                    if (reachable[z * ParcelGrid.Width + x]) return true;   // a way in from the settlement
+                }
+            return false;
+        }
+
+        /// <summary>
+        /// Every parcel a person can walk to from the hearth without crossing
+        /// a claim. One flood from the fire, rather than a path per candidate.
+        /// </summary>
+        static bool[] Reachable(Settlement settlement, ParcelGrid grid)
+        {
+            var seen = new bool[ParcelGrid.Width * ParcelGrid.Depth];
+            var queue = new Queue<int>();
+            int start = settlement.HearthParcelZ * ParcelGrid.Width + settlement.HearthParcelX;
+            seen[start] = true;
+            queue.Enqueue(start);
+
+            while (queue.Count > 0)
+            {
+                int at = queue.Dequeue();
+                int ax = at % ParcelGrid.Width, az = at / ParcelGrid.Width;
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dz == 0) continue;
+                        int nx = ax + dx, nz = az + dz;
+                        if (!ParcelGrid.InBounds(nx, nz)) continue;
+                        int next = nz * ParcelGrid.Width + nx;
+                        if (seen[next] || !grid.IsLand(nx, nz) || settlement.IsClaimed(nx, nz)) continue;
+
+                        double climb = grid.Height[nx, nz] - grid.Height[ax, az];
+                        if (climb < 0.0) climb = -climb;
+                        if (climb >= ParcelPath.Impassable || grid.Slope[nx, nz] >= ParcelPath.Impassable) continue;
+
+                        seen[next] = true;
+                        queue.Enqueue(next);
+                    }
+            }
+            return seen;
         }
 
         sealed class ParcelScope : IExprScope

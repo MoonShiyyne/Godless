@@ -33,17 +33,16 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15, S13, S1A.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15, S13, S1A, S1B.**
 
 **The stratum-1 loop is closed:** nights in the open raise pressure, pressure
 raises an intent, the genome plans a house, the ground is chosen and claimed,
 self-appointed gatherers bring the material in, and builders lay it course by
 course until there are roofs. `sim settle --days 400` walks it end to end.
 
-Next, toward G1: the **Unity side** (a settlement in the Island scene, so the
-village can be watched), then **S1B** footprint claim and worn roads, **S1E**
-subsistence and population, **S1G** the separation metric and **S29** the
-screenshot harness. Then G1 can be run.
+Next, toward G1: **S1E** subsistence and population, **S1G** the separation
+metric and **S29** the screenshot harness. Then G1 can be run. Worn roads and
+the paving threshold are S2K, at stratum 2.
 `sim settle --elevation_bias 0.9` runs the whole chain: nights in the open,
 intents, gathering, a plan, a site and a costed house. S18 split grammar is the first system that can turn a gene into a
 visible shape — S17's tell only becomes testable there, and it needs only
@@ -69,6 +68,17 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S1B shipped
+
+- Claims carry their owner (a structure's site record, or the founding for
+  the hearth), sorted so everything that walks them walks them the same way.
+- A site needs its own ground, **a parcel of daylight around it**, and a way
+  to the fire that does not cross somebody's house — checked by one flood
+  from the hearth rather than a path per candidate.
+- Nobody builds on the fire: the hearth parcel is claimed at founding.
+- With the ground all taken the settlement asks and gets no site, rather than
+  stacking houses on each other.
+
 ### What S1A shipped
 
 - `Build/Construction.cs`: a builder walks to the site (S13) and lays four

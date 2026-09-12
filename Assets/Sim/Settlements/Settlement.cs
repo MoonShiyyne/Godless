@@ -65,19 +65,35 @@ namespace Godless.Sim.Settlements
         /// <summary>What the land within hauling range offers (S11). Surveyed at founding.</summary>
         public Catchment Catchment { get; set; }
 
-        // Parcels this settlement has taken for its buildings (S15). S1B
-        // turns this into a claim with streets between the claims.
-        readonly List<int> _claims = new List<int>();
+        // Parcels this settlement has taken, and what took each of them (S1B).
+        // Sorted, because everything that walks it has to walk it the same way
+        // on every machine (L2).
+        readonly SortedDictionary<int, int> _claims = new SortedDictionary<int, int>();
 
-        public void ClaimParcel(int px, int pz)
+        /// <param name="owner">The record that took it: a structure's site, or the founding for the hearth.</param>
+        public void ClaimParcel(int px, int pz, RecordId owner)
         {
-            int key = pz * World.ParcelGrid.Width + px;
-            if (!_claims.Contains(key)) _claims.Add(key);
+            if (!World.ParcelGrid.InBounds(px, pz)) return;
+            _claims[pz * World.ParcelGrid.Width + px] = owner.Index;
         }
 
-        public bool IsClaimed(int px, int pz) { return _claims.Contains(pz * World.ParcelGrid.Width + px); }
+        public bool IsClaimed(int px, int pz)
+        {
+            return World.ParcelGrid.InBounds(px, pz) && _claims.ContainsKey(pz * World.ParcelGrid.Width + px);
+        }
 
-        public IReadOnlyList<int> Claims { get { return _claims; } }
+        /// <summary>What holds this parcel, or RecordId.None where nothing does.</summary>
+        public RecordId ClaimOn(int px, int pz)
+        {
+            int owner;
+            return World.ParcelGrid.InBounds(px, pz) && _claims.TryGetValue(pz * World.ParcelGrid.Width + px, out owner)
+                ? new RecordId(owner) : RecordId.None;
+        }
+
+        /// <summary>Claimed parcels, in grid order.</summary>
+        public IEnumerable<int> Claims { get { return _claims.Keys; } }
+
+        public int ClaimCount { get { return _claims.Count; } }
 
         /// <summary>The culture's dispositions (S17). What the grammar and the siting read.</summary>
         public Culture.Genome Genome { get; set; }
@@ -123,6 +139,9 @@ namespace Godless.Sim.Settlements
                 s._people.Add(person);
             }
             s.Pressure = new PressureTally(rules.Needs.Count);
+
+            // The fire is the one piece of ground nobody builds on.
+            s.ClaimParcel(s.HearthParcelX, s.HearthParcelZ, s.Founded);
             return s;
         }
 
@@ -137,7 +156,7 @@ namespace Godless.Sim.Settlements
             foreach (Agent a in _people) a.AddTo(ref d);
             if (Stock != null) d.Add(Stock.Digest());
             if (Tasks != null) d.Add(Tasks.Digest());
-            foreach (int claim in _claims) d.Add(claim);
+            foreach (KeyValuePair<int, int> claim in _claims) { d.Add(claim.Key); d.Add(claim.Value); }
             if (Genome != null) d.Add(Genome.Digest());
             foreach (Build.Project p in Projects)
             {

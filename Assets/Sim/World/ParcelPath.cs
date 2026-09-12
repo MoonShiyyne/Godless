@@ -47,7 +47,12 @@ namespace Godless.Sim.World
         /// is no way. Water and cliffs are refused; the goal itself is
         /// allowed to be either, so a path can end at the water's edge.
         /// </summary>
-        public static List<int> Find(ParcelGrid grid, int fromX, int fromZ, int toX, int toZ)
+        /// <param name="blocked">
+        /// Extra ground people will not cross — another building's claim, say
+        /// (S1B). The start and the goal are never blocked by it.
+        /// </param>
+        public static List<int> Find(ParcelGrid grid, int fromX, int fromZ, int toX, int toZ,
+                                     System.Func<int, int, bool> blocked = null)
         {
             var path = new List<int>();
             if (!ParcelGrid.InBounds(fromX, fromZ) || !ParcelGrid.InBounds(toX, toZ)) return path;
@@ -86,6 +91,7 @@ namespace Godless.Sim.World
 
                     int step = Step(walkable, ax, az, nx, nz, k >= 4, next == goal);
                     if (step < 0) continue;
+                    if (blocked != null && next != goal && blocked(nx, nz)) continue;
 
                     int through = cost[at] + step;
                     if (through >= cost[next]) continue;
