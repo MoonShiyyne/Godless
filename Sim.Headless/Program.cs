@@ -609,6 +609,8 @@ namespace Godless.Sim.Headless
             Palette palette = Palette.FromContent(db);
             Grammar grammar = GrammarTable.FromContent(db, genes).For("shelter");
             if (grammar == null) { Console.Error.WriteLine("no grammar builds shelter"); return 1; }
+            NegotiationTable negotiation = NegotiationTable.FromContent(db, genes);
+            foreach (string problem in negotiation.Problems) Console.WriteLine("refused: " + problem);
 
             string gene = cli.Text("gene", null);
             string[] wanted = cli.Text("biomes", "temperate,highland").Split(',');
@@ -632,21 +634,14 @@ namespace Godless.Sim.Headless
                 ushort water;
                 if (types.TryGetId(Symbol.For("voxel.water"), out water)) wet[water] = true;
                 ParcelGrid grid = ParcelGrid.Build(store, solid, wet);
+                ConstraintFields fields = ConstraintFields.Compute(island, grid, biomes);
 
-                if (gene == null)
-                {
-                    Silhouette a = BuildIn(wanted[0].Trim(), grid, island, biomes, materials, tiles, palette, types, grammar, genes, streams, null, 0);
-                    Silhouette b = BuildIn(wanted.Length > 1 ? wanted[1].Trim() : "highland", grid, island, biomes, materials, tiles, palette, types, grammar, genes, streams, null, 0);
-                    if (a == null || b == null) continue;
-                    setA.Add(a); setB.Add(b);
-                }
-                else
-                {
-                    Silhouette a = BuildIn(wanted[0].Trim(), grid, island, biomes, materials, tiles, palette, types, grammar, genes, streams, gene, 0.1);
-                    Silhouette b = BuildIn(wanted[0].Trim(), grid, island, biomes, materials, tiles, palette, types, grammar, genes, streams, gene, 0.9);
-                    if (a == null || b == null) continue;
-                    setA.Add(a); setB.Add(b);
-                }
+                string biomeA = wanted[0].Trim();
+                string biomeB = gene == null ? (wanted.Length > 1 ? wanted[1].Trim() : "highland") : biomeA;
+                Silhouette one = BuildIn(biomeA, grid, island, biomes, fields, negotiation, materials, tiles, palette, types, grammar, genes, streams, gene, 0.1);
+                Silhouette two = BuildIn(biomeB, grid, island, biomes, fields, negotiation, materials, tiles, palette, types, grammar, genes, streams, gene, 0.9);
+                if (one == null || two == null) continue;
+                setA.Add(one); setB.Add(two);
                 used++;
             }
             watch.Stop();
@@ -677,6 +672,7 @@ namespace Godless.Sim.Headless
 
         /// <summary>The house a culture builds on the best site it can find in a biome, from what that land gives.</summary>
         static Silhouette BuildIn(string biomeName, ParcelGrid grid, IslandMap island, BiomeTable biomes,
+                                  ConstraintFields fields, NegotiationTable negotiation,
                                   MaterialTable materials, TileSet tiles, Palette palette, VoxelTypes types,
                                   Grammar grammar, Godless.Sim.Culture.GeneTable genes, StreamRegistry streams,
                                   string gene, double value)
@@ -705,7 +701,11 @@ namespace Godless.Sim.Headless
             Blueprint plan = grammar.Build(genome, palette, 60, 60, 650);
             Structure built = Realizer.Realize(plan, tiles, materials, stock, palette, types,
                                                streams.Derive("build.realization", (ulong)(px * 1000 + pz)), catchment);
-            return Silhouette.Measure(plan, built, materials, types);
+
+            GroundPlan ground = negotiation.Count > 0
+                ? negotiation.Choose(px, pz, grid, fields, genome, plan.Width - 2 * Grammar.Margin, plan.Depth - 2 * Grammar.Margin)
+                : null;
+            return Silhouette.Measure(plan, built, materials, types, ground);
         }
 
         // ── sim settle ──────────────────────────────────────────────────────
@@ -801,7 +801,8 @@ namespace Godless.Sim.Headless
             Palette palette = Palette.FromContent(db);
             world.Add(new SiteSystem(GrammarTable.FromContent(db, genes),
                                      SitingTable.FromContent(db, genes, kinds),
-                                     tileset, materials, palette, grid, constraints));
+                                     tileset, materials, palette, grid, constraints,
+                                     NegotiationTable.FromContent(db, genes)));
 
             // S1A: hands that lay the voxels, allocated like any other work.
             var construction = new Construction(world.Voxels, materials, types, tileset, palette);
@@ -899,7 +900,9 @@ namespace Godless.Sim.Headless
                 Console.WriteLine("  " + project.Site.Record + " parcel (" + project.Site.ParcelX.ToString(c) + ", "
                     + project.Site.ParcelZ.ToString(c) + ") score " + project.Site.Score.ToString("0.0", c)
                     + ", sleeps " + project.Plan.Capacity.ToString(c) + ", " + string.Join(" + ", of)
-                    + "   " + (project.Complete ? "standing" : project.Placed + " of " + project.Built.TotalVoxels + " laid"));
+                    + "   " + (project.Complete ? "standing" : project.Placed + " of " + project.Built.TotalVoxels + " laid")
+                    + (project.Ground == null ? "" : ", " + project.Ground.Strategy.ToString().ToLowerInvariant()
+                        + (project.Ground.Moved > 0 ? " (" + project.Ground.Moved.ToString(c) + " voxels of earth moved)" : "")));
                 foreach (string note in project.Built.Compromises) Console.WriteLine("      " + note);
             }
 

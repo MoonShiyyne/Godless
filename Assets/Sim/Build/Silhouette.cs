@@ -20,6 +20,7 @@ namespace Godless.Sim.Build
         {
             "height", "footprint", "aspect", "roof rise", "raised floor", "openness",
             "stone", "timber", "thatch", "earth",
+            "cut and fill", "terraced", "stilted",
         };
 
         public readonly double[] Values = new double[Names.Length];
@@ -36,7 +37,13 @@ namespace Godless.Sim.Build
 
         static readonly string[] Classes = { "stone", "timber", "thatch", "earth" };
 
-        public static Silhouette Measure(Blueprint plan, Structure built, MaterialTable materials, VoxelTypes types)
+        /// <param name="ground">
+        /// How the building meets its site (S16), when it is known. A house on
+        /// a cut pad, a house stepped into a slope and a house on posts read as
+        /// three different buildings from outside.
+        /// </param>
+        public static Silhouette Measure(Blueprint plan, Structure built, MaterialTable materials, VoxelTypes types,
+                                         GroundPlan ground = null)
         {
             var s = new Silhouette();
             Symbol wall = Symbol.For("role.wall"), window = Symbol.For("role.window"), door = Symbol.For("role.door");
@@ -80,6 +87,7 @@ namespace Godless.Sim.Build
                     if (k >= 0) s.Values[6 + k] += built.Cost[m] / (double)total;
                 }
             }
+            if (ground != null) s.Values[10 + (int)ground.Strategy] = 1.0;
             return s;
         }
     }

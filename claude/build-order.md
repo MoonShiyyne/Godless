@@ -34,7 +34,7 @@ middle column):
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
 **Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15,
-S13, S1A, S1B, S1E, S1G.**
+S13, S1A, S1B, S1E, S1G, S16.**
 
 **The stratum-1 loop is closed:** nights in the open raise pressure, pressure
 raises an intent, the genome plans a house, the ground is chosen and claimed,
@@ -43,11 +43,15 @@ course until there are roofs. Food decides how many people there are to do
 it. `sim settle --days 400` walks it end to end, and the Island scene shows
 the same thing happening while you watch.
 
-**Next, toward G1: S16 terrain negotiation**, then **S29** the screenshot
-harness. S1G measured why S16 comes first: nothing yet makes the *shape* of a
-building answer to its ground, so two biomes differ only in what they are made
-of, and the biome test sits at 77.5% where the gene tests are at 88-100%.
+**Next, toward G1: S29** the screenshot harness, and then the gate itself.
 Worn roads and the paving threshold stay at S2K, in stratum 2.
+
+**Where G1's numbers stand** (`sim separate`, 30-40 seeds): the six genes at
+88-100%, biomes at 77.5%. The biome number is carried by materials and by how
+a building meets its ground; it is not higher because cultures pick the
+flattest ground they can find in any biome, so the terrain response is muted
+by their own good sense. Nothing yet makes the *genome* answer to the biome —
+that is S25, at stratum 2, mutation from scar mass.
 
 **The instruments:** `sim separate [--gene G]` is G1's two tests as numbers.
 `sim settle [--<gene> V]` runs a settlement and prints its days, its houses
@@ -72,6 +76,20 @@ constraint fields; `sim island` draws the island with its rivers and lakes.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S16 shipped
+
+- Three ways of meeting ground that is not flat, chosen by content in the same
+  expression language: cut and fill (level a pad, spoil on the low side),
+  terrace (two or three steps cut into the slope), stilt (posts down to
+  whatever the ground is doing, nothing moved).
+- The earthworks are real voxels through `VoxelWorld.Set`, carrying the
+  structure's record, and the spoil is whatever the surface was — a terrace
+  cut into grass reads as grass. A post at the bottom of a stilted house
+  carries on down to the ground under it, however far that is.
+- Measured: a highland settlement terraces (27 voxels of earth moved), a
+  culture with a high elevation bias stilts on flat ground where a plain one
+  levels, and land that floods is built over rather than filled.
+
 ### What S1G shipped
 
 - `Build/Silhouette.cs`: what a stranger can see of a building as ten numbers

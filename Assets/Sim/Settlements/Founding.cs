@@ -106,7 +106,8 @@ namespace Godless.Sim.Settlements
                  .Add(new IntentSystem())
                  .Add(new SiteSystem(GrammarTable.FromContent(content, genes),
                                      SitingTable.FromContent(content, genes, IntentKindTable.FromContent(content, rules.Needs)),
-                                     tiles, materials, palette, grid, fields))
+                                     tiles, materials, palette, grid, fields,
+                                     NegotiationTable.FromContent(content, genes)))
                  .Add(new TaskSystem(new Construction(world.Voxels, materials, world.VoxelTypes, tiles, palette), grid));
         }
 

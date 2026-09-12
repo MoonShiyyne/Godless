@@ -33,6 +33,9 @@ namespace Godless.Sim.Build
         public Site Site { get; internal set; }
         public Structure Built { get; internal set; }
 
+        /// <summary>How the building meets its ground, and what the ground becomes (S16).</summary>
+        public GroundPlan Ground { get; internal set; }
+
         /// <summary>Voxels placed so far. S1A raises it a day at a time.</summary>
         public int Placed { get; internal set; }
 
@@ -65,12 +68,14 @@ namespace Godless.Sim.Build
         readonly Palette _palette;
         readonly ParcelGrid _grid;
         readonly ConstraintFields _fields;
+        readonly NegotiationTable _negotiation;
 
         public SiteSystem(GrammarTable grammars, SitingTable siting, TileSet tiles, MaterialTable materials,
-                          Palette palette, ParcelGrid grid, ConstraintFields fields)
+                          Palette palette, ParcelGrid grid, ConstraintFields fields, NegotiationTable negotiation = null)
         {
             _grammars = grammars; _siting = siting; _tiles = tiles;
             _materials = materials; _palette = palette; _grid = grid; _fields = fields;
+            _negotiation = negotiation;
         }
 
         public Symbol Id { get { return SystemId; } }
@@ -109,8 +114,17 @@ namespace Godless.Sim.Build
             Site site = SiteScorer.Choose(s, intent, plan, rule, _grid, _fields, s.Genome, world.Clock.Tick, world.Annals);
             if (site == null) return null;
 
+            // How it will meet the ground, and so what level its floor sits at (S16).
+            GroundPlan ground = null;
+            if (_negotiation != null && _negotiation.Count > 0)
+            {
+                ground = _negotiation.Choose(site, _grid, _fields, s.Genome,
+                                             plan.Width - 2 * Grammar.Margin, plan.Depth - 2 * Grammar.Margin);
+                site.Ground = ground.Floor;
+            }
+
             Structure built = Realizer.Realize(plan, _tiles, _materials, s.Stock, _palette, world.VoxelTypes, rng, s.Catchment);
-            return new Project { Intent = intent, Plan = plan, Site = site, Built = built };
+            return new Project { Intent = intent, Plan = plan, Site = site, Built = built, Ground = ground };
         }
     }
 }

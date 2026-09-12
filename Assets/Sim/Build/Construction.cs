@@ -32,6 +32,7 @@ namespace Godless.Sim.Build
     {
         public static readonly Symbol BegunKind = Symbol.For("structure.begun");
         public static readonly Symbol CompletedKind = Symbol.For("structure.completed");
+        static readonly Symbol PostRole = Symbol.For("role.post");
 
         readonly VoxelWorld _voxels;
         readonly MaterialTable _materials;
@@ -149,6 +150,13 @@ namespace Godless.Sim.Build
                 _voxels.Set(at, type, tick, project.Begun);
                 project.Placed++;
                 laid++;
+
+                // A post at the bottom of the building carries on down to the
+                // ground it stands on, which under stilts is wherever the
+                // hillside happens to be.
+                if (y == 0 && project.Plan.At(x, y, z) == PostRole)
+                    for (int drop = 1; drop <= PostReach(project, x, z); drop++)
+                        _voxels.Set(new Int3(at.X, at.Y - drop, at.Z), type, tick, project.Begun);
             }
 
             if (project.Placed >= order.Count) Finish(settlement, project, tick, annals);
@@ -167,6 +175,8 @@ namespace Godless.Sim.Build
             project.Begun = annals.Write(tick, BegunKind, settlement.Id, Centre(project), project.Site.Record,
                                          project.Built.TotalVoxels, project.Plan.Capacity,
                                          new[] { project.Intent.Kind.Id });
+
+            Groundworks(project, tick, annals);
         }
 
         void Finish(Settlement settlement, Project project, long tick, Annalist annals)
@@ -178,6 +188,38 @@ namespace Godless.Sim.Build
                                          project.Built.TotalVoxels, project.Plan.Capacity,
                                          new[] { project.Intent.Kind.Id });
             if (project.Intent.Outstanding) settlement.Intents.Resolve(project.Intent, tick, annals, done);
+        }
+
+        /// <summary>
+        /// Cut and fill before anything is laid (S16). Under stilts nothing is
+        /// moved: that is the whole point of stilts. The spoil is whatever the
+        /// surface was, so a terrace cut into grassy ground reads as grass and
+        /// one cut into sand reads as sand.
+        /// </summary>
+        void Groundworks(Project project, long tick, Annalist annals)
+        {
+            GroundPlan ground = project.Ground;
+            if (ground == null || ground.Strategy == GroundStrategy.Stilt) return;
+
+            int moved = 0;
+            for (int z = 0; z < ground.Depth; z++)
+                for (int x = 0; x < ground.Width; x++)
+                {
+                    int target = ground.LevelAt(x, z), was = ground.GroundAt(x, z);
+                    if (target < 0 || was < 0 || target == was) continue;
+
+                    int worldX = project.Site.ParcelX * ParcelGrid.Size + x;
+                    int worldZ = project.Site.ParcelZ * ParcelGrid.Size + z;
+                    ushort surface = _voxels.Store.Get(worldX, was - 1, worldZ);
+
+                    for (int y = System.Math.Min(target, was); y < System.Math.Max(target, was); y++)
+                    {
+                        var at = new Int3(worldX, y, worldZ);
+                        _voxels.Set(at, target > was ? surface : VoxelTypes.AirId, tick, project.Begun);
+                        moved++;
+                    }
+                }
+            ground.Moved = moved;
         }
 
         static Int3 Centre(Project project)
@@ -192,6 +234,19 @@ namespace Godless.Sim.Build
             int originX = project.Site.ParcelX * ParcelGrid.Size - Grammar.Margin;
             int originZ = project.Site.ParcelZ * ParcelGrid.Size - Grammar.Margin;
             return new Int3(originX + x, project.Site.Ground + y, originZ + z);
+        }
+
+        /// <summary>
+        /// A post stands on the ground, however far down that is (S16). Under
+        /// stilts the blueprint's posts are as long as the genome made them;
+        /// this is what carries them the rest of the way.
+        /// </summary>
+        public static int PostReach(Project project, int x, int z)
+        {
+            GroundPlan ground = project.Ground;
+            if (ground == null || ground.Strategy != GroundStrategy.Stilt) return 0;
+            int under = ground.GroundAt(x - Grammar.Margin, z - Grammar.Margin);
+            return under < 0 ? 0 : project.Site.Ground - under;
         }
 
         /// <summary>

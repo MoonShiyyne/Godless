@@ -1,0 +1,33 @@
+{
+  "type": "negotiation",
+  "id": "ground",
+
+  // S16. How a building meets ground that is not flat. The site's own facts
+  // and the genome decide; the highest score wins. site.drop is the fall
+  // across the footprint in voxels, site.slope the parcel's own roughness,
+  // and the fields run 0..1.
+  "strategies": {
+    "cut-and-fill": {
+      "tell": "The house stands on a flat pad cut into the hillside, with the spoil piled on the low side.",
+
+      // The ordinary answer on ordinary ground, and the one a culture that
+      // likes a big footprint reaches for, because a big floor needs a flat.
+      "score": "1.0 + lerp(0.0, 0.8, gene.footprint_area) - 0.12 * site.drop"
+    },
+
+    "terrace": {
+      "tell": "The house is cut into the slope in two or three steps, each level a course above the last.",
+
+      // Steep ground where levelling the whole footprint would mean moving
+      // half the hill.
+      "score": "0.25 * site.drop - 0.5 + lerp(0.0, 0.5, gene.verticality)"
+    },
+
+    "stilt": {
+      "tell": "The floor stands clear of the ground on posts, with the ground left as it was underneath.",
+
+      // Wet ground, ground that floods, and cultures that already build high.
+      "score": "1.6 * field.flood + 1.2 * field.damp + lerp(0.0, 2.0, gene.elevation_bias) - 0.9"
+    }
+  }
+}
