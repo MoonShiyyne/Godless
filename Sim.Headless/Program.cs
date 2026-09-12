@@ -45,6 +45,7 @@ namespace Godless.Sim.Headless
                 case "parcels": return Parcels(cli);
                 case "settle": return Settle(cli);
                 case "blueprint": return BlueprintCmd(cli);
+                case "separate": return Separate(cli);
                 case "help": Help(); return 0;
                 default:
                     Console.Error.WriteLine("unknown command '" + command + "'");
@@ -583,6 +584,130 @@ namespace Godless.Sim.Headless
             return ' ';
         }
 
+
+        // ── sim separate ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// G1's first test as a number. For each seed, the same culture builds
+        /// on the best site in two biomes, and a nearest-centroid rule is asked
+        /// to tell the two piles of buildings apart. With --gene, the biome is
+        /// held still and one gene is moved instead: G1's second test.
+        /// </summary>
+        static int Separate(Args cli)
+        {
+            var c = CultureInfo.InvariantCulture;
+            LoadResult loaded;
+            try { loaded = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
+            catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
+
+            ContentDatabase db = loaded.Database;
+            var genes = Godless.Sim.Culture.GeneTable.FromContent(db);
+            BiomeTable biomes = BiomeTable.FromContent(db);
+            VoxelTypes types = VoxelTypes.FromContent(db);
+            MaterialTable materials = MaterialTable.FromContent(db, biomes);
+            TileSet tiles = TileSet.FromContent(db, materials);
+            Palette palette = Palette.FromContent(db);
+            Grammar grammar = GrammarTable.FromContent(db, genes).For("shelter");
+            if (grammar == null) { Console.Error.WriteLine("no grammar builds shelter"); return 1; }
+
+            string gene = cli.Text("gene", null);
+            string[] wanted = cli.Text("biomes", "temperate,highland").Split(',');
+            ulong first; int count;
+            cli.Seeds(out first, out count, defaultCount: 20);
+
+            var setA = new List<Silhouette>();
+            var setB = new List<Silhouette>();
+            var watch = Stopwatch.StartNew();
+            int used = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                ulong seed = first + (ulong)i;
+                var store = new ChunkStore();
+                var streams = new StreamRegistry(seed);
+                IslandMap island = IslandGenerator.Generate(store, streams, biomes, types);
+
+                bool[] solid = TerrainBrush.SolidTable(db, types);
+                var wet = new bool[types.Count];
+                ushort water;
+                if (types.TryGetId(Symbol.For("voxel.water"), out water)) wet[water] = true;
+                ParcelGrid grid = ParcelGrid.Build(store, solid, wet);
+
+                if (gene == null)
+                {
+                    Silhouette a = BuildIn(wanted[0].Trim(), grid, island, biomes, materials, tiles, palette, types, grammar, genes, streams, null, 0);
+                    Silhouette b = BuildIn(wanted.Length > 1 ? wanted[1].Trim() : "highland", grid, island, biomes, materials, tiles, palette, types, grammar, genes, streams, null, 0);
+                    if (a == null || b == null) continue;
+                    setA.Add(a); setB.Add(b);
+                }
+                else
+                {
+                    Silhouette a = BuildIn(wanted[0].Trim(), grid, island, biomes, materials, tiles, palette, types, grammar, genes, streams, gene, 0.1);
+                    Silhouette b = BuildIn(wanted[0].Trim(), grid, island, biomes, materials, tiles, palette, types, grammar, genes, streams, gene, 0.9);
+                    if (a == null || b == null) continue;
+                    setA.Add(a); setB.Add(b);
+                }
+                used++;
+            }
+            watch.Stop();
+
+            if (setA.Count < 2) { Console.Error.WriteLine("not enough seeds had both sites"); return 1; }
+
+            SeparationReport report = Separation.Between(setA, setB);
+            string what = gene == null
+                ? "biome." + wanted[0].Trim() + " against biome." + (wanted.Length > 1 ? wanted[1].Trim() : "highland")
+                : "gene." + gene + " at 0.1 against 0.9, both in biome." + wanted[0].Trim();
+
+            Console.WriteLine(what + ", " + used.ToString(c) + " seeds, " + watch.Elapsed.TotalSeconds.ToString("0.0", c) + "s");
+            Console.WriteLine("\nseparation " + (report.Accuracy * 100).ToString("0.0", c)
+                + "%  (50% is a coin; a stranger has to be able to do at least as well)\n");
+            Console.WriteLine("  feature          difference   mean A   mean B");
+            foreach (int f in report.Strongest)
+            {
+                double meanA = 0.0, meanB = 0.0;
+                foreach (Silhouette s in setA) meanA += s.Values[f] / setA.Count;
+                foreach (Silhouette s in setB) meanB += s.Values[f] / setB.Count;
+                Console.WriteLine("  " + Silhouette.Names[f].PadRight(16)
+                    + report.Difference[f].ToString("+0.00;-0.00", c).PadLeft(10)
+                    + meanA.ToString("0.00", c).PadLeft(9) + meanB.ToString("0.00", c).PadLeft(9));
+            }
+            Console.WriteLine("\ndifference is Cohen's d: how many spreads apart the two means are.");
+            return 0;
+        }
+
+        /// <summary>The house a culture builds on the best site it can find in a biome, from what that land gives.</summary>
+        static Silhouette BuildIn(string biomeName, ParcelGrid grid, IslandMap island, BiomeTable biomes,
+                                  MaterialTable materials, TileSet tiles, Palette palette, VoxelTypes types,
+                                  Grammar grammar, Godless.Sim.Culture.GeneTable genes, StreamRegistry streams,
+                                  string gene, double value)
+        {
+            int px, pz;
+            if (!Founding.StandInSite(grid, island, biomes, Symbol.For("biome." + biomeName), out px, out pz)) return null;
+
+            int hx = px * ParcelGrid.Size + 2, hz = pz * ParcelGrid.Size + 2;
+            Catchment catchment = Catchment.Survey(island, biomes, materials, hx, hz);
+
+            // What a settlement here would be holding: what its own land gives
+            // most readily, in proportion.
+            var stock = new MaterialStock(materials);
+            double best = 0.0;
+            for (int m = 0; m < materials.Count; m++) best = Math.Max(best, catchment.YieldPerLabourTick(m));
+            for (int m = 0; m < materials.Count; m++)
+            {
+                if (catchment.YieldPerLabourTick(m) <= 0.0) continue;
+                stock.Add(m, (long)(800.0 * catchment.YieldPerLabourTick(m) / best));
+            }
+
+            var genome = new Godless.Sim.Culture.Genome(genes);
+            if (gene != null)
+                genome.Mutate(Symbol.For("gene." + gene), value, 0, Symbol.None, RecordId.None, new Annalist());
+
+            Blueprint plan = grammar.Build(genome, palette, 60, 60, 650);
+            Structure built = Realizer.Realize(plan, tiles, materials, stock, palette, types,
+                                               streams.Derive("build.realization", (ulong)(px * 1000 + pz)), catchment);
+            return Silhouette.Measure(plan, built, materials, types);
+        }
+
         // ── sim settle ──────────────────────────────────────────────────────
 
         /// <summary>
@@ -875,6 +1000,8 @@ namespace Godless.Sim.Headless
                                             sun, snow-load, damp, exposure, flood-risk
   sim blueprint [--grammar G] [--<gene> V ...] [--stock a,b,c] [--lot N]
                                             run a grammar for a genome and draw the house (S18)
+  sim separate [--seeds A..B] [--gene G] [--biomes A,B]
+                                            measure whether two biomes (or two cultures) build differently (S1G)
   sim settle   [--seed N] [--days D] [--people P] [--roofs R] [--biome B] [--<gene> V ...]
                                             found a settlement and print its days (S12, S14)
 

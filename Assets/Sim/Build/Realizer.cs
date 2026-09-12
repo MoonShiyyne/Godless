@@ -201,38 +201,38 @@ namespace Godless.Sim.Build
         }
 
         /// <summary>
-        /// With <paramref name="wantEnough"/>, the first class that can supply
-        /// the whole role, best material within it. Without, the material there
-        /// is most of anywhere in the role's classes — when nothing is enough,
-        /// what there is most of goes furthest, whatever the preference order.
+        /// What the settlement has most of, across every class the role
+        /// allows. The tileset's order is a preference and breaks ties; it is
+        /// not a ranking that outvotes the yard, or every settlement on the
+        /// island builds in whatever material happens to be listed first and
+        /// the stock stops meaning anything (measured with S1G: biomes
+        /// separated at 55% until this changed).
         /// </summary>
         static int Pick(RoleTile tile, int need, TileSet tiles, MaterialTable materials, MaterialStock stock,
                         Palette palette, List<int> chosen, Symbol role, int wallMaterial, bool wantEnough)
         {
             bool isRoof = role == Symbol.For("role.roof");
-            int overall = -1;
-            long overallScore = long.MinValue;
+            int best = -1;
+            long bestScore = long.MinValue;
 
-            foreach (Symbol cls in tile.Classes)
+            for (int rank = 0; rank < tile.Classes.Count; rank++)
             {
-                int best = -1;
-                long bestScore = long.MinValue;
-                foreach (int m in tiles.MaterialsOf(materials, cls))
+                foreach (int m in tiles.MaterialsOf(materials, tile.Classes[rank]))
                 {
                     long held = stock.Of(m);
                     if (wantEnough ? held < need : held <= 0) continue;
-                    long score = held;
+
+                    long score = held * 100;
+                    score += (tile.Classes.Count - rank) * 20;                   // the tileset's preference, gently
                     if (chosen.Contains(m)) score += 500000;                     // keep the palette tight
                     else if (chosen.Count >= tiles.MaxMaterials) score -= 1000000; // a fourth material is a last resort
                     if (isRoof && wallMaterial >= 0)
                         score += TileSet.Contrast(palette, materials, m, wallMaterial) >= tiles.MinRoofWallContrast ? 800000 : 0;
                     score = score * 1000 - m;                                    // ties by table order
                     if (score > bestScore) { bestScore = score; best = m; }
-                    if (score > overallScore) { overallScore = score; overall = m; }
                 }
-                if (wantEnough && best >= 0) return best;
             }
-            return wantEnough ? -1 : overall;
+            return best;
         }
 
         /// <summary>
