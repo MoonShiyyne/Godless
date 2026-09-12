@@ -21,6 +21,7 @@ namespace Godless.Sim.Settlements
         public static readonly Symbol FoundedKind = Symbol.For("settlement.founded");
 
         readonly List<Agent> _people = new List<Agent>();
+        DriveRules _rules;
 
         Settlement() { }
 
@@ -57,6 +58,40 @@ namespace Godless.Sim.Settlements
         {
             Intents = bus;
             Pressure = bus;
+        }
+
+        /// <summary>Meals in the store (S1E).</summary>
+        public double Food { get; set; }
+
+        /// <summary>Whether everyone ate this morning.</summary>
+        public bool Fed { get; internal set; }
+
+        /// <summary>Days in a row somebody has gone without.</summary>
+        public int HungryDays { get; internal set; }
+
+        /// <summary>Everyone who has ever been born here or died here, for the record.</summary>
+        public int Born { get; internal set; }
+        public int Died { get; internal set; }
+
+        /// <summary>Takes in a person, with a stable id of their own. The task board grows with them.</summary>
+        public Agent Add(StreamRegistry streams)
+        {
+            var person = new Agent(Symbol.For(Id + ".person." + Born.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".b"),
+                                   _people.Count, _rules.Needs);
+            person.PlaceAt(HearthParcelX, HearthParcelZ);
+            _people.Add(person);
+            Born++;
+            if (Tasks != null) Tasks.Sync(this, streams);
+            return person;
+        }
+
+        /// <summary>Loses one. The board forgets them and keeps everyone else's thresholds.</summary>
+        public void Remove(int index, StreamRegistry streams)
+        {
+            if (index < 0 || index >= _people.Count) return;
+            _people.RemoveAt(index);
+            Died++;
+            if (Tasks != null) Tasks.Sync(this, streams);
         }
 
         /// <summary>What the settlement holds to build with (S11). Null where nothing can be gathered.</summary>
@@ -130,6 +165,7 @@ namespace Godless.Sim.Settlements
                 Hearth = hearth,
                 Biome = biome,
                 ActivityTicks = new long[rules.Activities.Count],
+                _rules = rules,
             };
             s.Founded = annals.Write(tick, FoundedKind, s.Id, hearth, cause, people);
             for (int i = 0; i < people; i++)
@@ -151,6 +187,8 @@ namespace Godless.Sim.Settlements
             d.Add(Id.Hash);
             d.Add(Hearth.X); d.Add(Hearth.Y); d.Add(Hearth.Z);
             d.Add(ShelterCapacity);
+            d.Add(System.BitConverter.DoubleToInt64Bits(Food));
+            d.Add(Fed ? 1 : 0); d.Add(HungryDays); d.Add(Born); d.Add(Died);
             d.Add(SpellRecord.Index);
             d.Add(SpellSignature);
             foreach (Agent a in _people) a.AddTo(ref d);

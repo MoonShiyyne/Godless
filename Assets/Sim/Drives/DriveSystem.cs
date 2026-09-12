@@ -51,11 +51,15 @@ namespace Godless.Sim.Drives
             ActivityTable activities = rules.Activities;
             IReadOnlyList<Agent> people = s.People;
 
-            ulong day = Conditions.Mask(Conditions.Day) | Conditions.Mask(Conditions.Hearth) | Weathered(sky);
+            ulong belly = Conditions.Mask(s.Fed ? Conditions.Fed : Conditions.Hungry);
+            ulong day = Conditions.Mask(Conditions.Day) | Conditions.Mask(Conditions.Hearth) | Weathered(sky) | belly;
+            // A roof in a settlement with more people than beds is a shared
+            // roof, and that presses on everyone under it (S1E).
+            ulong crowded = s.People.Count > s.ShelterCapacity ? Conditions.Mask(Conditions.Crowded) : 0UL;
             ulong sheltered = Conditions.Mask(Conditions.Night) | Conditions.Mask(Conditions.Hearth)
-                            | Conditions.Mask(Conditions.Sheltered);
+                            | Conditions.Mask(Conditions.Sheltered) | belly | crowded;
             ulong exposed = Conditions.Mask(Conditions.Night) | Conditions.Mask(Conditions.Hearth)
-                          | Conditions.Mask(Conditions.Unsheltered) | Weathered(sky)
+                          | Conditions.Mask(Conditions.Unsheltered) | Weathered(sky) | belly
                           | (sky.Rain ? Conditions.Mask(Conditions.Soaked) : 0UL);
 
             // The conditions a night in the open is to blame for. A need that

@@ -33,15 +33,15 @@ middle column):
 | S1G separation metric | S19 WFC against stock | S13 simple pather |
 | S29 screenshot harness | S1A physical construction | S1B footprint claim |
 
-**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15, S13, S1A, S1B.**
+**Done in stratum 1: S10, S17, S12, S14, S11, S1C, S18, S1D, S19, S1F, S15, S13, S1A, S1B, S1E.**
 
 **The stratum-1 loop is closed:** nights in the open raise pressure, pressure
 raises an intent, the genome plans a house, the ground is chosen and claimed,
 self-appointed gatherers bring the material in, and builders lay it course by
 course until there are roofs. `sim settle --days 400` walks it end to end.
 
-Next, toward G1: **S1E** subsistence and population, **S1G** the separation
-metric and **S29** the screenshot harness. Then G1 can be run. Worn roads and
+Next, toward G1: **S1G** the separation metric and **S29** the screenshot
+harness. Then G1 can be run. Worn roads and
 the paving threshold are S2K, at stratum 2.
 `sim settle --elevation_bias 0.9` runs the whole chain: nights in the open,
 intents, gathering, a plan, a site and a costed house. S18 split grammar is the first system that can turn a gene into a
@@ -68,6 +68,25 @@ settlement and prints its days — S12's tell, readable without a renderer.
   one. Hunger rises with time alone, so it names nothing, correctly.
 - All agents are identical apart from where they slept, so they move in
   step. Individual thresholds are S1C's job, not a tuning bug.
+### What S1E shipped
+
+- Food is a settlement store: foraging (a third task verb) fills it, a meal a
+  day per person empties it, and what the land gives comes from the biomes in
+  the catchment — 0.86 meals a forager-tick in the temperate belt against 0.45
+  in the highlands. Nobody feeds themselves any more; the `fed` and `hungry`
+  conditions are what the hunger need reads.
+- Fed, roofed, with food put by, a settlement takes in children; forty days
+  hungry and it loses someone, hungriest first. Both on record.
+- Growth asks for the next house: a child leaves the settlement a bed short,
+  and a shared roof presses on everyone under it — without that crowding the
+  village stalled for ever at one person short of its beds.
+- The task board follows the population: whoever stays keeps their thresholds
+  and their history; a newcomer draws their own from their id.
+- Tell, grimmer than the stage plan guessed: thin ground does not stop a
+  settlement building, it stops it being there. Twenty people on land that
+  feeds nobody put up four houses and dwindle to three, leaving a village of
+  empty roofs; on good ground the same twenty grow to twenty-five.
+
 ### What S1B shipped
 
 - Claims carry their owner (a structure's site record, or the founding for

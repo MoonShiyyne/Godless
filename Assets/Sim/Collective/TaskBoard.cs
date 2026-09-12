@@ -46,9 +46,10 @@ namespace Godless.Sim.Collective
         readonly Symbol[] _id;              // per task
         readonly double[] _stimulus;        // per task
         readonly double[] _demand;          // per task, as last computed
-        readonly double[][] _threshold;     // per agent, per task
-        readonly long[][] _work;            // per agent, per task
-        readonly int[] _current;            // per agent; -1 = free
+        double[][] _threshold;              // per agent, per task
+        long[][] _work;                     // per agent, per task
+        int[] _current;                     // per agent; -1 = free
+        List<ulong> _rows = new List<ulong>();   // which person each row belongs to
         readonly ActivityTable _activities;
         long _idle;
 
@@ -63,7 +64,7 @@ namespace Godless.Sim.Collective
             foreach (TaskKind k in kinds.All)
             {
                 if (k.Verb == "gather" && (materials == null || s.Catchment == null)) continue;
-                if (k.Verb == "build") { kind.Add(k); material.Add(-1); id.Add(k.Id); continue; }
+                if (k.Verb == "build" || k.Verb == "forage") { kind.Add(k); material.Add(-1); id.Add(k.Id); continue; }
                 if (k.Verb == "gather" && k.PerMaterial)
                 {
                     for (int m = 0; m < materials.Count; m++)
@@ -97,13 +98,54 @@ namespace Godless.Sim.Collective
                 _threshold[i] = new double[tasks];
                 _work[i] = new long[tasks];
                 _current[i] = -1;
-                for (int j = 0; j < tasks; j++)
-                {
-                    RngStream r = streams.Derive(ThresholdStream, StableHash.Combine(s.People[i].Id.Hash, _id[j].Hash));
-                    double u = r.NextInt(1000001) / 1000000.0;
-                    _threshold[i][j] = _kind[j].ThresholdMin + u * (_kind[j].ThresholdMax - _kind[j].ThresholdMin);
-                }
+                _rows.Add(s.People[i].Id.Hash);
+                for (int j = 0; j < tasks; j++) _threshold[i][j] = Draw(s.People[i].Id, j, streams);
             }
+        }
+
+        double Draw(Symbol person, int task, StreamRegistry streams)
+        {
+            RngStream r = streams.Derive(ThresholdStream, StableHash.Combine(person.Hash, _id[task].Hash));
+            double u = r.NextInt(1000001) / 1000000.0;
+            return _kind[task].ThresholdMin + u * (_kind[task].ThresholdMax - _kind[task].ThresholdMin);
+        }
+
+        /// <summary>
+        /// Matches the board to who is alive (S1E). Everyone who stays keeps
+        /// their thresholds and their history; a newcomer draws their own from
+        /// their id, so who they turn out to be does not depend on when they
+        /// were born.
+        /// </summary>
+        public void Sync(Settlement s, StreamRegistry streams)
+        {
+            int people = s.People.Count, tasks = _kind.Length;
+            var threshold = new double[people][];
+            var work = new long[people][];
+            var current = new int[people];
+            var rows = new List<ulong>(people);
+
+            for (int i = 0; i < people; i++)
+            {
+                Symbol id = s.People[i].Id;
+                int old = _rows.IndexOf(id.Hash);
+                rows.Add(id.Hash);
+                if (old >= 0)
+                {
+                    threshold[i] = _threshold[old];
+                    work[i] = _work[old];
+                    current[i] = _current[old];
+                    continue;
+                }
+                threshold[i] = new double[tasks];
+                work[i] = new long[tasks];
+                current[i] = -1;
+                for (int j = 0; j < tasks; j++) threshold[i][j] = Draw(id, j, streams);
+            }
+
+            _threshold = threshold;
+            _work = work;
+            _current = current;
+            _rows = rows;
         }
 
         public int Count { get { return _kind.Length; } }
@@ -205,6 +247,13 @@ namespace Godless.Sim.Collective
                 return work.Builder.Work(s, agent, work.Grid, work.Tick, work.Annals, rng);
             }
 
+            if (_kind[task].Verb == "forage")
+            {
+                if (s.Catchment == null || s.Catchment.FoodPerLabourTick <= 0.0) return false;
+                s.Food += s.Catchment.FoodPerLabourTick;
+                return true;
+            }
+
             int m = _material[task];
             if (m >= 0) { s.Stock.Gather(m, 1.0, s.Catchment); return true; }
 
@@ -234,6 +283,12 @@ namespace Godless.Sim.Collective
             for (int t = 0; t < _kind.Length; t++)
             {
                 if (_kind[t].Verb == "build") { _demand[t] = Construction.Remaining(s); continue; }
+                if (_kind[t].Verb == "forage")
+                {
+                    double shortfall = Subsistence.Wanted(s) - s.Food;
+                    _demand[t] = shortfall > 0.0 ? shortfall : 0.0;
+                    continue;
+                }
 
                 double want = _kind[t].ReserveVoxels + commissioned;
                 int m = _material[t];

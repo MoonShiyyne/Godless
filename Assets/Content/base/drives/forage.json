@@ -1,1 +1,0 @@
-{ "type": "activity", "id": "forage", "requires": ["day"], "relieves": { "hunger": 0.25 } }

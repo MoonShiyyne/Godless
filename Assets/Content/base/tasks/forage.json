@@ -1,0 +1,18 @@
+{
+  "type": "task",
+  "id": "forage",
+  "tell": "In a thin place most of the day goes on finding food, and the houses stop going up.",
+
+  // S1E. Demand is the store's shortfall against a season of meals, so a
+  // settlement on poor ground has a standing call for hands that never
+  // quiets, and a settlement on good ground can spare people to build.
+  "verb": "forage",
+
+  "threshold": { "min": 0.04, "max": 0.8 },
+  "learn": 0.03,
+  "forget": 0.004,
+  "quitChance": 0.05,
+
+  "stimulusGrowth": 0.002,
+  "workDone": 0.03
+}

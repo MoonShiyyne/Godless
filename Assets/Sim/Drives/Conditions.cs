@@ -41,9 +41,18 @@ namespace Godless.Sim.Drives
         /// <summary>The settlement has a fire to sit at.</summary>
         public static readonly Symbol Hearth = Symbol.For("condition.hearth");
 
+        /// <summary>Slept under a roof in a settlement with more people than beds (S1E).</summary>
+        public static readonly Symbol Crowded = Symbol.For("condition.crowded");
+
+        /// <summary>There was food in the store this morning (S1E).</summary>
+        public static readonly Symbol Fed = Symbol.For("condition.fed");
+
+        /// <summary>There was not, and this person went without.</summary>
+        public static readonly Symbol Hungry = Symbol.For("condition.hungry");
+
         // Bit positions are code order, fixed here. They never reach content,
         // a save or a digest, so they are free to be positional.
-        static readonly Symbol[] _known = { Day, Night, Sheltered, Unsheltered, Rain, Cold, Soaked, Hearth };
+        static readonly Symbol[] _known = { Day, Night, Sheltered, Unsheltered, Rain, Cold, Soaked, Hearth, Crowded, Fed, Hungry };
 
         public static IReadOnlyList<Symbol> Known { get { return _known; } }
 

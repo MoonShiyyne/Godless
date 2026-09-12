@@ -75,6 +75,11 @@ namespace Godless.Sim.Settlements
             settlement.ShelterCapacity = roofs;
             settlement.Stock = new MaterialStock(materials);
             settlement.Catchment = Catchment.Survey(world.Island, biomes, materials, hx, hz);
+
+            // People arrive with food and nothing else: a fortnight to find
+            // their feet, which is the difference between a hard first season
+            // and a settlement that starves before it can forage (S1E).
+            settlement.Food = people * Subsistence.MealsADay * 14;
             settlement.Genome = genome ?? new Genome(GeneTable.FromContent(content));
             settlement.AttachIntents(new IntentBus(IntentKindTable.FromContent(content, rules.Needs), rules.Needs.Count));
             settlement.Tasks = new TaskBoard(TaskKindTable.FromContent(content), settlement, rules, world.Streams);
@@ -97,6 +102,7 @@ namespace Godless.Sim.Settlements
             Palette palette = Palette.FromContent(content);
 
             world.Add(new DriveSystem(rules))
+                 .Add(new Subsistence(rules))
                  .Add(new IntentSystem())
                  .Add(new SiteSystem(GrammarTable.FromContent(content, genes),
                                      SitingTable.FromContent(content, genes, IntentKindTable.FromContent(content, rules.Needs)),

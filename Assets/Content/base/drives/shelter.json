@@ -14,6 +14,9 @@
 
   // Condition -> change per tick it holds. Signed: a roof takes it away.
   // No activity relieves shelter. Only a roof does, and agents cannot
-  // build one; they can only go on wanting it (Part 03).
-  "rises": { "unsheltered": 0.2, "soaked": 0.1, "rain": 0.02, "sheltered": -0.5 }
+  // build one; they can only go on wanting it (Part 03). A roof shared
+  // because the settlement has more people than beds is barely a roof: the
+  // relief and the crowding nearly cancel, so the want creeps back up and
+  // the settlement asks for another house (S1E).
+  "rises": { "unsheltered": 0.2, "soaked": 0.1, "rain": 0.02, "sheltered": -0.5, "crowded": 0.55 }
 }

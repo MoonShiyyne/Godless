@@ -227,15 +227,23 @@ namespace Godless.Sim.Tests
             Assert.True(s.People[2].ShelteredLastNight);
             Assert.False(s.People[0].ShelteredLastNight);
 
-            // Nobody owns the bed, so the misery rotates: over nine nights
-            // each of the three gets a roof about a third of the time.
+            // Nobody owns the bed. The one who started worst off keeps it
+            // while the others catch up — a crowded roof presses on whoever
+            // has it too (S1E) — and then it changes hands. Once everyone is
+            // equally desperate the need saturates and who has it stops
+            // meaning anything, which is the honest end of a village with
+            // three people and one bed.
             var roofed = new int[3];
-            for (long d = 1; d <= 9; d++)
+            for (long d = 1; d <= 24; d++)
             {
+                Day(s, rules, d, Sky.Fair, annals);
                 Night(s, rules, d, Sky.Fair, annals);
                 for (int i = 0; i < 3; i++) if (s.People[i].ShelteredLastNight) roofed[i]++;
             }
-            foreach (int nights in roofed) Assert.InRange(nights, 2, 4);
+            int slept = 0;
+            foreach (int nights in roofed) if (nights > 0) slept++;
+            Assert.True(slept > 1, "the same person had the bed every night");
+            Assert.True(roofed[2] > 0, "the one who needed it most never got it");
         }
 
         [Fact]

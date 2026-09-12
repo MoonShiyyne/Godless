@@ -119,9 +119,21 @@ namespace Godless.Sim.Settlements
         readonly long[] _sources;
         readonly double[] _yield;
 
-        Catchment(long[] sources, double[] yield, int haul) { _sources = sources; _yield = yield; HaulRangeVoxels = haul; }
+        Catchment(long[] sources, double[] yield, int haul, double food = 0.0)
+        {
+            _sources = sources;
+            _yield = yield;
+            HaulRangeVoxels = haul;
+            FoodPerLabourTick = food;
+        }
 
         public int HaulRangeVoxels { get; private set; }
+
+        /// <summary>
+        /// Meals a tick of foraging brings in here (S1E). Wooded, rainy land
+        /// feeds people; bare highland and sand do not.
+        /// </summary>
+        public double FoodPerLabourTick { get; private set; }
 
         /// <summary>Land columns within range whose biome offers this material.</summary>
         public long Sources(int material) { return _sources[material]; }
@@ -136,10 +148,10 @@ namespace Godless.Sim.Settlements
         /// systems that will change what the land offers — depletion (S2F), a
         /// god seeding an ore vein.
         /// </summary>
-        public static Catchment FromSources(MaterialTable materials, long[] sources)
+        public static Catchment FromSources(MaterialTable materials, long[] sources, double foodPerLabourTick = 1.0)
         {
             if (sources.Length != materials.Count) throw new System.ArgumentException("one source count per material", nameof(sources));
-            return new Catchment((long[])sources.Clone(), Yields(materials, sources), materials.HaulRangeVoxels);
+            return new Catchment((long[])sources.Clone(), Yields(materials, sources), materials.HaulRangeVoxels, foodPerLabourTick);
         }
 
         static double[] Yields(MaterialTable materials, long[] sources)
@@ -172,6 +184,8 @@ namespace Godless.Sim.Settlements
                 offered[b] = idx.ToArray();
             }
 
+            double food = 0.0;
+            long columns = 0;
             for (int z = hearthZ - r; z <= hearthZ + r; z++)
                 for (int x = hearthX - r; x <= hearthX + r; x++)
                 {
@@ -181,9 +195,18 @@ namespace Godless.Sim.Settlements
                     int b = map.BiomeAt(x, z);
                     if (b < 0) continue;
                     foreach (int m in offered[b]) sources[m]++;
+
+                    // What the land itself feeds people: cover to forage under
+                    // and rain to grow it. S1E.
+                    Biome biome = biomes.At(b);
+                    food += biome.TreeCoverPercent / 100.0 * 0.6 + SimMath.Clamp01(biome.RainfallMm / 1500.0) * 0.4;
+                    columns++;
                 }
 
-            return new Catchment(sources, Yields(materials, sources), r);
+            // A full catchment of the best land feeds a forager about two
+            // meals a tick; thin land much less.
+            double yieldPerTick = columns > 0 ? 2.0 * food / columns : 0.0;
+            return new Catchment(sources, Yields(materials, sources), r, yieldPerTick);
         }
     }
 }

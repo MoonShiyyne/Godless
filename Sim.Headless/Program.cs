@@ -637,7 +637,7 @@ namespace Godless.Sim.Headless
             s.AttachIntents(bus);
             PressureTally tally = bus.Tally;
             world.Settlements.Add(s);
-            world.Add(new DriveSystem(rules)).Add(new IntentSystem());
+            world.Add(new DriveSystem(rules)).Add(new Subsistence(rules)).Add(new IntentSystem());
 
             Console.WriteLine("seed " + seed.ToString(c) + ": " + people.ToString(c) + " people found a settlement at parcel ("
                 + px.ToString(c) + ", " + pz.ToString(c) + ") in " + (biome == null ? "no biome" : biome.Id.ToString())
@@ -687,7 +687,7 @@ namespace Godless.Sim.Headless
             foreach (Activity a in rules.Activities.All) if (a.Name != "sleep") header.Append(a.Name.PadLeft(11));
             header.Append("   pressure:");
             foreach (Need n in rules.Needs.All) header.Append(n.Name.PadLeft(9));
-            header.Append("   stock    built");
+            header.Append("     stock      built  people   food");
             Console.WriteLine(header.ToString());
 
             int lastIntents = 0, lastProjects = 0;
@@ -724,8 +724,10 @@ namespace Godless.Sim.Headless
                 for (int m = 0; m < s.Stock.Materials.Count; m++) held += s.Stock.Of(m);
                 long placed = 0, wanted = 0;
                 foreach (Project project in s.Projects) { placed += project.Placed; wanted += project.Built.TotalVoxels; }
-                line.Append(held.ToString(c).PadLeft(8))
-                    .Append((wanted == 0 ? "" : placed.ToString(c) + "/" + wanted.ToString(c)).PadLeft(9)).Append("   ");
+                line.Append(held.ToString(c).PadLeft(10))
+                    .Append((wanted == 0 ? "" : placed.ToString(c) + "/" + wanted.ToString(c)).PadLeft(11))
+                    .Append(s.People.Count.ToString(c).PadLeft(8))
+                    .Append(s.Food.ToString("0", c).PadLeft(7)).Append("   ");
                 for (; lastIntents < bus.Intents.Count; lastIntents++) line.Append("+" + bus.Intents[lastIntents].Kind.Name + " ");
                 for (; lastProjects < s.Projects.Count; lastProjects++)
                 {
@@ -787,7 +789,7 @@ namespace Godless.Sim.Headless
                     // The regulars: everyone who did at least a tenth of it.
                     var regulars = new List<string>();
                     long byRegulars = 0;
-                    for (int i = 0; i < people; i++)
+                    for (int i = 0; i < s.People.Count; i++)
                         if (s.Tasks.WorkBy(i, j) * 10 >= total) { regulars.Add("#" + i.ToString(c)); byRegulars += s.Tasks.WorkBy(i, j); }
                     int m = s.Tasks.MaterialOf(j);
                     Console.WriteLine("  " + s.Tasks.TaskId(j).ToString().Replace("task.", "").PadRight(16) + total.ToString(c).PadLeft(6)
@@ -795,7 +797,7 @@ namespace Godless.Sim.Headless
                         + (m >= 0 ? "   holding " + s.Stock.Of(m).ToString(c) : ""));
                 }
                 double sum = 0.0; int gatherers = 0;
-                for (int i = 0; i < people; i++)
+                for (int i = 0; i < s.People.Count; i++)
                 {
                     long all = 0, main = 0;
                     for (int j = 0; j < s.Tasks.Count; j++) { all += s.Tasks.WorkBy(i, j); main = Math.Max(main, s.Tasks.WorkBy(i, j)); }
@@ -807,7 +809,10 @@ namespace Godless.Sim.Headless
                         + "% of each one's gathering was their own main material");
                 Console.WriteLine("  " + s.Tasks.IdleTicks.ToString(c) + " working ticks found nothing that needed doing");
             }
-            Console.WriteLine("\nroofs now: " + s.ShelterCapacity.ToString(c) + " sleeping places for " + people.ToString(c) + " people.");
+            Console.WriteLine("\nroofs now: " + s.ShelterCapacity.ToString(c) + " sleeping places for " + s.People.Count.ToString(c)
+                + " people (" + s.Born.ToString(c) + " born, " + s.Died.ToString(c) + " lost); "
+                + s.Food.ToString("0", c) + " meals in the store, land feeds "
+                + s.Catchment.FoodPerLabourTick.ToString("0.00", c) + " a forager-tick.");
             Console.WriteLine("activity ticks are agent-ticks: " + people.ToString(c) + " people x 3 daylight ticks a day.");
             return 0;
         }

@@ -1,12 +1,13 @@
 {
   "type": "need",
   "id": "hunger",
-  "tell": "People leave work to go looking for food; when there is none to find they stop coming back.",
+  "tell": "People who are not being fed spend the day out looking for food instead of building, and a settlement that cannot feed them loses them.",
   "start": 0.2,
   "drift": 0.05,
   "threshold": 0.7,
   "urgencyPower": 2,
 
-  // Nothing but time. Food stock and famine arrive with S1E and S20.
-  "rises": {}
+  // S1E. Nobody feeds themselves: the settlement's store feeds everyone, or
+  // it does not. Foraging fills the store (a task), eating empties it.
+  "rises": { "fed": -0.12, "hungry": 0.06 }
 }
