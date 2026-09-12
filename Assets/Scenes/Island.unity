@@ -343,6 +343,7 @@ GameObject:
   - component: {fileID: 537360353}
   - component: {fileID: 537360355}
   - component: {fileID: 537360356}
+  - component: {fileID: 537360357}
   m_Layer: 0
   m_Name: World
   m_TagString: Untagged
@@ -380,6 +381,9 @@ MonoBehaviour:
   seed: 7
   frameCamera: 1
   showStats: 1
+  settle: 1
+  people: 20
+  daysPerSecond: 4
 --- !u!114 &537360354
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -424,6 +428,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b708c9bb23ce14894ba372415d71ea97, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &537360357
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 537360351}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2e29ae577dd04eaabacba7224020972, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  capture: 0
+  years: 010000000200000004000000
+  width: 960
+  height: 540
+  folder: Screenshots
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
