@@ -28,6 +28,9 @@ namespace Godless.Unity
         [Tooltip("World seed. The same seed gives the same island on every machine.")]
         [SerializeField] long seed = 7;
 
+        [Tooltip("Which world in Assets/Content to generate. Empty is the built-in island with every biome. See `sim maps`.")]
+        [SerializeField] string map = "green-shore";
+
         [Tooltip("Place the main camera over the island on start.")]
         [SerializeField] bool frameCamera = true;
 
@@ -59,6 +62,12 @@ namespace Godless.Unity
         /// <summary>How fast the world runs while somebody is watching. Never seen by the simulation.</summary>
         public TickPacer Pacer { get; private set; }
 
+        /// <summary>What the ground is made of, by place and height — the god's brush builds from this.</summary>
+        public GroundPalette Ground { get; private set; }
+
+        /// <summary>The map this world was generated on. Never null once the world exists.</summary>
+        public WorldPreset Map { get; private set; }
+
         float _smoothedFrame = 1f / 60f;
         float _worstFrame;
         float _loadSeconds;
@@ -73,17 +82,31 @@ namespace Godless.Unity
             foreach (string warning in content.Warnings) Debug.LogWarning("content: " + warning);
 
             VoxelTypes types = VoxelTypes.FromContent(content.Database);
-            BiomeTable biomes = BiomeTable.FromContent(content.Database);
+
+            WorldChoice choice;
+            try { choice = WorldChoice.Pick(content.Database, map == null ? "" : map.Trim()); }
+            catch (ContentException e)
+            {
+                // A misspelled map in the inspector is a content problem, not
+                // a crash: say what there is and fall back to the plain island.
+                Debug.LogWarning("Godless: " + e.Message);
+                choice = WorldChoice.Pick(content.Database, "");
+            }
+
+            BiomeTable biomes = choice.Biomes;
             if (biomes.Count == 0)
             {
                 // L5's tell, seen from the Unity side: no content is not a crash.
                 Debug.Log("No biomes declared in " + root + " — booting with nothing to build.");
                 return;
             }
+            foreach (string problem in choice.Maps.Problems) Debug.LogWarning("content: " + problem);
 
             World = new SimWorld((ulong)seed, content.Database, types);
             Pacer = new TickPacer(daysPerSecondAt1x, World.Clock.TicksPerDay, startSpeed);
-            World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types);
+            World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types, choice.Preset);
+            Ground = GroundPalette.From(World.Island, biomes, types);
+            Map = choice.Preset;
 
             // The untouched island is history's baseline (S04): everything the
             // player does is replayed forward from here when scrubbing back.
@@ -95,7 +118,9 @@ namespace Godless.Unity
             if (settle) Settle(content.Database, biomes);
 
             _loadSeconds = (float)watch.Elapsed.TotalSeconds;
-            Debug.Log("Godless: seed " + seed + ", island generated in " + _loadSeconds.ToString("0.00") + "s");
+            Debug.Log("Godless: " + Map.Title + " (" + Map.Name + "), seed " + seed
+                      + ", island generated in " + _loadSeconds.ToString("0.00") + "s"
+                      + "\n" + Map.Tell);
 
             if (frameCamera) FrameCamera();
         }
@@ -129,7 +154,9 @@ namespace Godless.Unity
             if (cam == null) return;
             if (cam.GetComponent<GodCamera>() != null) return;   // it frames itself
 
-            var centre = new Vector3(ChunkStore.SizeX * 0.5f, IslandMap.SeaLevel, ChunkStore.SizeZ * 0.5f);
+            var centre = new Vector3(ChunkStore.SizeX * 0.5f,
+                                     World.Island != null ? World.Island.SeaLevel : IslandMap.DefaultSeaLevel,
+                                     ChunkStore.SizeZ * 0.5f);
             cam.transform.position = centre + new Vector3(0f, 250f, -330f);
             cam.transform.LookAt(centre + new Vector3(0f, 0f, 30f));
             cam.nearClipPlane = 0.5f;

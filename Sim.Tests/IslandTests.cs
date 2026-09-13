@@ -63,14 +63,20 @@ namespace Godless.Sim.Tests
         public void ContentDeclaresTheBiomesAndVoxels_NotCode()
         {
             ContentDatabase content = RealContent();
-            Assert.Equal(4, content.Ids("biome").Count);
-            Assert.Equal(9, content.Ids("voxel").Count);
+
+            // The counts are content's to change; what must hold is that code
+            // reads them from content rather than knowing them.
+            Assert.Equal(content.Ids("biome").Count, BiomeTable.FromContent(content).Count);
+            Assert.True(content.Ids("biome").Count >= 4);
+            Assert.True(content.Ids("voxel").Count >= 9);
 
             BiomeTable biomes = BiomeTable.FromContent(content);
-            Assert.Equal(4, biomes.Count);
             // Sorted by id, which is what makes overlapping windows resolve
             // the same way on every machine.
-            Assert.Equal(Symbol.For("biome.flood-plain"), biomes.At(0).Id);
+            for (int i = 1; i < biomes.Count; i++)
+                Assert.True(string.CompareOrdinal(biomes.At(i - 1).Name, biomes.At(i).Name) < 0,
+                            "the biome table is not in stable name order: "
+                            + biomes.At(i - 1).Name + " before " + biomes.At(i).Name);
         }
 
         [Fact]
@@ -163,7 +169,7 @@ namespace Godless.Sim.Tests
                     Assert.NotEqual(air, g.Store.Get(x, h - 1, z));
                     // Above the ground, or above a river or lake on it (S0B).
                     int top = System.Math.Max(h, g.Map.WaterLevelAt(x, z));
-                    if (h > IslandMap.SeaLevel)
+                    if (h > g.Map.SeaLevel)
                         Assert.Equal(air, g.Store.Get(x, top + 1, z));
                 }
         }
@@ -173,8 +179,8 @@ namespace Godless.Sim.Tests
         {
             Generated g = Generate(7UL);
             ushort water = g.Types.IdOf(Symbol.For("voxel.water"));
-            Assert.Equal(water, g.Store.Get(2, IslandMap.SeaLevel, 2));
-            Assert.Equal(VoxelTypes.AirId, g.Store.Get(2, IslandMap.SeaLevel + 4, 2));
+            Assert.Equal(water, g.Store.Get(2, g.Map.SeaLevel, 2));
+            Assert.Equal(VoxelTypes.AirId, g.Store.Get(2, g.Map.SeaLevel + 4, 2));
         }
 
         [Fact]
@@ -184,7 +190,8 @@ namespace Godless.Sim.Tests
             long bytes = g.Store.MemoryBytes;
             _out.WriteLine("generated island: " + bytes / 1024 + " KB across "
                            + g.Store.AllocatedChunks + "/" + ChunkStore.ChunkCount + " chunks");
-            Assert.True(bytes < 8L * 1024 * 1024, "island cost " + bytes / 1024 + " KB");
+            Assert.True(bytes < ChunkStore.SizeX * (long)ChunkStore.SizeZ * 32L,
+                        "island cost " + bytes / 1024 + " KB");
         }
     }
 }

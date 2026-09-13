@@ -103,7 +103,9 @@ namespace Godless.Unity
         /// <summary>And the whole island, for the coastline and the rivers.</summary>
         (Vector3, Vector3) Island()
         {
-            var centre = new Vector3(ChunkStore.SizeX * 0.5f, IslandMap.SeaLevel, ChunkStore.SizeZ * 0.5f);
+            var centre = new Vector3(ChunkStore.SizeX * 0.5f,
+                                     _boot.World.Island != null ? _boot.World.Island.SeaLevel : IslandMap.DefaultSeaLevel,
+                                     ChunkStore.SizeZ * 0.5f);
             return (centre + new Vector3(0f, 300f, -360f), centre);
         }
 

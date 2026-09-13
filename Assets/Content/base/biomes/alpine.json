@@ -1,0 +1,16 @@
+{
+  "type": "biome",
+  "id": "alpine",
+
+  // Above the treeline. The same two stones the highland has and nothing
+  // else, but a winter twice as heavy — which is the roof, not the wall.
+  "materials": ["slate", "granite"],
+  "rainfallMm": 350,
+  "winterSeverity": 9,
+  "treeCoverPercent": 0,
+
+  "surface": "slate",
+  "subsurface": "granite",
+
+  "select": { "minElevation": 92, "maxElevation": 200, "minMoisture": 0, "maxMoisture": 101 }
+}

@@ -50,9 +50,12 @@ namespace Godless.Sim.Tests
                 DriveRules rules = DriveRules.FromContent(Content);
                 MaterialTable materials = MaterialTable.FromContent(Content, biomes);
                 var genes = GeneTable.FromContent(Content);
-                var hearth = new Int3(292, Grid.GroundAt(292, 124) + 1, 124);
-                Town = Settlement.Found("test", hearth, biomes.At(World.Island.BiomeAt(292, 124)), 20, rules, 0, World.Annals, RecordId.None);
-                Town.Catchment = Catchment.Survey(World.Island, biomes, materials, 292, 124);
+                int px, pz;
+                Assert.True(Founding.StandInSite(Grid, World.Island, biomes, Symbol.None, out px, out pz));
+                int hx = px * ParcelGrid.Size + 2, hz = pz * ParcelGrid.Size + 2;
+                var hearth = new Int3(hx, Grid.GroundAt(hx, hz) + 1, hz);
+                Town = Settlement.Found("test", hearth, biomes.At(World.Island.BiomeAt(hx, hz)), 20, rules, 0, World.Annals, RecordId.None);
+                Town.Catchment = Catchment.Survey(World.Island, biomes, materials, hx, hz);
                 Town.Stock = new MaterialStock(materials);
                 for (int m = 0; m < materials.Count; m++) if (Town.Catchment.Offers(m)) Town.Stock.Add(m, stocked);
                 Town.Genome = new Genome(genes);
@@ -155,7 +158,22 @@ namespace Godless.Sim.Tests
         public void AFinishedHouseIsSomewhereToSleep()
         {
             var village = new Village();
-            Assert.True(village.LiveUntil(() => village.First != null && village.First.Complete), "nothing was finished");
+            // The failure this guards against is a house that stands half
+            // built forever because one of its materials cannot be gathered
+            // here at all, so the message says what the yard was holding.
+            bool done = village.LiveUntil(() => village.First != null && village.First.Complete);
+            var why = new System.Text.StringBuilder("nothing was finished");
+            if (!done && village.First != null && village.First.Built != null)
+            {
+                why.Append("; placed ").Append(village.First.Placed);
+                for (int m = 0; m < village.First.Built.Cost.Length; m++)
+                    if (village.First.Built.Cost[m] > 0)
+                        why.Append("; ").Append(village.Town.Stock.Materials[m].Name)
+                           .Append(" cost ").Append(village.First.Built.Cost[m])
+                           .Append(" held ").Append(village.Town.Stock.Of(m))
+                           .Append(" yield ").Append(village.Town.Catchment.YieldPerLabourTick(m).ToString("0.0000"));
+            }
+            Assert.True(done, why.ToString());
             village.Live(2);   // the roofs are taken up at the next night
 
             Project p = village.First;

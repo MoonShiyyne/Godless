@@ -40,7 +40,7 @@ namespace Godless.Sim.Save
     public static class SaveGame
     {
         const uint Magic = 0x534C4447; // "GDLS" little-endian
-        const uint Version = 2;   // 2 added annal contributors (S14); 1 still reads
+        const uint Version = 3;   // 3 names the map (S09 presets); 2 added annal contributors (S14); 1 and 2 still read
 
         public static void Write(Stream stream, SimWorld world, bool containsCodeMod = false)
         {
@@ -53,6 +53,14 @@ namespace Godless.Sim.Save
             w.Write(world.Content.Digest());
             w.Write(containsCodeMod);
             w.Write(world.Island != null);
+
+            // Which map this world was generated on. The island is rebuilt
+            // from the seed on load, and a different preset — or the same
+            // preset with a different biome subset, which renumbers the
+            // biomes — rebuilds a different island under the same deltas.
+            w.Write(world.Island != null && world.Island.Map != null && !world.Island.Map.IsDefault
+                    ? world.Island.Map.Name : "");
+
             w.Write(world.Voxels.Store.Digest());
             w.Write(world.Annals.Digest());
 
@@ -105,14 +113,15 @@ namespace Godless.Sim.Save
             if (r.ReadUInt32() != Magic) throw new SaveException("not a Godless save");
 
             uint version = r.ReadUInt32();
-            if (version != Version && version != 1)
-                throw new SaveException("save is version " + version + " and this build reads versions 1 and " + Version);
+            if (version < 1 || version > Version)
+                throw new SaveException("save is version " + version + " and this build reads versions 1 to " + Version);
 
             ulong seed = r.ReadUInt64();
             long tick = r.ReadInt64();
             ulong contentDigest = r.ReadUInt64();
             bool codeMod = r.ReadBoolean();
             bool hasIsland = r.ReadBoolean();
+            string mapName = version >= 3 ? r.ReadString() : "";
             ulong expectedWorld = r.ReadUInt64();
             ulong expectedAnnals = r.ReadUInt64();
 
@@ -136,7 +145,21 @@ namespace Godless.Sim.Save
 
             var world = new SimWorld(seed, content, voxelTypes);
             if (hasIsland)
-                world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, voxelTypes);
+            {
+                // A named map brings its own biome subset with it; the table
+                // the caller handed in is the one for an unnamed world.
+                WorldPreset preset = null;
+                if (mapName.Length > 0)
+                {
+                    WorldChoice choice;
+                    try { choice = WorldChoice.Pick(content, mapName); }
+                    catch (Godless.Sim.Content.ContentException e)
+                    { throw new SaveException("this save was made on map '" + mapName + "': " + e.Message); }
+                    preset = choice.Preset;
+                    biomes = choice.Biomes;
+                }
+                world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, voxelTypes, preset);
+            }
 
             // The regenerated island is history's baseline. Without this the
             // loaded world plays correctly and cannot be scrubbed back: the

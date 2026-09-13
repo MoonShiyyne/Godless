@@ -17,7 +17,7 @@ namespace Godless.Unity
     /// </summary>
     public sealed class GodCamera : MonoBehaviour
     {
-        [SerializeField] Vector3 pivot = new Vector3(ChunkStore.SizeX * 0.5f, IslandMap.SeaLevel, ChunkStore.SizeZ * 0.5f);
+        [SerializeField] Vector3 pivot = new Vector3(ChunkStore.SizeX * 0.5f, IslandMap.DefaultSeaLevel, ChunkStore.SizeZ * 0.5f);
         [SerializeField] float yaw = 0f;
         [SerializeField, Range(10f, 89f)] float pitch = 48f;
         [SerializeField] float distance = 380f;

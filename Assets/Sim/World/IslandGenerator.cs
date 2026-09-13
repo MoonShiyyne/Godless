@@ -10,7 +10,15 @@ namespace Godless.Sim.World
     /// </summary>
     public sealed class IslandMap
     {
-        public const int SeaLevel = 42;
+        /// <summary>Where the sea stands on a map that does not say otherwise.</summary>
+        public const int DefaultSeaLevel = 42;
+
+        /// <summary>
+        /// Where the sea stands on this island. A map sets it (S09): a delta
+        /// sits at a different waterline from a massif, and everything that
+        /// asks what is land has to ask this island rather than a constant.
+        /// </summary>
+        public int SeaLevel { get; internal set; } = DefaultSeaLevel;
 
         readonly byte[] _height = new byte[ChunkStore.SizeX * ChunkStore.SizeZ];
         readonly byte[] _biome = new byte[ChunkStore.SizeX * ChunkStore.SizeZ];
@@ -37,6 +45,9 @@ namespace Godless.Sim.World
         public int BiomeAt(int x, int z) { return _biome[z * ChunkStore.SizeX + x] - 1; }
 
         public bool IsLand(int x, int z) { return HeightAt(x, z) > SeaLevel; }
+
+        /// <summary>The map this island was made from, for anything that needs its numbers again.</summary>
+        public WorldPreset Map { get; internal set; }
 
         /// <summary>Water stands here up to, not including, this height. Zero where the column is dry.</summary>
         public int WaterLevelAt(int x, int z) { return _water[z * ChunkStore.SizeX + x]; }
@@ -95,21 +106,23 @@ namespace Godless.Sim.World
     {
         public const string StreamId = "world.island";
 
+        /// <param name="map">
+        /// Which map this is (S09 as content): the shape of the land, the
+        /// wetness of the air and the biomes it admits. Null is the plain
+        /// island the generator made before maps existed.
+        /// </param>
         public static IslandMap Generate(ChunkStore store, StreamRegistry streams,
-                                         BiomeTable biomes, VoxelTypes voxelTypes)
+                                         BiomeTable biomes, VoxelTypes voxelTypes, WorldPreset map = null)
         {
+            WorldPreset preset = map ?? WorldPreset.Default();
             ulong seed = StableHash.Combine(streams.WorldSeed, StableHash.OfString(StreamId));
             ulong heightSeed = StableHash.Combine(seed, StableHash.OfString("height"));
             ulong moistureSeed = StableHash.Combine(seed, StableHash.OfString("moisture"));
             ulong roughSeed = StableHash.Combine(seed, StableHash.OfString("rough"));
 
-            var map = new IslandMap();
+            var island = new IslandMap { SeaLevel = preset.SeaLevel, Map = preset };
 
             ushort water = voxelTypes.IdOf(Symbol.For("voxel.water"));
-
-            const double centreX = ChunkStore.SizeX * 0.5;
-            const double centreZ = ChunkStore.SizeZ * 0.5;
-            const double radius = ChunkStore.SizeX * 0.46;
 
             // Pass one: the raw shape, and its peak.
             //
@@ -125,15 +138,11 @@ namespace Godless.Sim.World
             for (int z = 0; z < ChunkStore.SizeZ; z++)
                 for (int x = 0; x < ChunkStore.SizeX; x++)
                 {
-                    double continent = Noise.Fractal(heightSeed, x, z, 5, 1.0 / 220.0);
-                    double rough = Noise.Fractal(roughSeed, x, z, 4, 1.0 / 55.0);
+                    double continent = Noise.Fractal(heightSeed, x, z, 5, 1.0 / preset.ContinentScale);
+                    double rough = Noise.Fractal(roughSeed, x, z, 4, 1.0 / preset.RoughScale);
+                    double falloff = preset.Falloff(x, z, ChunkStore.SizeX, ChunkStore.SizeZ);
 
-                    double dx = (x - centreX) / radius;
-                    double dz = (z - centreZ) / radius;
-                    double distance = SimMath.Sqrt(dx * dx + dz * dz);
-                    double falloff = SimMath.Clamp01(1.0 - distance * distance);
-
-                    double v = SimMath.Clamp01(continent * 0.72 + rough * 0.28) * falloff;
+                    double v = SimMath.Clamp01(continent * (1.0 - preset.RoughWeight) + rough * preset.RoughWeight) * falloff;
                     v = v * v * (3.0 - 2.0 * v);
 
                     shaped[z * ChunkStore.SizeX + x] = v;
@@ -154,29 +163,38 @@ namespace Godless.Sim.World
                 for (int x = 0; x < ChunkStore.SizeX; x++)
                 {
                     double t = SimMath.Clamp01(shaped[z * ChunkStore.SizeX + x] * inversePeak);
-                    double v = 0.92 * (0.35 * t + 0.65 * t * t * t);
+                    double v = preset.Peak * (preset.Linear * t + preset.Cubic * t * t * t);
 
-                    int height = (int)SimMath.Round(18.0 + v * 118.0);
+                    int height = (int)SimMath.Round(preset.Base + v * preset.Relief);
+
+                    // A stepped map terraces: mesas and benches instead of
+                    // slopes, which is a landform and not a rendering trick.
+                    if (preset.Step > 1 && height > preset.SeaLevel)
+                    {
+                        int above = height - preset.SeaLevel;
+                        height = preset.SeaLevel + (above / preset.Step) * preset.Step;
+                    }
                     if (height < 1) height = 1;
                     if (height > ChunkStore.SizeY - 2) height = ChunkStore.SizeY - 2;
 
                     int moisture = (int)SimMath.Round(
-                        Noise.Fractal(moistureSeed, x, z, 4, 1.0 / 130.0) * 100.0);
+                        SimMath.Clamp01(Noise.Fractal(moistureSeed, x, z, 4, 1.0 / preset.MoistureScale)
+                                        + preset.MoistureBias) * 100.0);
 
                     Biome biome = biomes.Select(height, moisture);
                     int biomeIndex = biome == null ? -1 : biomes.IndexOf(biome.Id);
-                    map.Set(x, z, height, biomeIndex, moisture);
+                    island.Set(x, z, height, biomeIndex, moisture);
 
-                    FillColumn(store, voxelTypes, biome, x, z, height, water);
+                    FillColumn(store, voxelTypes, biome, x, z, height, water, preset.SeaLevel);
                 }
 
             // S0B: rivers, lakes and the water table, from the heights above.
-            Hydrology.Apply(map, store, biomes, water);
-            return map;
+            Hydrology.Apply(island, store, biomes, water, preset);
+            return island;
         }
 
         static void FillColumn(ChunkStore store, VoxelTypes types, Biome biome,
-                               int x, int z, int height, ushort water)
+                               int x, int z, int height, ushort water, int seaLevel)
         {
             // Worldgen is one of the two legitimate callers of SetRaw: this
             // runs before history starts, so there is no event to record and
@@ -194,7 +212,7 @@ namespace Godless.Sim.World
             }
 
             // Sea fills everything below the waterline that the land did not.
-            for (int y = height; y <= IslandMap.SeaLevel; y++)
+            for (int y = height; y <= seaLevel; y++)
                 store.SetRaw(x, y, z, water);
         }
     }

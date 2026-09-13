@@ -13,5 +13,5 @@
   "surface": "mud",
   "subsurface": "mud",
 
-  "select": { "minElevation": 43, "maxElevation": 52, "minMoisture": 72, "maxMoisture": 101 }
+  "select": { "minElevation": 43, "maxElevation": 47, "minMoisture": 68, "maxMoisture": 101 }
 }

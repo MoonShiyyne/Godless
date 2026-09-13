@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Godless.Sim.Voxels;
 
 namespace Godless.Sim.Harness
 {
@@ -32,8 +33,12 @@ namespace Godless.Sim.Harness
 
                 // S03 — the island stays resident. Measured at ~2 MB for a
                 // full surface; this fails long before a profiler would.
-                Invariant.PerRun("S03", "the world stays inside its 8 MB budget",
-                    run => run.Metric("world.megabytes") < 8.0),
+                // A full island surface measures about 14 MB at 1024 columns
+                // square. The bound is here so that losing uniform-chunk
+                // elision fails in CI rather than in a profiler, and it scales
+                // with the world: at 512 it was 8 MB for the same reason.
+                Invariant.PerRun("S03", "the world stays inside its memory budget",
+                    run => run.Metric("world.megabytes") < ChunkStore.SizeX * ChunkStore.SizeZ / 32768.0),
 
                 // S04 — provenance is not free-running. Every voxel change is
                 // a delta, so a system that churns voxels every tick shows up

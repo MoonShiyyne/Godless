@@ -31,7 +31,10 @@ namespace Godless.Sim.Tests
             ContentDatabase content = Shipped();
             MaterialTable materials = MaterialTable.FromContent(content, BiomeTable.FromContent(content));
             Assert.Empty(materials.Problems);
-            Assert.Equal(7, materials.Count);   // soil and water are not building material
+            // Every gatherable voxel some biome offers, and nothing else:
+            // soil and water are gatherable but no biome builds with them.
+            Assert.True(materials.Count >= 7);
+            Assert.True(materials.IndexOf("soil") < 0 && materials.IndexOf("water") < 0);
             Assert.Empty(Palette.FromContent(content).Violations());
         }
 

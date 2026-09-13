@@ -53,9 +53,16 @@ namespace Godless.Sim.World
             return (peak * (r2 - d2) + r2 / 2) / r2;
         }
 
+        /// <param name="ground">
+        /// Where the new ground's material comes from. Null keeps
+        /// <paramref name="material"/> for every voxel, which is what a test
+        /// wanting one known type asks for; a palette instead gives each
+        /// column the surface and rock that belong at the height it reaches,
+        /// so a raised hill wears the biome it grows into.
+        /// </param>
         public static int Raise(VoxelWorld world, bool[] solid, int centreX, int centreZ,
                                 int radius, int peak, ushort material, long tick, RecordId cause,
-                                List<Int3> changed)
+                                List<Int3> changed, GroundPalette ground = null)
         {
             int count = 0;
             for (int x = centreX - radius; x <= centreX + radius; x++)
@@ -68,10 +75,16 @@ namespace Godless.Sim.World
 
                     int top = TopSolid(world.Store, solid, x, z);
                     int limit = System.Math.Min(top + amount, ChunkStore.SizeY - 2);
+
+                    // The column's new top is decided before anything is
+                    // placed, so the whole stroke agrees with itself: the
+                    // soil cap sits under the final surface, not under
+                    // whatever height the loop happened to have reached.
                     for (int y = top + 1; y <= limit; y++)
                     {
                         var at = new Int3(x, y, z);
-                        if (world.Set(at, material, tick, cause)) { count++; if (changed != null) changed.Add(at); }
+                        ushort type = ground != null ? ground.At(x, y, z, limit) : material;
+                        if (world.Set(at, type, tick, cause)) { count++; if (changed != null) changed.Add(at); }
                     }
                 }
             return count;

@@ -94,12 +94,25 @@ namespace Godless.Sim.World
     {
         readonly List<Biome> _biomes = new List<Biome>();
 
-        public static BiomeTable FromContent(ContentDatabase content)
+        /// <param name="only">
+        /// Biomes this table may contain, by name — a map's own list (S09).
+        /// Null or empty means every biome the content declares.
+        /// </param>
+        public static BiomeTable FromContent(ContentDatabase content, IReadOnlyList<string> only = null)
         {
             var table = new BiomeTable();
             foreach (string id in content.Ids("biome"))
+            {
+                if (only != null && only.Count > 0 && !Contains(only, id)) continue;
                 table._biomes.Add(Biome.FromDocument(id, content.Get("biome", id)));
+            }
             return table;
+        }
+
+        static bool Contains(IReadOnlyList<string> names, string id)
+        {
+            for (int i = 0; i < names.Count; i++) if (names[i] == id) return true;
+            return false;
         }
 
         public int Count { get { return _biomes.Count; } }
@@ -110,9 +123,42 @@ namespace Godless.Sim.World
         /// <summary>The first biome accepting this column, or null if none does.</summary>
         public Biome Select(int elevation, int moisture)
         {
+            bool exact;
+            return Select(elevation, moisture, out exact);
+        }
+
+        /// <summary>
+        /// The first biome, in id order, whose window contains the column. A
+        /// map that admits only some biomes can produce ground none of them
+        /// asked for — a delta's table has no highland in it, and the seed can
+        /// still throw up a hill — so the nearest window takes it rather than
+        /// leaving the column unclaimed. <paramref name="exact"/> says which
+        /// happened, and `sim content` reports the gaps per map.
+        /// </summary>
+        public Biome Select(int elevation, int moisture, out bool exact)
+        {
             for (int i = 0; i < _biomes.Count; i++)
-                if (_biomes[i].Accepts(elevation, moisture)) return _biomes[i];
-            return null;
+                if (_biomes[i].Accepts(elevation, moisture)) { exact = true; return _biomes[i]; }
+
+            exact = false;
+            Biome nearest = null;
+            long best = long.MaxValue;
+            for (int i = 0; i < _biomes.Count; i++)
+            {
+                Biome b = _biomes[i];
+                long de = Outside(elevation, b.MinElevation, b.MaxElevation);
+                long dm = Outside(moisture, b.MinMoisture, b.MaxMoisture);
+                long distance = de * de + dm * dm;
+                if (distance < best) { best = distance; nearest = b; }
+            }
+            return nearest;
+        }
+
+        static long Outside(int value, int low, int high)
+        {
+            if (value < low) return low - value;
+            if (value > high) return value - high;
+            return 0;
         }
 
         public int IndexOf(Symbol biomeId)

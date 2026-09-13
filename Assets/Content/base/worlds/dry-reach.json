@@ -1,0 +1,27 @@
+{
+  "type": "world",
+  "id": "dry-reach",
+  "title": "The Dry Reach",
+
+  // Stepped desert country. The terracing is the landform — the land rises in
+  // benches rather than slopes — and the moisture bias holds the whole map
+  // below the window any forest biome will accept. Clay and granite, no wood,
+  // which is the hardest constraint the build system has to answer to.
+  "tell": "Pale country that rises in flat steps. No trees anywhere: the houses are sun-dried clay on stone footings, and the rivers are short.",
+
+  "seaLevel": 40,
+  "height": { "base": 22, "relief": 96, "linear": 0.55, "cubic": 0.45, "peak": 0.8, "step": 6 },
+  "noise":  { "continentScale": 300, "roughScale": 90, "roughWeight": 0.18, "moistureScale": 170, "moistureBias": -0.42 },
+  "water":  { "riverFlow": 6000, "maxLakeDepth": 2 },
+
+  // How much of the map this world should be land. The harness checks
+  // every seed against this, so a generator change that quietly drowns or
+  // floods a map is caught at 200 seeds rather than by eye.
+  "land": { "least": 0.06, "most": 0.34 },
+
+  "centres": [
+    { "x": 0.46, "z": 0.42, "radius": 0.44 },
+    { "x": 0.60, "z": 0.66, "radius": 0.26 }
+  ],
+  "biomes": ["shore", "mesa", "highland", "alpine"]
+}

@@ -12,5 +12,5 @@
   "surface": "granite",
   "subsurface": "granite",
 
-  "select": { "minElevation": 68, "maxElevation": 200, "minMoisture": 0, "maxMoisture": 101 }
+  "select": { "minElevation": 68, "maxElevation": 91, "minMoisture": 0, "maxMoisture": 101 }
 }

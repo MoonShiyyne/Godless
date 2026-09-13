@@ -49,6 +49,7 @@ namespace Godless.Sim.Collective
         readonly Symbol[] _id;              // per task
         readonly double[] _stimulus;        // per task
         readonly double[] _demand;          // per task, as last computed
+        double[] _ordered;                  // per material, voxels the standing plans still want
         double[][] _threshold;              // per agent, per task
         long[][] _work;                     // per agent, per task
         int[] _current;                     // per agent; -1 = free
@@ -312,14 +313,46 @@ namespace Godless.Sim.Collective
         /// </summary>
         void ComputeDemand(Settlement s)
         {
+            int count = s.Stock.Materials.Count;
+            if (_ordered == null || _ordered.Length != count) _ordered = new double[count];
+            for (int m = 0; m < count; m++) _ordered[m] = 0.0;
+
+            // What the standing plans actually call for, material by material.
+            //
+            // This used to split the whole building budget across materials in
+            // proportion to how *easily* each could be gathered, which made the
+            // yard a mirror of the landscape rather than of the plans. Adding
+            // two materials to content was then enough to starve a house that
+            // wanted neither: every share shrank, nobody fetched enough oak,
+            // and the walls stopped halfway up. A plan that names its cost is
+            // the only thing that should decide what people carry.
+            long designed = 0;
+            foreach (Project p in s.Projects)
+            {
+                if (p.Complete || p.Built == null) continue;
+                long total = 0;
+                for (int m = 0; m < p.Built.Cost.Length && m < count; m++) total += p.Built.Cost[m];
+                if (total <= 0) continue;
+
+                double left = 1.0 - (p.Placed / (double)total);
+                if (left <= 0.0) continue;
+                for (int m = 0; m < p.Built.Cost.Length && m < count; m++) _ordered[m] += p.Built.Cost[m] * left;
+                designed += total;
+            }
+
+            // Intents nobody has designed yet have a budget but no bill of
+            // materials, so those still spread by what the land gives — it is
+            // the best guess available before a site is chosen.
             long commissioned = 0;
             if (s.Intents != null)
                 foreach (BuildIntent intent in s.Intents.Intents)
                     if (intent.Outstanding) commissioned += intent.BudgetVoxels;
+            commissioned -= designed;
+            if (commissioned < 0) commissioned = 0;
 
             double yieldSum = 0.0;
             long held = 0;
-            for (int m = 0; m < s.Stock.Materials.Count; m++) { yieldSum += s.Catchment.YieldPerLabourTick(m); held += s.Stock.Of(m); }
+            for (int m = 0; m < count; m++) { yieldSum += s.Catchment.YieldPerLabourTick(m); held += s.Stock.Of(m); }
 
             for (int t = 0; t < _kind.Length; t++)
             {
@@ -343,11 +376,14 @@ namespace Godless.Sim.Collective
                     continue;
                 }
 
-                double want = _kind[t].ReserveVoxels + commissioned;
                 int m = _material[t];
-                double d = m >= 0
-                    ? (yieldSum > 0.0 ? want * s.Catchment.YieldPerLabourTick(m) / yieldSum : 0.0) - s.Stock.Of(m)
-                    : want - held;
+                double share = m >= 0 && yieldSum > 0.0
+                    ? commissioned * s.Catchment.YieldPerLabourTick(m) / yieldSum : 0.0;
+                double want = m >= 0
+                    ? _kind[t].ReserveVoxels * (yieldSum > 0.0 ? s.Catchment.YieldPerLabourTick(m) / yieldSum : 0.0)
+                      + _ordered[m] + share
+                    : _kind[t].ReserveVoxels + commissioned + designed;
+                double d = m >= 0 ? want - s.Stock.Of(m) : want - held;
                 double per = m >= 0 ? s.Catchment.YieldPerLabourTick(m) : 1.0;
                 if (per <= 0.0) per = 1.0;
                 _demand[t] = d > 0.0 ? d / per : 0.0;

@@ -12,7 +12,9 @@
     "roof":   { "classes": ["thatch", "timber", "stone"] },
     "post":   { "classes": ["timber", "stone"] },
     "plinth": { "classes": ["stone", "earth"] },
-    "hearth": { "classes": ["stone"] },
+    // Stone if the land has it, fired earth if it does not: a settlement in
+    // an oak wood with no quarry still has a hearth, and it is clay.
+    "hearth": { "classes": ["stone", "earth"] },
 
     // A doorway and a window are holes. Shutters and doors are a later
     // system's business; what matters for the silhouette is the hole.

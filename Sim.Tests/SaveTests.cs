@@ -216,5 +216,71 @@ namespace Godless.Sim.Tests
 
             Assert.True(RoundTrip(original, content, out _).ContainsCodeMod);
         }
+
+        /// <summary>The shipped content with one document taken out, as an uninstalled mod would leave it.</summary>
+        static ContentDatabase ContentWithout(string type, string id)
+        {
+            ContentDatabase content = Shipped();
+            var src = new MemoryContentSource().Add("base", "mod.json", "{}");
+            foreach (string t in content.Types())
+                foreach (string each in content.Ids(t))
+                {
+                    if (t == type && each == id) continue;
+                    src.Add("base", t + "s/" + each + ".json", content.Get(t, each).ToString());
+                }
+            return ContentLoader.Load(src).Database;
+        }
+
+        [Fact]
+        public void ASaveRemembersWhichMapItWasPlayedOn()
+        {
+            ContentDatabase content = Shipped();
+            WorldChoice choice = WorldChoice.Pick(content, "cold-massif");
+            VoxelTypes types = VoxelTypes.FromContent(content);
+
+            var world = new SimWorld(4242UL, content, types);
+            world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams,
+                                                    choice.Biomes, types, choice.Preset);
+            world.BeginHistory();
+            world.RunYears(1);
+
+            using var buffer = new MemoryStream();
+            SaveGame.Write(buffer, world, world.ContainsCodeMod);
+            buffer.Position = 0;
+
+            // The caller hands in the whole biome table, as every caller does.
+            // The save has to correct that from the map it names, or the
+            // island comes back renumbered and the digests disagree.
+            SimWorld loaded = SaveGame.Read(buffer, content, BiomeTable.FromContent(content), types);
+
+            Assert.Equal(world.Island.Digest(), loaded.Island.Digest());
+            Assert.Equal(world.Voxels.Store.Digest(), loaded.Voxels.Store.Digest());
+            Assert.Equal("cold-massif", loaded.Island.Map.Name);
+            Assert.Equal(choice.Preset.SeaLevel, loaded.Island.SeaLevel);
+        }
+
+        [Fact]
+        public void ASaveFromAMissingMapSaysSoRatherThanLoadingSomethingElse()
+        {
+            ContentDatabase content = Shipped();
+            WorldChoice choice = WorldChoice.Pick(content, "dry-reach");
+            VoxelTypes types = VoxelTypes.FromContent(content);
+
+            var world = new SimWorld(9UL, content, types);
+            world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams,
+                                                    choice.Biomes, types, choice.Preset);
+            world.BeginHistory();
+
+            using var buffer = new MemoryStream();
+            SaveGame.Write(buffer, world, world.ContainsCodeMod);
+            buffer.Position = 0;
+
+            // Content without that map — a mod uninstalled between sessions.
+            ContentDatabase without = ContentWithout("world", "dry-reach");
+            var e = Assert.Throws<SaveException>(
+                () => SaveGame.Read(buffer, without, BiomeTable.FromContent(without), VoxelTypes.FromContent(without)));
+            Assert.Contains("dry-reach", e.Message);
+        }
+
     }
 }

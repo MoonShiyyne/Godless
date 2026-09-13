@@ -47,11 +47,14 @@ namespace Godless.Sim.World
         static readonly int[] Sz = { 0, 1, 0, -1 };
 
         /// <summary>Computes drainage from the generated heights, carves it into the store, and records it on the map.</summary>
-        public static DrainageMap Apply(IslandMap map, ChunkStore store, BiomeTable biomes, ushort water)
+        public static DrainageMap Apply(IslandMap map, ChunkStore store, BiomeTable biomes, ushort water,
+                                        WorldPreset preset = null)
         {
             const int W = ChunkStore.SizeX, D = ChunkStore.SizeZ;
             int n = W * D;
-            int sea = IslandMap.SeaLevel;
+            int sea = map.SeaLevel;
+            long riverFlow = preset != null ? preset.RiverFlow : RiverFlow;
+            int maxLake = preset != null ? preset.MaxLakeDepth : MaxLakeDepth;
 
             var ground = new int[n];
             var rain = new int[n];
@@ -98,7 +101,7 @@ namespace Godless.Sim.World
                     }
                 }
 
-                int surface = spill < floor + MaxLakeDepth ? spill : floor + MaxLakeDepth;
+                int surface = spill < floor + maxLake ? spill : floor + maxLake;
                 foreach (int c in basin) if (ground[c] < surface) level[c] = surface;
             }
 
@@ -109,10 +112,10 @@ namespace Godless.Sim.World
             for (int i = 0; i < n; i++)
             {
                 if (ground[i] <= sea || level[i] > 0 || drainage.Filled[i] > ground[i]) continue;
-                if (drainage.Flow[i] < RiverFlow) continue;
+                if (drainage.Flow[i] < riverFlow) continue;
                 carve[i] = true;
 
-                if (drainage.Flow[i] < BroadRiverFlow) continue;
+                if (drainage.Flow[i] < riverFlow * 6) continue;
                 int x = i % W, z = i / W;
                 for (int k = 0; k < 4; k++)
                 {

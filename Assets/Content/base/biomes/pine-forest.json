@@ -1,0 +1,15 @@
+{
+  "type": "biome",
+  "id": "pine-forest",
+
+  // Cold wet uplands: conifer and slate, and a winter that decides the roof.
+  "materials": ["pine", "slate"],
+  "rainfallMm": 1100,
+  "winterSeverity": 4,
+  "treeCoverPercent": 80,
+
+  "surface": "soil",
+  "subsurface": "granite",
+
+  "select": { "minElevation": 60, "maxElevation": 82, "minMoisture": 55, "maxMoisture": 101 }
+}

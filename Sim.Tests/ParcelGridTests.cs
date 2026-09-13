@@ -28,9 +28,9 @@ namespace Godless.Sim.Tests
         [Fact]
         public void TheGridIsFourColumnsAParcel()
         {
-            Assert.Equal(128, ParcelGrid.Width);
-            Assert.Equal(128, ParcelGrid.Depth);
-            Assert.Equal(512, ParcelGrid.Width * ParcelGrid.Size);
+            Assert.Equal(ChunkStore.SizeX / ParcelGrid.Size, ParcelGrid.Width);
+            Assert.Equal(ChunkStore.SizeZ / ParcelGrid.Size, ParcelGrid.Depth);
+            Assert.Equal(ChunkStore.SizeX, ParcelGrid.Width * ParcelGrid.Size);
         }
 
         /// <summary>
@@ -112,16 +112,16 @@ namespace Godless.Sim.Tests
         public void WaterDistanceIsTheOctileDistanceToTheNearestWater()
         {
             var s = new ChunkStore();
-            for (int x = 0; x < 512; x += 1)
-                for (int z = 0; z < 512; z += 1)
+            for (int x = 0; x < ChunkStore.SizeX; x += 1)
+                for (int z = 0; z < ChunkStore.SizeZ; z += 1)
                     s.SetRaw(x, 0, z, Stone);
             // Three ponds.
             int[,] ponds = { { 10, 12 }, { 90, 40 }, { 60, 110 } };
             for (int i = 0; i < 3; i++) s.SetRaw(ponds[i, 0] * 4 + 1, 1, ponds[i, 1] * 4 + 2, Water);
 
             ParcelGrid g = ParcelGrid.Build(s, Solid, Wet);
-            for (int px = 0; px < 128; px += 5)
-                for (int pz = 0; pz < 128; pz += 5)
+            for (int px = 0; px < ParcelGrid.Width; px += 5)
+                for (int pz = 0; pz < ParcelGrid.Depth; pz += 5)
                 {
                     double best = double.MaxValue;
                     for (int i = 0; i < 3; i++)
@@ -205,8 +205,8 @@ namespace Godless.Sim.Tests
             watch.Stop();
 
             int land = 0; double farthest = 0; double steepest = 0;
-            for (int px = 0; px < 128; px++)
-                for (int pz = 0; pz < 128; pz++)
+            for (int px = 0; px < ParcelGrid.Width; px++)
+                for (int pz = 0; pz < ParcelGrid.Depth; pz++)
                     if (g.IsLand(px, pz))
                     {
                         land++;
@@ -220,7 +220,7 @@ namespace Godless.Sim.Tests
 
             // The generator's own land count, at parcel resolution.
             int islandLand = 0;
-            for (int x = 0; x < 512; x++) for (int z = 0; z < 512; z++) if (island.IsLand(x, z)) islandLand++;
+            for (int x = 0; x < ChunkStore.SizeX; x++) for (int z = 0; z < ChunkStore.SizeZ; z++) if (island.IsLand(x, z)) islandLand++;
             Assert.InRange(land, islandLand / 16 * 0.85, islandLand / 16 * 1.15);
 
             Assert.True(farthest > 3, "an island has an interior");

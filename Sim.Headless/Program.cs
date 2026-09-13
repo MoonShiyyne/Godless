@@ -46,6 +46,7 @@ namespace Godless.Sim.Headless
                 case "settle": return Settle(cli);
                 case "blueprint": return BlueprintCmd(cli);
                 case "separate": return Separate(cli);
+                case "maps": return Maps(cli);
                 case "help": Help(); return 0;
                 default:
                     Console.Error.WriteLine("unknown command '" + command + "'");
@@ -75,14 +76,17 @@ namespace Godless.Sim.Headless
                 try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
                 catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
 
-                BiomeTable biomes = BiomeTable.FromContent(content.Database);
+                WorldChoice map;
+                try { map = WorldChoice.Pick(content.Database, cli.Text("map", "")); }
+                catch (System.Exception e) { Console.Error.WriteLine(e.Message); return 1; }
+                BiomeTable biomes = map.Biomes;
                 VoxelTypes types = VoxelTypes.FromContent(content.Database);
                 if (biomes.Count == 0) { Console.Error.WriteLine("no biomes declared"); return 1; }
 
                 runner = new BatchRunner(seed =>
                 {
                     var world = new SimWorld(seed, content.Database, types);
-                    world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types);
+                    world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types, map.Preset);
                     return world;
                 });
                 runner.Collect(IslandInvariants.Collector(biomes));
@@ -296,13 +300,16 @@ namespace Godless.Sim.Headless
             try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
             catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
 
-            BiomeTable biomes = BiomeTable.FromContent(content.Database);
+            WorldChoice choice;
+            try { choice = WorldChoice.Pick(content.Database, cli.Text("map", "")); }
+            catch (System.Exception e) { Console.Error.WriteLine(e.Message); return 1; }
+            BiomeTable biomes = choice.Biomes;
             VoxelTypes types = VoxelTypes.FromContent(content.Database);
             if (biomes.Count == 0) { Console.Error.WriteLine("no biomes declared — nothing to generate"); return 1; }
 
             var store = new ChunkStore();
             var watch = Stopwatch.StartNew();
-            IslandMap map = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types);
+            IslandMap map = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types, choice.Preset);
             watch.Stop();
 
             // Terminal cells are about twice as tall as wide.
@@ -320,7 +327,7 @@ namespace Godless.Sim.Headless
             {
                 for (int x = 0; x < ChunkStore.SizeX; x += stepX)
                 {
-                    if (!map.IsLand(x, z)) { sb.Append(map.HeightAt(x, z) > IslandMap.SeaLevel - 6 ? '~' : ' '); continue; }
+                    if (!map.IsLand(x, z)) { sb.Append(map.HeightAt(x, z) > map.SeaLevel - 6 ? '~' : ' '); continue; }
                     if (AnyWater(map, x, z, stepX, stepZ, out bool lake)) { sb.Append(lake ? 'o' : '='); continue; }
                     int b = map.BiomeAt(x, z);
                     sb.Append(b < 0 ? '?' : glyphs[b]);
@@ -387,9 +394,12 @@ namespace Godless.Sim.Headless
             catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
 
             VoxelTypes types = VoxelTypes.FromContent(content.Database);
-            BiomeTable biomes = BiomeTable.FromContent(content.Database);
+            WorldChoice choice;
+            try { choice = WorldChoice.Pick(content.Database, cli.Text("map", "")); }
+            catch (System.Exception e) { Console.Error.WriteLine(e.Message); return 1; }
+            BiomeTable biomes = choice.Biomes;
             var store = new ChunkStore();
-            IslandMap island = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types);
+            IslandMap island = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types, choice.Preset);
 
             bool[] solid = TerrainBrush.SolidTable(content.Database, types);
             var wet = new bool[types.Count];
@@ -439,7 +449,9 @@ namespace Godless.Sim.Headless
             Console.Write(sb.ToString());
             Console.WriteLine("\nfield." + field + " over land: " + lo.ToString("0.#", c) + " (.) to "
                 + hi.ToString("0.#", c) + " (@), sea blank");
-            Console.WriteLine("128 x 128 parcels of 4 x 4 columns, built in " + first.ToString("0", c)
+            Console.WriteLine(ParcelGrid.Width.ToString(c) + " x " + ParcelGrid.Depth.ToString(c)
+                + " parcels of " + ParcelGrid.Size.ToString(c) + " x " + ParcelGrid.Size.ToString(c)
+                + " columns, built in " + first.ToString("0", c)
                 + " ms cold, " + watch.Elapsed.TotalMilliseconds.ToString("0", c) + " ms warm");
             return 0;
         }
@@ -602,7 +614,10 @@ namespace Godless.Sim.Headless
 
             ContentDatabase db = loaded.Database;
             var genes = Godless.Sim.Culture.GeneTable.FromContent(db);
-            BiomeTable biomes = BiomeTable.FromContent(db);
+            WorldChoice choice;
+            try { choice = WorldChoice.Pick(db, cli.Text("map", "")); }
+            catch (System.Exception e) { Console.Error.WriteLine(e.Message); return 1; }
+            BiomeTable biomes = choice.Biomes;
             VoxelTypes types = VoxelTypes.FromContent(db);
             MaterialTable materials = MaterialTable.FromContent(db, biomes);
             TileSet tiles = TileSet.FromContent(db, materials);
@@ -627,7 +642,7 @@ namespace Godless.Sim.Headless
                 ulong seed = first + (ulong)i;
                 var store = new ChunkStore();
                 var streams = new StreamRegistry(seed);
-                IslandMap island = IslandGenerator.Generate(store, streams, biomes, types);
+                IslandMap island = IslandGenerator.Generate(store, streams, biomes, types, choice.Preset);
 
                 bool[] solid = TerrainBrush.SolidTable(db, types);
                 var wet = new bool[types.Count];
@@ -730,12 +745,15 @@ namespace Godless.Sim.Headless
 
             ContentDatabase db = content.Database;
             VoxelTypes types = VoxelTypes.FromContent(db);
-            BiomeTable biomes = BiomeTable.FromContent(db);
+            WorldChoice choice;
+            try { choice = WorldChoice.Pick(db, cli.Text("map", "")); }
+            catch (System.Exception e) { Console.Error.WriteLine(e.Message); return 1; }
+            BiomeTable biomes = choice.Biomes;
             DriveRules rules = DriveRules.FromContent(db);
             if (biomes.Count == 0) { Console.Error.WriteLine("no biomes declared — nowhere to settle"); return 1; }
 
             var world = new SimWorld(seed, db, types);
-            IslandMap island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types);
+            IslandMap island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types, choice.Preset);
             world.Island = island;
             world.BeginHistory();
 
@@ -972,7 +990,10 @@ namespace Godless.Sim.Headless
             if (biomeId.EndsWith("flood-plain", StringComparison.Ordinal)) return ',';
             if (biomeId.EndsWith("temperate", StringComparison.Ordinal)) return 'n';
             if (biomeId.EndsWith("highland", StringComparison.Ordinal)) return '^';
-            return '#';
+            if (biomeId.EndsWith("pine-forest", StringComparison.Ordinal)) return 'Y';
+            if (biomeId.EndsWith("mesa", StringComparison.Ordinal)) return ':';
+            if (biomeId.EndsWith("alpine", StringComparison.Ordinal)) return '#';
+            return '*';
         }
 
         static string DefaultContentRoot()
@@ -989,6 +1010,88 @@ namespace Godless.Sim.Headless
 
         // ── help ────────────────────────────────────────────────────────────
 
+        // ── sim maps ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// What worlds there are to play on, and what each one gives you to
+        /// build with. Generates nothing: this is the content view, and the
+        /// thing it is for is catching a map that admits no biome offering
+        /// timber, or a biome window no map can reach.
+        /// </summary>
+        static int Maps(Args cli)
+        {
+            var c = CultureInfo.InvariantCulture;
+            LoadResult loaded;
+            try { loaded = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
+            catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
+
+            ContentDatabase db = loaded.Database;
+            BiomeTable all = BiomeTable.FromContent(db);
+            WorldTable maps = WorldTable.FromContent(db, all);
+
+            foreach (string problem in maps.Problems) Console.WriteLine("refused: " + problem);
+            if (maps.Count == 0) { Console.WriteLine("no maps declared — every world is the built-in island"); return 0; }
+
+            foreach (WorldPreset w in maps.All)
+            {
+                Console.WriteLine();
+                Console.WriteLine(w.Name + "  \"" + w.Title + "\"");
+                Console.WriteLine("  " + w.Tell);
+
+                string shape = w.Centres == 1 ? "one land mass" : w.Centres.ToString(c) + " land masses";
+                Console.WriteLine("  " + shape
+                    + ", sea at " + w.SeaLevel.ToString(c)
+                    + ", ground " + w.Base.ToString(c) + " to " + (w.Base + w.Relief).ToString(c)
+                    + (w.Step > 0 ? ", terraced every " + w.Step.ToString(c) : "")
+                    + ", curve " + w.Linear.ToString("0.00", c) + " straight / " + w.Cubic.ToString("0.00", c) + " cubed");
+                Console.WriteLine("  water: channels at " + w.RiverFlow.ToString(c)
+                    + " flow, lakes to " + w.MaxLakeDepth.ToString(c) + " deep"
+                    + (w.MoistureBias > 0.0 ? ", air wetter by " + w.MoistureBias.ToString("0.00", c)
+                       : w.MoistureBias < 0.0 ? ", air drier by " + (-w.MoistureBias).ToString("0.00", c) : ""));
+
+                BiomeTable admitted = w.Biomes.Count == 0 ? all : BiomeTable.FromContent(db, w.Biomes);
+                var names = new List<string>();
+                var materials = new List<string>();
+                var classes = new SortedDictionary<string, int>(StringComparer.Ordinal);
+                foreach (Biome b in admitted.All)
+                {
+                    names.Add(b.Name);
+                    foreach (string m in b.MaterialNames)
+                    {
+                        if (!materials.Contains(m)) materials.Add(m);
+                        JsonValue doc = db.Get("voxel", m);
+                        string cls = doc["class"].AsString("(none)");
+                        int had; classes.TryGetValue(cls, out had);
+                        classes[cls] = had + 1;
+                    }
+                }
+                materials.Sort(StringComparer.Ordinal);
+
+                Console.WriteLine("  biomes: " + string.Join(", ", names.ToArray()));
+                Console.WriteLine("  builds with: " + string.Join(", ", materials.ToArray()));
+
+                if (!classes.ContainsKey("timber"))
+                    Console.WriteLine("  note: no timber anywhere on this map — everything here is stone or earth.");
+                if (!classes.ContainsKey("stone"))
+                    Console.WriteLine("  note: no stone anywhere on this map.");
+
+                // A window no column can land in is content that will never
+                // appear; report it rather than letting it pass silently.
+                int reachable = 0;
+                for (int e = 0; e <= 100; e += 2)
+                    for (int m = 0; m <= 100; m += 2)
+                    {
+                        bool exact;
+                        admitted.Select(e, m, out exact);
+                        if (exact) reachable++;
+                    }
+                Console.WriteLine("  " + (reachable * 100 / (51 * 51)).ToString(c)
+                    + "% of the elevation/moisture square lands inside a biome's own window");
+            }
+
+            return 0;
+        }
+
         static void Help()
         {
             Console.WriteLine(
@@ -998,7 +1101,9 @@ namespace Godless.Sim.Headless
                                             batch run, checking every invariant
   sim verify   [--seeds A..B] [--years N]   run each seed twice, compare byte for byte
   sim content  [--path P]                   load Assets/Content and report what it holds
-  sim island   [--seed N] [--width W]       generate an island and draw it
+  sim maps     [--path P]                   list the maps content declares, and what each is like
+  sim island   [--seed N] [--width W] [--map M]
+                                            generate an island and draw it
   sim parcels  [--seed N] [--field F]       draw a planning field: height, slope, water-distance,
                                             sun, snow-load, damp, exposure, flood-risk
   sim blueprint [--grammar G] [--<gene> V ...] [--stock a,b,c] [--lot N]
@@ -1007,6 +1112,10 @@ namespace Godless.Sim.Headless
                                             measure whether two biomes (or two cultures) build differently (S1G)
   sim settle   [--seed N] [--days D] [--people P] [--roofs R] [--biome B] [--<gene> V ...]
                                             found a settlement and print its days (S12, S14)
+
+--map picks one of the worlds in Assets/Content (see `sim maps`); without it
+you get the built-in island with every biome content declares. It works on
+run, island, parcels, separate and settle.
 
 Defaults: run 0..200 x 300 years (0..20 with --island), verify 0..20 x 100 years.
 --island generates real terrain from Assets/Content for every seed, which is

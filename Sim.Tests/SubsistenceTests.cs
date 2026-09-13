@@ -73,8 +73,9 @@ namespace Godless.Sim.Tests
             MaterialTable materials = MaterialTable.FromContent(Content, biomes);
 
             double best = 0.0, worst = double.MaxValue;
-            for (int x = 64; x < 448; x += 64)
-                for (int z = 64; z < 448; z += 64)
+            int step = ChunkStore.SizeX / 8;
+            for (int x = step; x < ChunkStore.SizeX - step; x += step)
+                for (int z = step; z < ChunkStore.SizeZ - step; z += step)
                 {
                     if (!island.IsLand(x, z)) continue;
                     double food = Catchment.Survey(island, biomes, materials, x, z).FoodPerLabourTick;

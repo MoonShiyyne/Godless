@@ -1,0 +1,23 @@
+{
+  "type": "world",
+  "id": "cold-massif",
+  "title": "The Cold Massif",
+
+  // One mountain with a narrow foot. The cubic curve keeps the lowland thin
+  // and throws the rest of the relief at the summit, and the biome list has
+  // no oak in it at all: pine, slate and granite, or nothing.
+  "tell": "A single cold mountain with almost no lowland. Black pine below the snowline, slate above it, and not an oak on the island.",
+
+  "seaLevel": 38,
+  "height": { "base": 14, "relief": 150, "linear": 0.14, "cubic": 0.86, "peak": 1.0, "step": 0 },
+  "noise":  { "continentScale": 260, "roughScale": 44, "roughWeight": 0.22, "moistureScale": 160, "moistureBias": 0.22 },
+  "water":  { "riverFlow": 1800, "maxLakeDepth": 4 },
+
+  // How much of the map this world should be land. The harness checks
+  // every seed against this, so a generator change that quietly drowns or
+  // floods a map is caught at 200 seeds rather than by eye.
+  "land": { "least": 0.04, "most": 0.24 },
+
+  "centres": [ { "x": 0.5, "z": 0.5, "radius": 0.40 } ],
+  "biomes": ["shore", "pine-forest", "highland", "alpine"]
+}

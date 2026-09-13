@@ -91,16 +91,19 @@ namespace Godless.Sim.Tests
 
     public class ChunkStoreTests
     {
+        /// <summary>Thirty-two bytes a column: about six times what an island surface costs.</summary>
+        static readonly long Budget = ChunkStore.SizeX * (long)ChunkStore.SizeZ * 32L;
+
         readonly Xunit.Abstractions.ITestOutputHelper _out;
         public ChunkStoreTests(Xunit.Abstractions.ITestOutputHelper output) { _out = output; }
 
         [Fact]
         public void TheIslandDividesIntoChunksExactly()
         {
-            Assert.Equal(16, ChunkStore.ChunksX);
+            Assert.Equal(ChunkStore.SizeX / Chunk.Size, ChunkStore.ChunksX);
             Assert.Equal(5, ChunkStore.ChunksY);   // 160 / 32 — the reason chunks are not 64^3
-            Assert.Equal(16, ChunkStore.ChunksZ);
-            Assert.Equal(1280, ChunkStore.ChunkCount);
+            Assert.Equal(ChunkStore.SizeZ / Chunk.Size, ChunkStore.ChunksZ);
+            Assert.Equal(ChunkStore.ChunksX * ChunkStore.ChunksY * ChunkStore.ChunksZ, ChunkStore.ChunkCount);
         }
 
         [Fact]
@@ -141,11 +144,11 @@ namespace Godless.Sim.Tests
         {
             var store = new ChunkStore();
             Assert.Equal(VoxelTypes.AirId, store.Get(-1, 0, 0));
-            Assert.Equal(VoxelTypes.AirId, store.Get(512, 0, 0));
+            Assert.Equal(VoxelTypes.AirId, store.Get(ChunkStore.SizeX, 0, 0));
             Assert.Equal(VoxelTypes.AirId, store.Get(0, 160, 0));
 
             Assert.False(store.SetRaw(-1, 0, 0, 1));
-            Assert.False(store.SetRaw(0, 0, 512, 1));
+            Assert.False(store.SetRaw(0, 0, ChunkStore.SizeZ, 1));
             Assert.Equal(0, store.AllocatedChunks);
         }
 
@@ -179,12 +182,13 @@ namespace Godless.Sim.Tests
                            + "/" + ChunkStore.ChunkCount + " chunks; naive int-per-voxel would be "
                            + naive / 1024 / 1024 + " MB (" + (naive / bytes) + "x)");
 
-            // Measured at about 2 MB when this landed. The budget is set at
-            // 8 MB: loose enough for more materials and a rougher surface,
-            // tight enough that losing uniform-chunk elision fails here
-            // rather than in a profiler six months from now.
-            Assert.True(bytes < 8L * 1024 * 1024,
-                "island cost " + (bytes / 1024) + " KB, budget is 8192 KB");
+            // Measured at about 2 MB when this landed at 512 columns square,
+            // and 8 MB at 1024. The budget scales with the map for the same
+            // reason it existed: loose enough for more materials and a rougher
+            // surface, tight enough that losing uniform-chunk elision fails
+            // here rather than in a profiler six months from now.
+            Assert.True(bytes < Budget,
+                "island cost " + (bytes / 1024) + " KB, budget is " + Budget / 1024 + " KB");
             Assert.True(bytes * 16 < naive,
                 "palette compression should beat an int per voxel by well over 16x; got "
                 + bytes + " against " + naive);
@@ -240,7 +244,7 @@ namespace Godless.Sim.Tests
         {
             var store = new ChunkStore();
             for (int i = 0; i < 200; i++)
-                store.SetRaw(i, i % 160, (i * 7) % 512, (ushort)((i % 4) + 1));
+                store.SetRaw(i % ChunkStore.SizeX, i % 160, (i * 7) % ChunkStore.SizeZ, (ushort)((i % 4) + 1));
             return store;
         }
     }

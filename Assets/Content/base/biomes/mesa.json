@@ -1,0 +1,16 @@
+{
+  "type": "biome",
+  "id": "mesa",
+
+  // Dry stepped country: pale clay and whatever stone the benches expose. No
+  // timber at all, so a house here is earth on a stone footing or nothing.
+  "materials": ["clay", "granite"],
+  "rainfallMm": 220,
+  "winterSeverity": 1,
+  "treeCoverPercent": 4,
+
+  "surface": "sand",
+  "subsurface": "granite",
+
+  "select": { "minElevation": 46, "maxElevation": 95, "minMoisture": 0, "maxMoisture": 34 }
+}

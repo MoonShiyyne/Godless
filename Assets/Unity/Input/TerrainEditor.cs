@@ -120,10 +120,11 @@ namespace Godless.Unity
             _changed.Clear();
             if (lower)
                 TerrainBrush.Lower(world.Voxels, _solid, hit.Voxel.X, hit.Voxel.Z, radius, strength,
-                                   _water, IslandMap.SeaLevel, tick, stroke, _changed);
+                                   _water, world.Island != null ? world.Island.SeaLevel : IslandMap.DefaultSeaLevel,
+                                   tick, stroke, _changed);
             else
                 TerrainBrush.Raise(world.Voxels, _solid, hit.Voxel.X, hit.Voxel.Z, radius, strength,
-                                   _stone, tick, stroke, _changed);
+                                   _stone, tick, stroke, _changed, _boot.Ground);
 
             for (int i = 0; i < _changed.Count; i++) _boot.View.MarkDirty(_changed[i]);
             world.Voxels.EndTick(tick);

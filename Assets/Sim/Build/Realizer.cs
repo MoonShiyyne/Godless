@@ -164,6 +164,14 @@ namespace Godless.Sim.Build
         /// preferring what it already builds with, what it holds enough of,
         /// and — for a roof — something that reads against the walls.
         /// </summary>
+        /// <remarks>
+        /// <see cref="UsableYield"/> is the rate below which a material is
+        /// treated as absent rather than scarce: a tenth of a voxel a tick is
+        /// a day's walk for one stone.
+        /// </remarks>
+        /// <summary>Voxels a tick of labour must bring in for a material to count as available at all.</summary>
+        public const double UsableYield = 0.02;
+
         static int Choose(RoleTile tile, int need, TileSet tiles, MaterialTable materials, MaterialStock stock,
                           Palette palette, List<int> chosen, Symbol role, int wallMaterial, Structure structure,
                           Catchment catchment)
@@ -183,14 +191,31 @@ namespace Godless.Sim.Build
                 return pick;
             }
 
-            // Nothing in hand at all: plan in something the land can give,
-            // rather than in the first material that happens to be listed.
+            // Nothing in hand at all: plan in whatever the land gives most
+            // readily, not in the first material it gives at all.
+            //
+            // A trickle counts as "offered", and a roof planned in a stone
+            // that arrives at a tenth of a voxel a day is a roof that never
+            // gets built — the whole settlement walks to the highland and
+            // back while the reed it could have used grows beside the yard.
+            // Abundance decides; the tileset's order only breaks ties, which
+            // is the same rule the stocked case already follows.
             int last = -1;
+            double best = -1.0;
             foreach (Symbol cls in tile.Classes)
                 foreach (int m in tiles.MaterialsOf(materials, cls))
                 {
                     if (last < 0) last = m;
-                    if (catchment != null && catchment.Offers(m)) { last = m; break; }
+                    if (catchment == null || !catchment.Offers(m)) continue;
+                    double yield = catchment.YieldPerLabourTick(m);
+
+                    // A few source columns at the far edge of the haul range
+                    // round to nothing per tick. Counting those as available
+                    // is how a house ends up needing four voxels of a stone
+                    // that will never arrive, and standing unfinished for
+                    // four hundred days with its walls up.
+                    if (yield < UsableYield) continue;
+                    if (yield > best) { best = yield; last = m; }
                 }
             if (last >= 0)
             {

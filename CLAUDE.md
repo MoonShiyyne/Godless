@@ -106,6 +106,29 @@ added Parts 16, 09 and 10. Do not file that material under `Culture/`.
   .NET 8 runtime, so a `net8.0` project builds clean and then dies at
   `dotnet run` — the failure surfaces a step later wearing a different mask.
 
+## Maps are content
+
+A world is a document in `Assets/Content/base/worlds`: falloff centres, the
+elevation curve, terrace step, moisture bias, river flow, how much of the map
+should be land, and which biomes it admits. `WorldChoice.Pick(content, name)`
+is the only way to start one — it returns the preset *and* the biome subset
+together, because a map's biome list decides the biome indices the island
+stores, so taking one without the other generates a world that loads back as a
+different one. `sim maps` lists them; `--map <id>` picks one on run, island,
+parcels, separate and settle; the Editor picks one in the inspector; a save
+records its name.
+
+Two rules that keep falling out of this:
+
+- **Sea level is per island** (`IslandMap.SeaLevel`), not a constant. Anything
+  reading `IslandMap.DefaultSeaLevel` outside a preset is a bug waiting for
+  someone to play the delta.
+- **Numbers that describe a place belong to the place.** "An island covers
+  8% to 75% of the map" was a generator constant and became wrong the day a
+  delta existed; it is now `land.least`/`land.most` in each world document and
+  the S09 invariant reads it. Prefer moving a threshold into content over
+  widening it until every map fits.
+
 ## Speed is a display decision
 
 The player can pause and run at 1x to 16x (`Assets/Sim/Harness/TickPacer.cs`,

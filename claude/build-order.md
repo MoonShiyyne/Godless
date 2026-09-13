@@ -52,6 +52,29 @@ this frame and the simulation never learns a speed exists, which is what
 (the Silence wants two hundred unattended years) is one number in
 `TickPacer.Multipliers`.
 
+**Maps** (S09 revisited): the world is 1024x1024 now, and which world it is
+comes from content — `Assets/Content/base/worlds`, five of them, chosen with
+`--map` or in the inspector. They differ in landform (one island, five isles,
+a massif, a delta, stepped desert), in how much of the map is land, and, the
+point of the exercise, in what they give people to build with. The Dry Reach
+has no timber at all and the Broad Delta has no stone, so the same genome
+builds clay-on-granite in one and mud-and-reed in the other. Measured with
+`sim separate --map`: temperate against alpine on the Green Shore separates
+100%, pine-forest against alpine on the Cold Massif 100%, mesa against
+highland on the Dry Reach 71%, flood-plain against temperate on the Delta 75%.
+Neighbouring bands blur (temperate against highland, 63%) because their
+catchments overlap, which is the honest answer rather than a tuning target.
+
+Three bugs this surfaced, all of them older than the maps:
+- Gathering demand split the building budget by *how easily* each material
+  could be gathered instead of by what the plans cost, so adding two voxel
+  types to content was enough to starve a house that wanted neither.
+- The empty-yard fallback planned in the first material the catchment offered
+  at all, including one arriving at a hundredth of a voxel a tick — a house
+  stood unfinished for four hundred days waiting for four voxels of slate.
+- `role.hearth` admitted only stone, so a settlement in an oak wood with no
+  quarry could not build at all. It takes fired earth now.
+
 **Next: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

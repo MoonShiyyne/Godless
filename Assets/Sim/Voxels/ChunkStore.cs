@@ -15,14 +15,14 @@ namespace Godless.Sim.Voxels
     /// </summary>
     public sealed class ChunkStore
     {
-        public const int SizeX = 512;
+        public const int SizeX = 1024;
         public const int SizeY = 160;
-        public const int SizeZ = 512;
+        public const int SizeZ = 1024;
 
-        public const int ChunksX = SizeX / Chunk.Size; // 16
+        public const int ChunksX = SizeX / Chunk.Size; // 32
         public const int ChunksY = SizeY / Chunk.Size; // 5
-        public const int ChunksZ = SizeZ / Chunk.Size; // 16
-        public const int ChunkCount = ChunksX * ChunksY * ChunksZ; // 1280
+        public const int ChunksZ = SizeZ / Chunk.Size; // 32
+        public const int ChunkCount = ChunksX * ChunksY * ChunksZ; // 5120
 
         readonly Chunk[] _chunks = new Chunk[ChunkCount];
 

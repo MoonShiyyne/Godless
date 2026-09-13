@@ -87,7 +87,7 @@ namespace Godless.Sim.World
                     f.Sun[px, pz] = SimMath.Clamp01(0.5 - fall / 8.0);
 
                     // Snow: the biome's winter, worse the higher it stands.
-                    double aboveSea = height - IslandMap.SeaLevel;
+                    double aboveSea = height - map.SeaLevel;
                     double climb = SimMath.Clamp01(aboveSea / 60.0);
                     f.SnowLoad[px, pz] = SimMath.Clamp01(meanSeverity / 5.0 * (0.4 + 0.6 * climb));
 

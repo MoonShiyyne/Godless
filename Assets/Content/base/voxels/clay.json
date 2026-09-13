@@ -1,0 +1,14 @@
+{
+  "type": "voxel",
+  "id": "clay",
+  "solid": true,
+  "hardness": 2,
+
+  // Pale sun-dried earth, the lightest material on the island. What a dry
+  // country builds with when it has no timber and little stone.
+  "value": 94,
+  "hue": 35,
+  "saturation": 22,
+  "class": "earth",
+  "gather": { "perLabourTick": 2.2 }
+}

@@ -1,0 +1,15 @@
+{
+  "type": "voxel",
+  "id": "pine",
+  "solid": true,
+  "hardness": 3,
+
+  // Near-black resinous conifer: the darkest thing anybody builds with, so a
+  // pine wall reads against slate and snow. The palette has room for it at 4
+  // and nowhere else (the contrast rule wants 8 clear of oak at 12).
+  "value": 4,
+  "hue": 140,
+  "saturation": 18,
+  "class": "timber",
+  "gather": { "perLabourTick": 1.2 }
+}
