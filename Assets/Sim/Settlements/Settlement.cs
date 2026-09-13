@@ -136,6 +136,14 @@ namespace Godless.Sim.Settlements
         /// <summary>Buildings commissioned and not yet standing (S15, S1A).</summary>
         public List<Build.Project> Projects { get; } = new List<Build.Project>();
 
+        public static readonly Symbol TrafficField = Symbol.For("field.traffic");
+
+        /// <summary>
+        /// Footsteps per parcel, ever (S2G). Where a road will wear (S2K) and
+        /// a bridge will be wanted (S2M). Null until anybody has walked.
+        /// </summary>
+        public InfluenceMap Traffic { get; internal set; }
+
         /// <summary>Who does what (S1C). Null in a settlement with nothing to do.</summary>
         public Collective.TaskBoard Tasks { get; set; }
 

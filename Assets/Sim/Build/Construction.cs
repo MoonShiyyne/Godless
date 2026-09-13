@@ -43,6 +43,9 @@ namespace Godless.Sim.Build
 
         /// <param name="voxelsPerTick">Voxels one builder lays in a tick. A house is days of work.</param>
         readonly DepositMap _deposits;
+
+        /// <summary>The island builders walk on, so a straight walk never goes out to sea (S2G). May be null.</summary>
+        internal IslandMap _island;
         readonly int _ticksPerDay;
 
         public Construction(VoxelWorld voxels, MaterialTable materials, VoxelTypes types,
@@ -135,28 +138,21 @@ namespace Godless.Sim.Build
             }
             if (project == null) return false;
 
-            if (Walk(agent, grid, project)) return true;
+            if (Walk(settlement, agent, grid, project)) return true;
             Lay(settlement, project, tick, annals, rng);
             return true;
         }
 
-        /// <summary>A step along the way there, if the builder is not there yet.</summary>
-        static bool Walk(Agent agent, ParcelGrid grid, Project project)
+        /// <summary>
+        /// A tick's walk toward the site, if the builder is not there yet. The
+        /// same walk everyone takes (S2G): a path once, then strides along it.
+        /// </summary>
+        bool Walk(Settlement settlement, Agent agent, ParcelGrid grid, Project project)
         {
-            int goalX = project.Site.ParcelX, goalZ = project.Site.ParcelZ;
-            if (agent.ParcelX == goalX && agent.ParcelZ == goalZ) return false;
-
-            List<int> path = ParcelPath.Find(grid, agent.ParcelX, agent.ParcelZ, goalX, goalZ);
-            if (path.Count < 2)
-            {
-                // No way round: step straight at it rather than stand still.
-                agent.ParcelX += System.Math.Sign(goalX - agent.ParcelX);
-                agent.ParcelZ += System.Math.Sign(goalZ - agent.ParcelZ);
-                return true;
-            }
-            int next = path[1];
-            agent.ParcelX = next % ParcelGrid.Width;
-            agent.ParcelZ = next / ParcelGrid.Width;
+            if (agent.ParcelX == project.Site.ParcelX && agent.ParcelZ == project.Site.ParcelZ) return false;
+            int gx = project.Site.ParcelX * ParcelGrid.Size + ParcelGrid.Size / 2 + (agent.Index % 3) - 1;
+            int gz = project.Site.ParcelZ * ParcelGrid.Size + ParcelGrid.Size / 2 + (agent.Index / 3 % 3) - 1;
+            Movement.Toward(agent, grid, gx, gz, settlement.Traffic, _island);
             return true;
         }
 

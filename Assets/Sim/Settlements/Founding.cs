@@ -114,7 +114,8 @@ namespace Godless.Sim.Settlements
                  .Add(new DepositSystem(grid))
                  .Add(new TaskSystem(new Construction(world.Voxels, materials, world.VoxelTypes, tiles, palette,
                                                       deposits: world.Island != null ? world.Island.Deposits : null,
-                                                      ticksPerDay: world.Clock.TicksPerDay), grid));
+                                                      ticksPerDay: world.Clock.TicksPerDay) { _island = world.Island }, grid))
+                 .Add(new MovementSystem(grid, rules));
         }
 
         /// <summary>The parcel grid and the fields an island needs before anybody can settle it.</summary>

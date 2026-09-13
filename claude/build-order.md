@@ -130,6 +130,30 @@ traffic is high, abandoned when it falls (Part 16).
   the settlement's houses are oak and thatch rather than the sand-and-reed
   plan it first drew against an empty yard.
 
+### What S2G shipped
+
+- Everyone has a place, as a world column. It follows from the two things
+  that already decide what they do: their drives (the fire when cold, a roof
+  or the open at night) and the task board (the tree they are felling, the
+  reed bed, the site). `Agent.Doing` says it in words a stranger reads.
+- One walk for everybody (`Settlements/Movement.cs`), builders included: a
+  path over the planning grid once per goal, three parcels a tick along it,
+  never out into the sea. Every parcel crossed is foot traffic on the
+  settlement (`Settlement.Traffic`), which S2K's roads and S2M's bridges read.
+- The Editor draws people as instanced cut-out sprites coloured by what they
+  are doing, eased between ticks by the pacer's fraction, and scaled up with
+  distance so a village reads from the whole-island view. Hover one to read
+  its activity and pressing needs.
+- A path search used to clear two hundred thousand cells before its first
+  step; with everyone walking that was most of a settlement's cost. Buffers
+  are reused and reset by generation stamp now (same search, same paths):
+  the settled batch went from 57 s to 13 s.
+- **L7 for stratum 2:** `sim run --settle [--map M]` founds one settlement per
+  seed on a planted island with every system running, and checks
+  `SettlementInvariants` — nobody in the sea, everyone on the island, no
+  deposit regrows past what it grew with, and a settlement that lived has
+  worked the land. Green on all five maps.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

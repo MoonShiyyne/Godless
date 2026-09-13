@@ -41,11 +41,40 @@ namespace Godless.Sim.Drives
 
         public bool ShelteredLastNight { get; internal set; }
 
-        /// <summary>Where this person is, on the planning grid (S13). Everyone starts at the hearth.</summary>
-        public int ParcelX { get; internal set; }
-        public int ParcelZ { get; internal set; }
+        /// <summary>
+        /// Where this person stands, as a world column (S2G). Everyone starts
+        /// at the hearth. The planning grid's parcel follows from it.
+        /// </summary>
+        public int X { get; internal set; }
+        public int Z { get; internal set; }
+
+        /// <summary>Where this person is, on the planning grid (S13).</summary>
+        public int ParcelX
+        {
+            get { return X / World.ParcelGrid.Size; }
+            internal set { X = value * World.ParcelGrid.Size + World.ParcelGrid.Size / 2; }
+        }
+
+        public int ParcelZ
+        {
+            get { return Z / World.ParcelGrid.Size; }
+            internal set { Z = value * World.ParcelGrid.Size + World.ParcelGrid.Size / 2; }
+        }
 
         public void PlaceAt(int px, int pz) { ParcelX = px; ParcelZ = pz; }
+
+        /// <summary>Where this person is headed this tick, as a world column (S2G).</summary>
+        public int GoalX { get; internal set; }
+        public int GoalZ { get; internal set; }
+
+        /// <summary>Why they are headed there, in a word a stranger can read: "felling oak", "at the fire".</summary>
+        public string Doing { get; internal set; } = "";
+
+        // The way to the current goal, as parcels, and how far along it. Derived
+        // from the position and the goal, so a digest need not carry it.
+        internal System.Collections.Generic.List<int> Path;
+        internal int PathGoal = -1;
+        internal int PathStep;
 
         /// <summary>The deposit feature this person last worked (S2F), or -1.</summary>
         public int WorkingAt { get; internal set; } = -1;
@@ -70,7 +99,7 @@ namespace Godless.Sim.Drives
             }
             d.Add(Activity);
             d.Add(ShelteredLastNight ? 1 : 0);
-            d.Add(ParcelX); d.Add(ParcelZ);
+            d.Add(X); d.Add(Z);
             d.Add(ProductiveTicks);
         }
     }

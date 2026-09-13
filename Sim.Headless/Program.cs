@@ -67,11 +67,26 @@ namespace Godless.Sim.Headless
             // batch shrinks when one is asked for. Two hundred seeds of an
             // empty world is a framework check; twenty seeds of a real island
             // is a content check.
-            cli.Seeds(out first, out count, defaultCount: withIsland ? 20 : 200);
-            int years = cli.Int("years", 300);
+            bool settled = cli.Text("settle", "false") != "false";
+            cli.Seeds(out first, out count, defaultCount: settled ? 10 : withIsland ? 20 : 200);
+            int years = cli.Int("years", settled ? 5 : 300);
 
             BatchRunner runner;
-            if (withIsland)
+            if (cli.Text("settle", "false") != "false")
+            {
+                // Stratum 2's batch: one settlement per seed on a planted island.
+                LoadResult content;
+                try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
+                catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
+                WorldChoice map;
+                try { map = WorldChoice.Pick(content.Database, cli.Text("map", "")); }
+                catch (System.Exception e) { Console.Error.WriteLine(e.Message); return 1; }
+
+                runner = new BatchRunner(SettlementInvariants.Settled(content.Database, map, cli.Int("people", 20)));
+                runner.Collect(SettlementInvariants.Collector());
+                foreach (Invariant i in SettlementInvariants.All()) runner.Assert(i);
+            }
+            else if (withIsland)
             {
                 LoadResult content;
                 try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
@@ -857,6 +872,7 @@ namespace Godless.Sim.Headless
                                                 deposits: island.Deposits, ticksPerDay: world.Clock.TicksPerDay);
             world.Add(new DepositSystem(grid));
             world.Add(new TaskSystem(construction, grid));
+            world.Add(new MovementSystem(grid, rules));
             world.BeginHistory();
 
             var header = new StringBuilder("  day  weather     in open ");
@@ -1162,7 +1178,7 @@ namespace Godless.Sim.Headless
             Console.WriteLine(
 @"godless sim harness
 
-  sim run      [--seeds A..B] [--years N] [--island]
+  sim run      [--seeds A..B] [--years N] [--island | --settle [--map M] [--people P]]
                                             batch run, checking every invariant
   sim verify   [--seeds A..B] [--years N]   run each seed twice, compare byte for byte
   sim content  [--path P]                   load Assets/Content and report what it holds

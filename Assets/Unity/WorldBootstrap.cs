@@ -34,6 +34,9 @@ namespace Godless.Unity
         [Tooltip("Grow the woods, reed beds and rock that settlements gather from and use up (S2F). Off gives the bare island stratum 1 was built on.")]
         [SerializeField] bool plantDeposits = true;
 
+        [Tooltip("Draw the people as sprites, coloured by what they are doing (S2G). Hover one to read it.")]
+        [SerializeField] bool showPeople = true;
+
         [Tooltip("Place the main camera over the island on start.")]
         [SerializeField] bool frameCamera = true;
 
@@ -78,6 +81,13 @@ namespace Godless.Unity
         float _worstFrame;
         float _loadSeconds;
         int _deltaCursor;
+
+        void Awake()
+        {
+            // Added in code rather than in the scene, so a scene saved before
+            // S2G still shows its people.
+            if (showPeople && GetComponent<PeopleView>() == null) gameObject.AddComponent<PeopleView>();
+        }
 
         void Start()
         {

@@ -1,0 +1,253 @@
+using System.Collections.Generic;
+using Godless.Sim.Build;
+using Godless.Sim.Collective;
+using Godless.Sim.Core;
+using Godless.Sim.Drives;
+using Godless.Sim.Harness;
+using Godless.Sim.World;
+
+namespace Godless.Sim.Settlements
+{
+    /// <summary>
+    /// Where everybody is, and where they are going. S2G.
+    ///
+    /// Until this a person was a row of numbers at the hearth, and only a
+    /// builder ever moved. Now each one has a place, and the place follows
+    /// from the same two things that already decide what they do: their own
+    /// needs (the drives: the fire when they are cold, a roof or the open at
+    /// night) and the settlement's calls on them (the task board: the tree
+    /// they are felling, the reed bed, the house going up). Nothing here
+    /// decides anything new. It puts the decisions somewhere a stranger can
+    /// see them.
+    ///
+    /// The tell: at dawn the village walks out to the edge of its clearing,
+    /// the builders climb onto the walls, and at dusk everyone who has no
+    /// roof lies down round the fire.
+    /// </summary>
+    public static class Movement
+    {
+        /// <summary>Parcels a person covers in a tick. A tick is a quarter of a day; this is what a picture can follow.</summary>
+        public const int StrideParcels = 3;
+
+        /// <summary>
+        /// A tick's walk toward a column. Follows a path over the planning grid
+        /// once one is known, straight at the goal when there is none, and
+        /// counts every parcel crossed as foot traffic. True once there.
+        /// </summary>
+        public static bool Toward(Agent a, ParcelGrid grid, int goalX, int goalZ, InfluenceMap traffic = null,
+                                  IslandMap island = null)
+        {
+            a.GoalX = goalX;
+            a.GoalZ = goalZ;
+            if (a.X == goalX && a.Z == goalZ) return true;
+
+            int goalParcel = (goalZ / ParcelGrid.Size) * ParcelGrid.Width + goalX / ParcelGrid.Size;
+            int here = a.ParcelZ * ParcelGrid.Width + a.ParcelX;
+            int stride = StrideParcels * ParcelGrid.Size;
+
+            if (here == goalParcel || grid == null)
+            {
+                Step(a, goalX, goalZ, stride, island);
+                return a.X == goalX && a.Z == goalZ;
+            }
+
+            if (a.Path == null || a.PathGoal != goalParcel || a.PathStep >= a.Path.Count || a.Path[a.PathStep] != here)
+            {
+                a.Path = ParcelPath.Find(grid, a.ParcelX, a.ParcelZ, goalX / ParcelGrid.Size, goalZ / ParcelGrid.Size);
+                a.PathGoal = goalParcel;
+                a.PathStep = 0;
+            }
+
+            if (a.Path.Count < 2)
+            {
+                // No way round: straight at it rather than standing still,
+                // though never out into the sea.
+                Step(a, goalX, goalZ, stride, island);
+                return a.X == goalX && a.Z == goalZ;
+            }
+
+            int last = a.Path.Count - 1;
+            int to = a.PathStep + StrideParcels > last ? last : a.PathStep + StrideParcels;
+            for (int i = a.PathStep + 1; i <= to && traffic != null; i++)
+            {
+                int p = a.Path[i];
+                traffic[p % ParcelGrid.Width, p / ParcelGrid.Width] += 1.0;
+            }
+            a.PathStep = to;
+            if (to == last) { a.X = goalX; a.Z = goalZ; return true; }
+            int next = a.Path[to];
+            int cx, cz;
+            if (DryIn(island, next % ParcelGrid.Width, next / ParcelGrid.Width, out cx, out cz)) { a.X = cx; a.Z = cz; }
+            return false;
+        }
+
+        static void Step(Agent a, int goalX, int goalZ, int stride, IslandMap island)
+        {
+            int dx = goalX - a.X, dz = goalZ - a.Z;
+            int nx = a.X + (System.Math.Abs(dx) <= stride ? dx : System.Math.Sign(dx) * stride);
+            int nz = a.Z + (System.Math.Abs(dz) <= stride ? dz : System.Math.Sign(dz) * stride);
+            if (island != null && !island.IsLand(Clamp(nx, Voxels.ChunkStore.SizeX), Clamp(nz, Voxels.ChunkStore.SizeZ))) return;
+            a.X = nx;
+            a.Z = nz;
+        }
+
+        static int Clamp(int v, int n) { return v < 0 ? 0 : (v >= n ? n - 1 : v); }
+
+        /// <summary>A parcel's centre, or failing that its first dry column in grid order. False when all of it is sea.</summary>
+        static bool DryIn(IslandMap island, int px, int pz, out int x, out int z)
+        {
+            x = px * ParcelGrid.Size + ParcelGrid.Size / 2;
+            z = pz * ParcelGrid.Size + ParcelGrid.Size / 2;
+            if (island == null || island.IsLand(x, z)) return true;
+            for (int dz = 0; dz < ParcelGrid.Size; dz++)
+                for (int dx = 0; dx < ParcelGrid.Size; dx++)
+                    if (island.IsLand(px * ParcelGrid.Size + dx, pz * ParcelGrid.Size + dz))
+                    { x = px * ParcelGrid.Size + dx; z = pz * ParcelGrid.Size + dz; return true; }
+            return false;
+        }
+
+        /// <summary>
+        /// The goal if it is dry land, otherwise the fallback: a place by the
+        /// reeds is the reed bed itself, not the water a voxel past it.
+        /// </summary>
+        public static void OnLand(IslandMap island, ref int x, ref int z, int fallbackX, int fallbackZ)
+        {
+            x = Clamp(x, Voxels.ChunkStore.SizeX);
+            z = Clamp(z, Voxels.ChunkStore.SizeZ);
+            if (island == null || island.IsLand(x, z)) return;
+            x = Clamp(fallbackX, Voxels.ChunkStore.SizeX);
+            z = Clamp(fallbackZ, Voxels.ChunkStore.SizeZ);
+        }
+
+        /// <summary>A place round the fire for the i-th person: rings of eight, three voxels apart.</summary>
+        public static void AtFire(Settlement s, int i, out int x, out int z)
+        {
+            int ring = 1 + i / 8, slot = i % 8;
+            int r = 2 + ring * 2;
+            int[] ox = { r, r, 0, -r, -r, -r, 0, r };
+            int[] oz = { 0, r, r, r, 0, -r, -r, -r };
+            x = s.Hearth.X + ox[slot];
+            z = s.Hearth.Z + oz[slot];
+        }
+    }
+
+    /// <summary>Moves every settlement's people toward what their drives and their tasks have them doing. S2G.</summary>
+    public sealed class MovementSystem : ISimSystem
+    {
+        public static readonly Symbol SystemId = Symbol.For("system.movement");
+
+        readonly ParcelGrid _grid;
+        readonly ActivityTable _activities;
+
+        public MovementSystem(ParcelGrid grid, DriveRules rules)
+        {
+            _grid = grid;
+            _activities = rules.Activities;
+        }
+
+        public Symbol Id { get { return SystemId; } }
+
+        public void Tick(SimWorld world)
+        {
+            bool night = world.Clock.TickOfDay == world.Clock.TicksPerDay - 1;
+            foreach (Settlement s in world.Settlements) Place(s, world, night);
+        }
+
+        void Place(Settlement s, SimWorld world, bool night)
+        {
+            IReadOnlyList<Agent> people = s.People;
+            DepositMap deposits = world.Island != null ? world.Island.Deposits : null;
+            if (s.Traffic == null) s.Traffic = new InfluenceMap(Settlement.TrafficField);
+
+            // Houses, in the order they were finished, filled in roll order by
+            // whoever got a roof last night.
+            var beds = new List<Project>();
+            foreach (Project p in s.Projects) if (p.Complete) beds.Add(p);
+            int house = 0, usedInHouse = 0;
+
+            for (int i = 0; i < people.Count; i++)
+            {
+                Agent a = people[i];
+                int gx, gz;
+                string doing;
+
+                if (night && a.ShelteredLastNight && house < beds.Count)
+                {
+                    Project home = beds[house];
+                    Int3 door = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);
+                    gx = door.X; gz = door.Z;
+                    doing = "asleep under a roof";
+                    if (++usedInHouse >= home.Plan.Capacity) { house++; usedInHouse = 0; }
+                }
+                else if (night)
+                {
+                    Movement.AtFire(s, i, out gx, out gz);
+                    doing = "asleep in the open";
+                }
+                else if (a.Activity >= 0 && _activities[a.Activity].Productive && s.Tasks != null
+                         && Working(s, i, a, deposits, world.Clock.TotalDays, out gx, out gz, out doing))
+                {
+                    // A builder has already walked this tick (S1A does its own).
+                    if (s.Tasks.CurrentTask(i) >= 0 && s.Tasks.KindOf(s.Tasks.CurrentTask(i)).Verb == "build")
+                    {
+                        a.Doing = doing;
+                        continue;
+                    }
+                }
+                else
+                {
+                    Movement.AtFire(s, i, out gx, out gz);
+                    doing = a.Activity >= 0 && !_activities[a.Activity].Productive
+                        ? "at the fire (" + _activities[a.Activity].Name + ")"
+                        : "idle at the fire";
+                }
+
+                a.Doing = doing;
+                Movement.OnLand(world.Island, ref gx, ref gz, s.Hearth.X, s.Hearth.Z);
+                Movement.Toward(a, _grid, gx, gz, s.Traffic, world.Island);
+            }
+        }
+
+        /// <summary>Where a worker's task puts them, and what to call it.</summary>
+        static bool Working(Settlement s, int i, Agent a, DepositMap deposits, long day,
+                            out int gx, out int gz, out string doing)
+        {
+            gx = s.Hearth.X; gz = s.Hearth.Z; doing = "";
+            int task = s.Tasks.CurrentTask(i);
+            if (task < 0) return false;
+
+            TaskKind kind = s.Tasks.KindOf(task);
+            if (kind.Verb == "build")
+            {
+                doing = "building";
+                return true;
+            }
+
+            if (kind.Verb == "forage")
+            {
+                int spot = s.Catchment != null ? s.Catchment.ForageSpot(a.Id.Hash, day) : -1;
+                if (spot >= 0 && deposits != null) { gx = deposits.X(spot); gz = deposits.Z(spot); }
+                else Movement.AtFire(s, i + 16, out gx, out gz);
+                doing = "foraging";
+                return true;
+            }
+
+            int m = s.Tasks.MaterialOf(task);
+            string material = m >= 0 ? s.Stock.Materials[m].Name : "material";
+            if (deposits != null && a.WorkingAt >= 0)
+            {
+                gx = deposits.X(a.WorkingAt) + 1;
+                gz = deposits.Z(a.WorkingAt);
+                FeatureShape shape = deposits.KindOf(a.WorkingAt).Shape;
+                doing = (shape == FeatureShape.Tree ? "felling " : shape == FeatureShape.Tuft ? "cutting "
+                        : shape == FeatureShape.Boulder ? "breaking " : "digging ") + material;
+            }
+            else
+            {
+                Movement.AtFire(s, i + 16, out gx, out gz);
+                doing = "gathering " + material;
+            }
+            return true;
+        }
+    }
+}

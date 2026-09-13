@@ -228,6 +228,28 @@ namespace Godless.Sim.Settlements
             return c;
         }
 
+        /// <summary>
+        /// Where a forager goes today: one of the nearest dozen standing trees
+        /// or tufts, picked by the person and the day so the foragers spread
+        /// out and move on (S2G). -1 when nothing stands, or on a bare island.
+        /// </summary>
+        public int ForageSpot(ulong person, long day)
+        {
+            if (_deposits == null) return -1;
+            int seen = 0, pick = (int)(StableHash.Combine(person, (ulong)day) % 12UL);
+            foreach (int f in _vegetation)
+            {
+                if (!_deposits.Standing(f)) continue;
+                if (seen++ == pick) return f;
+            }
+            if (seen == 0) return -1;
+            pick %= seen;
+            seen = 0;
+            foreach (int f in _vegetation)
+                if (_deposits.Standing(f) && seen++ == pick) return f;
+            return -1;
+        }
+
         int StandingVegetation()
         {
             int v = 0;

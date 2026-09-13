@@ -61,24 +61,30 @@ namespace Godless.Sim.World
             int start = fromZ * ParcelGrid.Width + fromX, goal = toZ * ParcelGrid.Width + toX;
             if (start == goal) { path.Add(start); return path; }
 
-            int cells = ParcelGrid.Width * ParcelGrid.Depth;
-            var cost = new int[cells];
-            var from = new int[cells];
-            var closed = new bool[cells];
-            for (int i = 0; i < cells; i++) { cost[i] = int.MaxValue; from[i] = -1; }
+            // Buffers reused across searches, one set per thread, and reset by
+            // a generation stamp rather than a sweep: a short walk used to
+            // clear two hundred thousand cells before taking its first step,
+            // which with everyone walking (S2G) was most of a settlement's
+            // cost. The search itself, and so every path, is unchanged.
+            Buffers b = Buffers.Get();
+            int[] cost = b.Cost, from = b.From;
+            int gen = b.Next();
+            int[] seen = b.Seen, shut = b.Shut;
+            Touch(seen, cost, from, start, gen);
             cost[start] = 0;
 
             // A binary heap keyed by (estimate, parcel): small, and ordered
             // the same way on every machine.
-            var heap = new List<long>();
+            List<long> heap = b.Heap;
+            heap.Clear();
             Push(heap, Key(Estimate(start, goal), start));
 
             while (heap.Count > 0)
             {
                 long top = Pop(heap);
                 int at = (int)(top & 0xFFFFFFFFL);
-                if (closed[at]) continue;
-                closed[at] = true;
+                if (shut[at] == gen) continue;
+                shut[at] = gen;
                 if (at == goal) break;
 
                 int ax = at % ParcelGrid.Width, az = at / ParcelGrid.Width;
@@ -87,7 +93,8 @@ namespace Godless.Sim.World
                     int nx = ax + Dx[k], nz = az + Dz[k];
                     if (!ParcelGrid.InBounds(nx, nz)) continue;
                     int next = nz * ParcelGrid.Width + nx;
-                    if (closed[next]) continue;
+                    if (shut[next] == gen) continue;
+                    Touch(seen, cost, from, next, gen);
 
                     int step = Step(walkable, ax, az, nx, nz, k >= 4, next == goal);
                     if (step < 0) continue;
@@ -101,6 +108,7 @@ namespace Godless.Sim.World
                 }
             }
 
+            Touch(seen, cost, from, goal, gen);
             if (from[goal] < 0 && start != goal) return path;
             for (int at = goal; at >= 0; at = from[at]) path.Add(at);
             path.Reverse();
@@ -125,6 +133,39 @@ namespace Godless.Sim.World
             }
             int flat = diagonal ? 141 : StepCost;
             return flat + (int)(climb * SlopeCost) + (int)(grid.Slope(px, pz) * SlopeCost);
+        }
+
+        static void Touch(int[] seen, int[] cost, int[] from, int cell, int gen)
+        {
+            if (seen[cell] == gen) return;
+            seen[cell] = gen;
+            cost[cell] = int.MaxValue;
+            from[cell] = -1;
+        }
+
+        sealed class Buffers
+        {
+            [System.ThreadStatic] static Buffers _mine;
+
+            public readonly int[] Cost = new int[ParcelGrid.Width * ParcelGrid.Depth];
+            public readonly int[] From = new int[ParcelGrid.Width * ParcelGrid.Depth];
+            public readonly int[] Seen = new int[ParcelGrid.Width * ParcelGrid.Depth];
+            public readonly int[] Shut = new int[ParcelGrid.Width * ParcelGrid.Depth];
+            public readonly List<long> Heap = new List<long>();
+            int _gen;
+
+            public static Buffers Get() { return _mine ?? (_mine = new Buffers()); }
+
+            public int Next()
+            {
+                if (++_gen == int.MaxValue)
+                {
+                    System.Array.Clear(Seen, 0, Seen.Length);
+                    System.Array.Clear(Shut, 0, Shut.Length);
+                    _gen = 1;
+                }
+                return _gen;
+            }
         }
 
         static int Estimate(int at, int goal)
