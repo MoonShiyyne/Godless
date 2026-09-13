@@ -26,7 +26,7 @@ namespace Godless.Sim.Tests
             var isle = new Isle { Biomes = BiomeTable.FromContent(content) };
             VoxelTypes types = VoxelTypes.FromContent(content);
             var store = new ChunkStore();
-            isle.Map = IslandGenerator.Generate(store, new StreamRegistry(seed), isle.Biomes, types);
+            isle.Map = TestIslands.Generate(store, new StreamRegistry(seed), isle.Biomes, types);
 
             bool[] solid = TerrainBrush.SolidTable(content, types);
             var wet = new bool[types.Count];

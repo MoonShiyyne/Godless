@@ -20,14 +20,19 @@ namespace Godless.Sim.Settlements
     public static class SettlementInvariants
     {
         /// <summary>A planted island with one settlement on it, every stratum-1 and stratum-2 system running.</summary>
-        public static WorldFactory Settled(ContentDatabase content, WorldChoice choice, int people = 20)
+        /// <summary>How an island is made for a seed. Tests pass one that copies a shared island.</summary>
+        public delegate IslandMap IslandMaker(ChunkStore into, StreamRegistry streams, BiomeTable biomes, VoxelTypes types,
+                                              WorldPreset preset, FeatureTable features);
+
+        public static WorldFactory Settled(ContentDatabase content, WorldChoice choice, int people = 20, IslandMaker make = null)
         {
             VoxelTypes types = VoxelTypes.FromContent(content);
             return seed =>
             {
                 var world = new SimWorld(seed, content, types);
-                world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, choice.Biomes, types,
-                                                        choice.Preset, choice.Features);
+                world.Island = make != null
+                    ? make(world.Voxels.Store, world.Streams, choice.Biomes, types, choice.Preset, choice.Features)
+                    : IslandGenerator.Generate(world.Voxels.Store, world.Streams, choice.Biomes, types, choice.Preset, choice.Features);
                 world.BeginHistory();
 
                 ConstraintFields fields;

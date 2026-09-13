@@ -82,6 +82,24 @@ namespace Godless.Sim.World
             }
         }
 
+        /// <summary>
+        /// A copy that shares nothing mutable: the deposits are copied, so one
+        /// world's felling never reaches another's. For tools and tests that
+        /// start many worlds from one generated island.
+        /// </summary>
+        public IslandMap Clone()
+        {
+            var c = new IslandMap { SeaLevel = SeaLevel, Map = Map };
+            System.Array.Copy(_height, c._height, _height.Length);
+            System.Array.Copy(_biome, c._biome, _biome.Length);
+            System.Array.Copy(_moisture, c._moisture, _moisture.Length);
+            System.Array.Copy(_water, c._water, _water.Length);
+            System.Array.Copy(_aboveWater, c._aboveWater, _aboveWater.Length);
+            System.Array.Copy(_river, c._river, _river.Length);
+            c.Deposits = Deposits != null ? Deposits.Clone() : null;
+            return c;
+        }
+
         public ulong Digest()
         {
             var d = new Digest();

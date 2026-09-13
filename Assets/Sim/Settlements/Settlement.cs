@@ -89,10 +89,21 @@ namespace Godless.Sim.Settlements
         public void Remove(int index, StreamRegistry streams)
         {
             if (index < 0 || index >= _people.Count) return;
+            Settlements.Households.Leave(this, _people[index]);
             _people.RemoveAt(index);
             Died++;
             if (Tasks != null) Tasks.Sync(this, streams);
         }
+
+        // S2N. Families, in the order they formed.
+        internal readonly List<Household> HouseholdList = new List<Household>();
+        internal int NextHousehold;
+
+        /// <summary>The families (S2N). Empty in a settlement founded without household rules.</summary>
+        public IReadOnlyList<Household> Households { get { return HouseholdList; } }
+
+        /// <summary>How families grow and split (S2N), or null.</summary>
+        public HouseholdRules HouseholdRules { get; internal set; }
 
         /// <summary>What the settlement holds to build with (S11). Null where nothing can be gathered.</summary>
         public MaterialStock Stock { get; set; }
@@ -200,6 +211,7 @@ namespace Godless.Sim.Settlements
             d.Add(SpellRecord.Index);
             d.Add(SpellSignature);
             foreach (Agent a in _people) a.AddTo(ref d);
+            Settlements.Households.AddTo(this, ref d);
             if (Stock != null) d.Add(Stock.Digest());
             if (Tasks != null) d.Add(Tasks.Digest());
             foreach (KeyValuePair<int, int> claim in _claims) { d.Add(claim.Key); d.Add(claim.Value); }

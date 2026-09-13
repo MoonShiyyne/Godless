@@ -222,6 +222,31 @@ namespace Godless.Sim.Settlements
                 if (kind.Shape == FeatureShape.Tree || kind.Shape == FeatureShape.Tuft) c._vegetation.Add(f);
             }
 
+            // What the open land in walking range feeds, whatever grows on it:
+            // roots, game, the shallows. The floor foraging never falls below.
+            int range = materials.DepositRangeVoxels;
+            double richness = 0.0, fish = 0.0;
+            for (int z = hearthZ - range; z <= hearthZ + range; z += 2)
+                for (int x = hearthX - range; x <= hearthX + range; x += 2)
+                {
+                    if (x < 0 || z < 0 || x >= Voxels.ChunkStore.SizeX || z >= Voxels.ChunkStore.SizeZ) continue;
+                    long dx = x - hearthX, dz = z - hearthZ;
+                    if (dx * dx + dz * dz > (long)range * range) continue;
+
+                    // The water feeds people too: fish in the shallows and the
+                    // river, which is how a desert village beside the sea lives.
+                    if (!map.IsLand(x, z) || map.WaterLevelAt(x, z) > 0)
+                    {
+                        if (Shallow(map, x, z)) fish += 4.0;
+                        continue;
+                    }
+                    int b = map.BiomeAt(x, z);
+                    if (b < 0) continue;
+                    Biome biome = biomes.At(b);
+                    richness += 4.0 * (biome.TreeCoverPercent / 100.0 * 0.6 + SimMath.Clamp01(biome.RainfallMm / 1500.0) * 0.4);
+                }
+            c._landForagePerDay = richness * MealsPerRichColumnDay + fish * MealsPerWaterColumnDay;
+
             c._foodAtFounding = c.FoodPerLabourTick;
             c._vegetationAtFounding = c.StandingVegetation();
             c.Refresh();
@@ -282,13 +307,78 @@ namespace Godless.Sim.Settlements
                 _sources[m] = left;
                 int nearest = NearestSource(m);
                 _yield[m] = nearest < 0 ? 0.0 : _materials[m].PerLabourTick * Travel(nearest);
-                if (nearest >= 0) _exhausted[m] = false;
+                // Recorded once: the first time the land in reach ran out of it.
+                // Grass growing back and being cut again is not news.
             }
 
             // Foraging lives off what grows. A felled wood feeds a quarter of
             // what it did, which is the pressure that will ask for fields (S2I).
             double standing = _vegetationAtFounding > 0 ? (double)StandingVegetation() / _vegetationAtFounding : 0.0;
             FoodPerLabourTick = _foodAtFounding * (0.25 + 0.75 * SimMath.Clamp01(standing));
+
+            // And it is finite (S2N): what stands gives up so many meals a day
+            // and no more, however many hands go out for it. Without this a
+            // village of three hundred fed itself off the same wood as a
+            // village of twenty, and nothing ever pushed back on growth.
+            ForagePerDay = _landForagePerDay;
+            foreach (int f in _vegetation)
+                if (_deposits.Standing(f))
+                    ForagePerDay += _deposits.KindOf(f).Shape == FeatureShape.Tree ? MealsPerTreeDay : MealsPerTuftDay;
+            _forageLeft = ForagePerDay;
+
+            // How fast a forager fills a basket follows how much the land has
+            // to give, not only what grows on it: a desert beach with fish in
+            // the shallows is slow foraging, not none.
+            double rate = 0.4 + ForagePerDay / 80.0;
+            FoodPerLabourTick = rate > 3.0 ? 3.0 : rate;
+        }
+
+        /// <summary>Meals a day a standing tree's worth of woodland gives a forager: nuts, fungi, game under it.</summary>
+        public const double MealsPerTreeDay = 0.35;
+
+        /// <summary>Meals a day a stand of grass or reed gives: seed, roots, birds.</summary>
+        public const double MealsPerTuftDay = 0.10;
+
+        /// <summary>What a forager finds once the day's yield is gone: scraps.</summary>
+        public const double Scraps = 0.05;
+
+        /// <summary>Meals a day a column of the richest land gives, before anything standing on it.</summary>
+        public const double MealsPerRichColumnDay = 0.012;
+
+        /// <summary>Meals a day a column of shallow water or river gives: fish, shellfish, fowl.</summary>
+        public const double MealsPerWaterColumnDay = 0.01;
+
+        /// <summary>Water near enough to land to fish from the shore: within four columns of it.</summary>
+        static bool Shallow(IslandMap map, int x, int z)
+        {
+            if (map.IsRiver(x, z) || map.IsLake(x, z)) return true;
+            for (int d = 1; d <= 4; d++)
+                if ((x + d < Voxels.ChunkStore.SizeX && map.IsLand(x + d, z)) || (x - d >= 0 && map.IsLand(x - d, z))
+                    || (z + d < Voxels.ChunkStore.SizeZ && map.IsLand(x, z + d)) || (z - d >= 0 && map.IsLand(x, z - d)))
+                    return true;
+            return false;
+        }
+
+        double _forageLeft;
+        double _landForagePerDay;
+
+        /// <summary>Meals the land in reach gives up a day, however many forage it (S2N). Zero on a bare island, which is unlimited.</summary>
+        public double ForagePerDay { get; private set; }
+
+        /// <summary>Meals a tick of foraging brings in right now: the full rate while today's yield lasts, scraps after.</summary>
+        public double ForageRateNow
+        {
+            get { return _deposits == null || _forageLeft > 0.0 ? FoodPerLabourTick : FoodPerLabourTick * Scraps; }
+        }
+
+        /// <summary>A tick of foraging. On a bare island, the old unlimited rate.</summary>
+        public double Forage(double labourTicks)
+        {
+            double want = FoodPerLabourTick * labourTicks;
+            if (_deposits == null) return want;
+            double full = want < _forageLeft ? want : _forageLeft;
+            _forageLeft -= full;
+            return full + (want - full) * Scraps;
         }
 
         /// <summary>

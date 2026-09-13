@@ -51,6 +51,19 @@ namespace Godless.Sim.Settlements
                 return a.X == goalX && a.Z == goalZ;
             }
 
+            // Open ground is walked straight. Only a line that crosses water
+            // or a cliff is worth a path search, and most walks — fire to
+            // wood, wood to fire — cross neither. Searching every one was most
+            // of a settlement's running cost.
+            if (Clear(grid, a.ParcelX, a.ParcelZ, goalX / ParcelGrid.Size, goalZ / ParcelGrid.Size))
+            {
+                int bx = a.X, bz = a.Z;
+                Step(a, goalX, goalZ, stride, island);
+                if (traffic != null) Wear(traffic, bx, bz, a.X, a.Z);
+                a.Path = null;
+                return a.X == goalX && a.Z == goalZ;
+            }
+
             if (a.Path == null || a.PathGoal != goalParcel || a.PathStep >= a.Path.Count || a.Path[a.PathStep] != here)
             {
                 a.Path = ParcelPath.Find(grid, a.ParcelX, a.ParcelZ, goalX / ParcelGrid.Size, goalZ / ParcelGrid.Size);
@@ -79,6 +92,41 @@ namespace Godless.Sim.Settlements
             int cx, cz;
             if (DryIn(island, next % ParcelGrid.Width, next / ParcelGrid.Width, out cx, out cz)) { a.X = cx; a.Z = cz; }
             return false;
+        }
+
+        /// <summary>Whether a straight walk between two parcels stays on land and never climbs a wall.</summary>
+        static bool Clear(ParcelGrid grid, int x0, int z0, int x1, int z1)
+        {
+            int dx = System.Math.Abs(x1 - x0), dz = System.Math.Abs(z1 - z0);
+            int sx = x0 < x1 ? 1 : -1, sz = z0 < z1 ? 1 : -1;
+            int err = dx - dz, x = x0, z = z0;
+            double last = grid.Height[x0, z0];
+            while (x != x1 || z != z1)
+            {
+                int e2 = 2 * err;
+                if (e2 > -dz) { err -= dz; x += sx; }
+                if (e2 < dx) { err += dx; z += sz; }
+                if (!ParcelGrid.InBounds(x, z)) return false;
+                bool goal = x == x1 && z == z1;
+                if (!goal && (!grid.IsLand(x, z) || grid.Slope[x, z] >= ParcelPath.Impassable)) return false;
+                double h = grid.Height[x, z];
+                if (System.Math.Abs(h - last) >= ParcelPath.Impassable) return false;
+                last = h;
+            }
+            return true;
+        }
+
+        /// <summary>Foot traffic along a straight stride, a parcel at a time.</summary>
+        static void Wear(InfluenceMap traffic, int x0, int z0, int x1, int z1)
+        {
+            int p0x = x0 / ParcelGrid.Size, p0z = z0 / ParcelGrid.Size;
+            int p1x = x1 / ParcelGrid.Size, p1z = z1 / ParcelGrid.Size;
+            int steps = System.Math.Max(System.Math.Abs(p1x - p0x), System.Math.Abs(p1z - p0z));
+            for (int i = 1; i <= steps; i++)
+            {
+                int px = p0x + (p1x - p0x) * i / steps, pz = p0z + (p1z - p0z) * i / steps;
+                if (ParcelGrid.InBounds(px, pz)) traffic[px, pz] += 1.0;
+            }
         }
 
         static void Step(Agent a, int goalX, int goalZ, int stride, IslandMap island)
@@ -171,7 +219,15 @@ namespace Godless.Sim.Settlements
                 int gx, gz;
                 string doing;
 
-                if (night && a.ShelteredLastNight && house < beds.Count)
+                Household family = s.Households.Count > 0 ? Households.Of(s, a) : null;
+                if (night && a.ShelteredLastNight && family != null && family.Housed && !a.Crowded)
+                {
+                    Project home = family.Home[0];
+                    Int3 door = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);
+                    gx = door.X; gz = door.Z;
+                    doing = "asleep at home";
+                }
+                else if (night && a.ShelteredLastNight && house < beds.Count)
                 {
                     Project home = beds[house];
                     Int3 door = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);

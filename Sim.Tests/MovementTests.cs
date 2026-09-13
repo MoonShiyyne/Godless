@@ -36,7 +36,7 @@ namespace Godless.Sim.Tests
         static SimWorld Settled(ulong seed)
         {
             WorldChoice choice = WorldChoice.Pick(Content, "green-shore");
-            SimWorld world = SettlementInvariants.Settled(Content, choice)(seed);
+            SimWorld world = SettlementInvariants.Settled(Content, choice, 20, TestIslands.Generate)(seed);
             Assert.NotEmpty(world.Settlements);
             return world;
         }

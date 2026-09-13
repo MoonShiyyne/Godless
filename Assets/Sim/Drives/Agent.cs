@@ -41,6 +41,12 @@ namespace Godless.Sim.Drives
 
         public bool ShelteredLastNight { get; internal set; }
 
+        /// <summary>The family this person belongs to (S2N), by number, or -1.</summary>
+        public int Household { get; internal set; } = -1;
+
+        /// <summary>Slept last night lodging, or in a family that did not fit its roof (S2N).</summary>
+        public bool Crowded { get; internal set; }
+
         /// <summary>
         /// Where this person stands, as a world column (S2G). Everyone starts
         /// at the hearth. The planning grid's parcel follows from it.
@@ -99,6 +105,7 @@ namespace Godless.Sim.Drives
             }
             d.Add(Activity);
             d.Add(ShelteredLastNight ? 1 : 0);
+            d.Add(Household); d.Add(Crowded ? 1 : 0);
             d.Add(X); d.Add(Z);
             d.Add(ProductiveTicks);
         }

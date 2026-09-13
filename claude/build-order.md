@@ -154,6 +154,37 @@ traffic is high, abandoned when it falls (Part 16).
   deposit regrows past what it grew with, and a settlement that lived has
   worked the land. Green on all five maps.
 
+### What S2N shipped (revises S1E)
+
+- **Why growth stalled:** a child was only born into a settlement with a bed
+  for everyone, and the roofs rotated nightly to whoever needed one most, so
+  one bed short spread the misery too thin to ever raise an intent. Every
+  settlement froze at its beds plus one.
+- **Households** (`Settlements/Households.cs`, content `households/base.json`):
+  families of the culture's size own their homes. Each night families sleep
+  under their own roofs, overflow lodges in spare beds or sleeps out, and a
+  family that did not fit is crowded — all of it, at its own door, which is
+  where the pressure lands and so where the next house is asked for.
+  Roofless families move into any home with room before anyone asks for more.
+  A family grown past the culture's limit splits; its young half needs a roof.
+- **Growth scales with people:** births per person per year, slowed but not
+  stopped by crowding and a thin store; a small death rate besides hunger.
+- **Food is finite** on a planted island: the land in reach gives so many
+  meals a day — trees, grass, the open ground by biome, fish in the shallows —
+  and a forager past that finds scraps. Clearing the wood lowers the ceiling,
+  which is the pressure fields (S2I) will answer.
+- Measured over fifteen years, seed 7: green shore 20 → 142, cold massif 87 in
+  19 houses, delta and isles ~100 each. The dry reach survives at ~16 on 17
+  meals a day of fish and cannot spare a hand to build: fishing and fields.
+- Three stalls found on the way: a plan whose material the land no longer had
+  was re-realized (the WFC solve) every builder tick; a half-built house waited
+  years for four voxels of hearth stone that did not exist (now substituted
+  from the yard, or left out and noted); and every walk searched a path even
+  over open ground (now only when a straight line crosses water or a cliff).
+- The test suite had grown to ten minutes by generating the same island dozens
+  of times; `Sim.Tests/TestIslands.cs` makes each once and hands out deep
+  copies. It is seven minutes now and still too slow.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

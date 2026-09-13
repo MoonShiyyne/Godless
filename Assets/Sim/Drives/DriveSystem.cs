@@ -55,9 +55,13 @@ namespace Godless.Sim.Drives
             ulong day = Conditions.Mask(Conditions.Day) | Conditions.Mask(Conditions.Hearth) | Weathered(sky) | belly;
             // A roof in a settlement with more people than beds is a shared
             // roof, and that presses on everyone under it (S1E).
-            ulong crowded = s.People.Count > s.ShelterCapacity ? Conditions.Mask(Conditions.Crowded) : 0UL;
+            // With families (S2N) crowding is each person's own: their family
+            // did not fit its roof. Without, it is the whole settlement's.
+            bool families = s.Households.Count > 0;
+            ulong crowded = !families && s.People.Count > s.ShelterCapacity ? Conditions.Mask(Conditions.Crowded) : 0UL;
             ulong sheltered = Conditions.Mask(Conditions.Night) | Conditions.Mask(Conditions.Hearth)
                             | Conditions.Mask(Conditions.Sheltered) | belly | crowded;
+            ulong crowdedBit = Conditions.Mask(Conditions.Crowded);
             ulong exposed = Conditions.Mask(Conditions.Night) | Conditions.Mask(Conditions.Hearth)
                           | Conditions.Mask(Conditions.Unsheltered) | Weathered(sky) | belly
                           | (sky.Rain ? Conditions.Mask(Conditions.Soaked) : 0UL);
@@ -70,7 +74,12 @@ namespace Godless.Sim.Drives
             RecordId exposure = RecordId.None;
             if (night)
             {
-                AssignRoofs(s, needs);
+                if (families)
+                {
+                    Settlements.Households.Rehouse(s, tick, annals);
+                    Settlements.Households.AssignRoofs(s, needs.IndexOf("shelter"));
+                }
+                else AssignRoofs(s, needs);
                 exposure = RecordExposure(s, sky, tick, annals);
             }
 
@@ -81,7 +90,11 @@ namespace Godless.Sim.Drives
                 ulong conditions;
                 RecordId cause;
                 if (!night) { conditions = day; cause = RecordId.None; }
-                else if (a.ShelteredLastNight) { conditions = sheltered; cause = RecordId.None; }
+                else if (a.ShelteredLastNight)
+                {
+                    conditions = families && a.Crowded ? sheltered | crowdedBit : sheltered;
+                    cause = RecordId.None;
+                }
                 else { conditions = exposed; cause = exposure; }
 
                 Feel(a, needs, conditions, cause, blamed);
@@ -96,10 +109,14 @@ namespace Godless.Sim.Drives
                     s.ActivityTicks[chosen]++;
                 }
 
+                // Felt at the family's own door, so what it asks for is asked
+                // for there (S2N); at the fire for anyone with no roof.
+                int ax = px, az = pz;
+                if (families) Settlements.Households.PressurePoint(s, a, out ax, out az);
                 for (int n = 0; n < needs.Count; n++)
                 {
                     double over = a.Levels[n] - needs[n].Threshold;
-                    if (over > 0.0) s.Pressure.Add(n, px, pz, over, a.Causes[n]);
+                    if (over > 0.0) s.Pressure.Add(n, ax, az, over, a.Causes[n]);
                 }
             }
         }

@@ -50,7 +50,7 @@ namespace Godless.Sim.Tests
                 Choice = WorldChoice.Pick(Content, "green-shore");
                 VoxelTypes types = VoxelTypes.FromContent(Content);
                 World = new SimWorld(seed, Content, types);
-                World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, Choice.Biomes, types,
+                World.Island = TestIslands.Generate(World.Voxels.Store, World.Streams, Choice.Biomes, types,
                                                         Choice.Preset, Choice.Features);
                 World.BeginHistory();
 
@@ -104,6 +104,7 @@ namespace Godless.Sim.Tests
             VoxelTypes types = VoxelTypes.FromContent(Content);
             var a = new ChunkStore();
             var b = new ChunkStore();
+            // Two real generations: this is the test of generation itself, so it must not share.
             IslandMap ia = IslandGenerator.Generate(a, new StreamRegistry(3), choice.Biomes, types, choice.Preset, choice.Features);
             IslandMap ib = IslandGenerator.Generate(b, new StreamRegistry(3), choice.Biomes, types, choice.Preset, choice.Features);
             Assert.Equal(a.Digest(), b.Digest());

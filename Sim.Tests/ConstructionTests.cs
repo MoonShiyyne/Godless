@@ -39,7 +39,7 @@ namespace Godless.Sim.Tests
                 BiomeTable biomes = BiomeTable.FromContent(Content);
                 VoxelTypes types = VoxelTypes.FromContent(Content);
                 World = new SimWorld(seed, Content, types);
-                World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types);
+                World.Island = TestIslands.Generate(World.Voxels.Store, World.Streams, biomes, types);
 
                 bool[] solid = TerrainBrush.SolidTable(Content, types);
                 var wet = new bool[types.Count];

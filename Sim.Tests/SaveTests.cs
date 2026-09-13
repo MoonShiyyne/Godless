@@ -35,7 +35,7 @@ namespace Godless.Sim.Tests
 
             var world = new SimWorld(seed, content, types);
             if (withIsland)
-                world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types);
+                world.Island = TestIslands.Generate(world.Voxels.Store, world.Streams, biomes, types);
 
             ushort granite = types.IdOf(Symbol.For("voxel.granite"));
             ushort sand = types.IdOf(Symbol.For("voxel.sand"));
@@ -239,7 +239,7 @@ namespace Godless.Sim.Tests
             VoxelTypes types = VoxelTypes.FromContent(content);
 
             var world = new SimWorld(4242UL, content, types);
-            world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams,
+            world.Island = TestIslands.Generate(world.Voxels.Store, world.Streams,
                                                     choice.Biomes, types, choice.Preset);
             world.BeginHistory();
             world.RunYears(1);
@@ -267,7 +267,7 @@ namespace Godless.Sim.Tests
             VoxelTypes types = VoxelTypes.FromContent(content);
 
             var world = new SimWorld(9UL, content, types);
-            world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams,
+            world.Island = TestIslands.Generate(world.Voxels.Store, world.Streams,
                                                     choice.Biomes, types, choice.Preset);
             world.BeginHistory();
 

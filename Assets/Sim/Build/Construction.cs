@@ -97,12 +97,32 @@ namespace Godless.Sim.Build
             return true;
         }
 
+        /// <summary>Something in the yard to use instead: the same class if there is any, else whatever there is most of. -1 if the yard is empty.</summary>
+        int Substitute(Settlement settlement, int material)
+        {
+            int best = -1;
+            long most = 0;
+            for (int pass = 0; pass < 2 && best < 0; pass++)
+                for (int m = 0; m < _materials.Count; m++)
+                {
+                    if (m == material) continue;
+                    if (pass == 0 && _materials[m].Class != _materials[material].Class) continue;
+                    long held = settlement.Stock.Of(m);
+                    if (held > most) { most = held; best = m; }
+                }
+            return best;
+        }
+
         /// <summary>
         /// Remakes the materials of what is not yet built from what can be had
         /// now. What stands keeps what it was made of.
         /// </summary>
-        void Rethink(Settlement settlement, Project project, RngStream rng, string ranOut)
+        void Rethink(Settlement settlement, Project project, RngStream rng, string ranOut, long tick)
         {
+            // Once a day at most: realizing is the WFC solve, and a plan that
+            // is still unobtainable after one is not going to change by the
+            // next builder's tick.
+            project.RethoughtOn = tick / _ticksPerDay;
             Structure fresh = Realizer.Realize(project.Plan, _tiles, _materials, settlement.Stock, _palette, _types,
                                                rng, settlement.Catchment);
             if (ranOut != null) fresh.Note("finished in what was left after the " + ranOut + " in reach ran out");
@@ -133,7 +153,7 @@ namespace Godless.Sim.Build
             foreach (Project p in settlement.Projects)
             {
                 if (p.Complete) continue;
-                if (!Obtainable(settlement, p)) Rethink(settlement, p, rng, null);
+                if (p.RethoughtOn != tick / _ticksPerDay && !Obtainable(settlement, p)) Rethink(settlement, p, rng, null, tick);
                 if (Ready(settlement, p)) { project = p; break; }
             }
             if (project == null) return false;
@@ -173,6 +193,24 @@ namespace Godless.Sim.Build
                 if (material < 0) { project.Placed++; continue; }
 
                 Int3 at = World(project, x, y, z);
+                // Rethought today and still not to be had: a few voxels of a
+                // hearth stone the land no longer holds do not hold up a house.
+                // Use what the yard has, the same kind of thing if it can, and
+                // failing that leave the voxel out and say so.
+                if (settlement.Stock.Of(material) <= 0 && project.RethoughtOn == tick / _ticksPerDay
+                    && !Obtainable(settlement, project))
+                {
+                    int instead = Substitute(settlement, material);
+                    if (instead < 0)
+                    {
+                        project.Built.Note("left out a voxel of " + _materials[material].Name + ": none to be had");
+                        project.Placed++;
+                        continue;
+                    }
+                    type = _types.IdOf(_materials[instead].Voxel);
+                    material = instead;
+                }
+
                 if (!settlement.Stock.TryTake(material, 1, tick, settlement.Id, at, annals, project.Begun))
                 {
                     // The wall stops at the height its material reached. A plan
@@ -186,8 +224,8 @@ namespace Godless.Sim.Build
                     // not waited for (S2F): the rest of the building goes up in
                     // whatever there is, so the wall itself records the day
                     // the sand ran out.
-                    else if (!Obtainable(settlement, project))
-                        Rethink(settlement, project, rng, _materials[material].Name);
+                    else if (project.RethoughtOn != tick / _ticksPerDay && !Obtainable(settlement, project))
+                        Rethink(settlement, project, rng, _materials[material].Name, tick);
                     return;
                 }
 
@@ -250,6 +288,10 @@ namespace Godless.Sim.Build
             RecordId done = annals.Write(tick, CompletedKind, settlement.Id, Centre(project), project.Begun,
                                          project.Built.TotalVoxels, project.Plan.Capacity,
                                          new[] { project.Intent.Kind.Id });
+
+            // A family moves in (S2N): whoever had no roof, or the overflow of
+            // whoever was most crowded.
+            Households.MoveIn(settlement, project, project.Plan.Capacity, tick, annals, done);
             if (project.Intent.Outstanding) settlement.Intents.Resolve(project.Intent, tick, annals, done);
         }
 

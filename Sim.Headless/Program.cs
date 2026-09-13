@@ -822,7 +822,7 @@ namespace Godless.Sim.Headless
             s.AttachIntents(bus);
             PressureTally tally = bus.Tally;
             world.Settlements.Add(s);
-            world.Add(new DriveSystem(rules)).Add(new Subsistence(rules)).Add(new IntentSystem());
+            Profiled(world, cli, new DriveSystem(rules)); Profiled(world, cli, new Subsistence(rules)); Profiled(world, cli, new IntentSystem());
 
             Console.WriteLine("seed " + seed.ToString(c) + ": " + people.ToString(c) + " people found a settlement at parcel ("
                 + px.ToString(c) + ", " + pz.ToString(c) + ") in " + (biome == null ? "no biome" : biome.Id.ToString())
@@ -859,10 +859,15 @@ namespace Godless.Sim.Headless
             s.Genome = genome;
             if (named.Count > 0) Console.WriteLine("culture: " + string.Join(", ", named));
 
+            // S2N: the founders as families.
+            HouseholdRules householdRules = HouseholdRules.FromContent(db);
+            if (householdRules != null && cli.Text("no-families", "false") == "false")
+                Households.Found(s, householdRules, world.Clock.Tick, world.Annals);
+
             ConstraintFields constraints = ConstraintFields.Compute(island, grid, biomes);
             TileSet tileset = TileSet.FromContent(db, materials);
             Palette palette = Palette.FromContent(db);
-            world.Add(new SiteSystem(GrammarTable.FromContent(db, genes),
+            Profiled(world, cli, new SiteSystem(GrammarTable.FromContent(db, genes),
                                      SitingTable.FromContent(db, genes, kinds),
                                      tileset, materials, palette, grid, constraints,
                                      NegotiationTable.FromContent(db, genes)));
@@ -870,9 +875,9 @@ namespace Godless.Sim.Headless
             // S1A: hands that lay the voxels, allocated like any other work.
             var construction = new Construction(world.Voxels, materials, types, tileset, palette,
                                                 deposits: island.Deposits, ticksPerDay: world.Clock.TicksPerDay);
-            world.Add(new DepositSystem(grid));
-            world.Add(new TaskSystem(construction, grid));
-            world.Add(new MovementSystem(grid, rules));
+            Profiled(world, cli, new DepositSystem(grid));
+            Profiled(world, cli, new TaskSystem(construction, grid));
+            Profiled(world, cli, new MovementSystem(grid, rules));
             world.BeginHistory();
 
             var header = new StringBuilder("  day  weather     in open ");
@@ -1021,8 +1026,22 @@ namespace Godless.Sim.Headless
                 }
                 Console.WriteLine("  " + world.Annals.OfKind(Catchment.ExhaustedKind).Count.ToString(c)
                     + " material(s) worked out of reach; foraging now feeds " + s.Catchment.FoodPerLabourTick.ToString("0.00", c)
-                    + " a tick");
+                    + " a tick, and the land in reach gives up " + s.Catchment.ForagePerDay.ToString("0", c) + " meals a day at most");
             }
+            if (s.Households.Count > 0)
+            {
+                // S2N: who lives where.
+                Households.Settle(s);
+                int housed = 0, crowded = 0, roofless = 0;
+                foreach (Household h in s.Households) { if (!h.Housed) roofless++; else if (h.Crowded) crowded++; else housed++; }
+                Console.WriteLine("\nfamilies (S2N): " + s.Households.Count.ToString(c) + " — " + housed.ToString(c) + " housed, "
+                    + crowded.ToString(c) + " crowded, " + roofless.ToString(c) + " with no roof of their own");
+                foreach (Household h in s.Households)
+                    Console.WriteLine("  " + h.Id.ToString().Replace(s.Id + ".", "").PadRight(14) + h.Size.ToString(c).PadLeft(3) + " people, "
+                        + (h.Housed ? h.Beds.ToString(c) + " beds in " + h.Home.Count.ToString(c) + " home(s)" : "no roof"));
+            }
+            foreach (TimedSystem t in Timed)
+                Console.WriteLine("  profile " + t.Id.ToString().PadRight(22) + t.Watch.Elapsed.TotalSeconds.ToString("0.00", c) + " s");
             Console.WriteLine("\nroofs now: " + s.ShelterCapacity.ToString(c) + " sleeping places for " + s.People.Count.ToString(c)
                 + " people (" + s.Born.ToString(c) + " born, " + s.Died.ToString(c) + " lost); "
                 + s.Food.ToString("0", c) + " meals in the store, land feeds "
@@ -1050,6 +1069,26 @@ namespace Godless.Sim.Headless
         {
             if (whole <= 0) return "0.0%";
             return (100.0 * part / whole).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        }
+
+        static readonly List<TimedSystem> Timed = new List<TimedSystem>();
+
+        static void Profiled(SimWorld world, Args cli, ISimSystem system)
+        {
+            if (cli.Text("profile", "false") == "false") { world.Add(system); return; }
+            var timed = new TimedSystem(system);
+            Timed.Add(timed);
+            world.Add(timed);
+        }
+
+        /// <summary>Wall-clock per system, for `sim settle --profile`. Headless only: the sim never sees a clock.</summary>
+        sealed class TimedSystem : ISimSystem
+        {
+            readonly ISimSystem _inner;
+            public readonly Stopwatch Watch = new Stopwatch();
+            public TimedSystem(ISimSystem inner) { _inner = inner; }
+            public Symbol Id { get { return _inner.Id; } }
+            public void Tick(SimWorld world) { Watch.Start(); _inner.Tick(world); Watch.Stop(); }
         }
 
         /// <summary>Material units per material in features within haul range; with <paramref name="initial"/>, what they started with.</summary>

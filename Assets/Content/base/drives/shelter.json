@@ -18,5 +18,5 @@
   // because the settlement has more people than beds is barely a roof: the
   // relief and the crowding nearly cancel, so the want creeps back up and
   // the settlement asks for another house (S1E).
-  "rises": { "unsheltered": 0.2, "soaked": 0.1, "rain": 0.02, "sheltered": -0.5, "crowded": 0.55 }
+  "rises": { "unsheltered": 0.2, "soaked": 0.1, "rain": 0.02, "sheltered": -0.5, "crowded": 0.8 }
 }

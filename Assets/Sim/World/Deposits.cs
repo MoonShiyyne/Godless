@@ -403,6 +403,21 @@ namespace Godless.Sim.World
             return at.X == x && at.Z == z && at.Y < ground + size ? kind.Voxel : kind.Crown;
         }
 
+        /// <summary>A deep copy, including what has been cut and what is due back.</summary>
+        public DepositMap Clone()
+        {
+            var c = new DepositMap(_kinds);
+            c._kind.AddRange(_kind); c._x.AddRange(_x); c._y.AddRange(_y); c._z.AddRange(_z);
+            c._size.AddRange(_size); c._voxels.AddRange(_voxels); c._remaining.AddRange(_remaining);
+            c._dug.AddRange(_dug); c._standing.AddRange(_standing); c._regrowAt.AddRange(_regrowAt);
+            c._cause.AddRange(_cause);
+            foreach (long due in _due) c._due.Add(due);
+            c._parcelStart = _parcelStart;   // never changes after sealing
+            c._byParcel = _byParcel;
+            c._dirty = _dirty; c._dx0 = _dx0; c._dz0 = _dz0; c._dx1 = _dx1; c._dz1 = _dz1;
+            return c;
+        }
+
         public ulong Digest()
         {
             var d = new Digest();

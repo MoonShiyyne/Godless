@@ -48,7 +48,7 @@ namespace Godless.Sim.Tests
         {
             VoxelTypes types = VoxelTypes.FromContent(content);
             var world = new SimWorld(11, content, types);
-            world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, BiomeTable.FromContent(content), types);
+            world.Island = TestIslands.Generate(world.Voxels.Store, world.Streams, BiomeTable.FromContent(content), types);
             world.BeginHistory();
 
             ushort granite = types.IdOf(Symbol.For("voxel.granite"));

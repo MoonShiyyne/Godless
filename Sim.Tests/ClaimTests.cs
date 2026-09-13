@@ -33,7 +33,7 @@ namespace Godless.Sim.Tests
                 BiomeTable biomes = BiomeTable.FromContent(Content);
                 VoxelTypes types = VoxelTypes.FromContent(Content);
                 World = new SimWorld(seed, Content, types);
-                World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types);
+                World.Island = TestIslands.Generate(World.Voxels.Store, World.Streams, biomes, types);
 
                 ConstraintFields fields;
                 Grid = Founding.Survey(World, Content, biomes, out fields);

@@ -34,7 +34,7 @@ namespace Godless.Sim.Tests
                 BiomeTable biomes = BiomeTable.FromContent(Content);
                 VoxelTypes types = VoxelTypes.FromContent(Content);
                 World = new SimWorld(7, Content, types);
-                World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types);
+                World.Island = TestIslands.Generate(World.Voxels.Store, World.Streams, biomes, types);
 
                 ConstraintFields fields;
                 ParcelGrid grid = Founding.Survey(World, Content, biomes, out fields);
@@ -69,7 +69,7 @@ namespace Godless.Sim.Tests
             BiomeTable biomes = BiomeTable.FromContent(Content);
             VoxelTypes types = VoxelTypes.FromContent(Content);
             var store = new ChunkStore();
-            IslandMap island = IslandGenerator.Generate(store, new StreamRegistry(7), biomes, types);
+            IslandMap island = TestIslands.Generate(store, new StreamRegistry(7), biomes, types);
             MaterialTable materials = MaterialTable.FromContent(Content, biomes);
 
             double best = 0.0, worst = double.MaxValue;
@@ -98,8 +98,8 @@ namespace Godless.Sim.Tests
             // finding food is labour that does not go to building.
             var fed = new Village(1.2, stocked: 0);
             var starving = new Village(0.05, stocked: 0);
-            fed.Live(1400);
-            starving.Live(1400);
+            fed.Live(700);
+            starving.Live(700);
 
             Assert.True(fed.Town.Born > 0, "nobody was born on good ground");
             Assert.True(fed.Town.People.Count > 20, "the fed village did not grow: " + fed.Town.People.Count);
@@ -128,7 +128,7 @@ namespace Godless.Sim.Tests
         public void GrowingAsksForAnotherHouse()
         {
             var village = new Village(1.2);
-            village.Live(1400);
+            village.Live(900);
             Assert.True(village.Houses >= 3, village.Houses + " houses");
             Assert.True(village.Town.ShelterCapacity >= 20, village.Town.ShelterCapacity + " sleeping places");
         }

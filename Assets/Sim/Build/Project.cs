@@ -46,6 +46,9 @@ namespace Godless.Sim.Build
         internal List<int> Order;
 
         public bool Complete { get; internal set; }
+
+        /// <summary>The day its materials were last remade from what can be had (S2F), so it is not remade every tick.</summary>
+        internal long RethoughtOn = -1;
     }
 
     /// <summary>

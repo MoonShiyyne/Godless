@@ -85,6 +85,10 @@ namespace Godless.Sim.Settlements
             settlement.Food = people * Subsistence.MealsADay * 45;
             settlement.Genome = genome ?? new Genome(GeneTable.FromContent(content));
             settlement.AttachIntents(new IntentBus(IntentKindTable.FromContent(content, rules.Needs), rules.Needs.Count));
+
+            // S2N: the founders as families.
+            HouseholdRules households = HouseholdRules.FromContent(content);
+            if (households != null) Households.Found(settlement, households, world.Clock.Tick, world.Annals);
             settlement.Tasks = new TaskBoard(TaskKindTable.FromContent(content), settlement, rules, world.Streams);
             world.Settlements.Add(settlement);
             return settlement;

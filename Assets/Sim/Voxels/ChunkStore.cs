@@ -183,6 +183,13 @@ namespace Godless.Sim.Voxels
             return copy;
         }
 
+        /// <summary>Becomes a deep copy of another store. For tools and tests that start many worlds from one island.</summary>
+        public void CopyFrom(ChunkStore other)
+        {
+            for (int i = 0; i < _chunks.Length; i++)
+                _chunks[i] = other._chunks[i] != null ? other._chunks[i].Clone() : null;
+        }
+
         /// <summary>Writes by raw chunk and voxel index. Used by delta replay.</summary>
         public void SetByIndex(int chunkIndex, int voxelIndex, ushort type)
         {

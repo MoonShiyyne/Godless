@@ -57,7 +57,12 @@ namespace Godless.Sim.Settlements
             {
                 Eat(s, world, rng);
                 Lose(s, world);
-                Gain(s, world, rng);
+                if (s.HouseholdRules != null)
+                {
+                    Age(s, world, rng);
+                    Grow(s, world, rng);
+                }
+                else Gain(s, world, rng);
             }
         }
 
@@ -112,6 +117,61 @@ namespace Godless.Sim.Settlements
 
             Agent child = s.Add(world.Streams);
             world.Annals.Write(world.Clock.Tick, BornKind, child.Id, s.Hearth, s.Founded, s.People.Count);
+        }
+
+        /// <summary>
+        /// Births with families (S2N). The chance is per person, so a village
+        /// of a hundred has five times the children of one of twenty: growth
+        /// accelerates as the settlement does. Crowding and a thin store slow
+        /// it — fertility falls with the share of people who have a bed, down
+        /// to a floor, and halves on a store below a season — but neither stops
+        /// it outright. What stops it is hunger, and the houses a crowded
+        /// family builds are what let it go on.
+        /// </summary>
+        static void Grow(Settlement s, SimWorld world, RngStream rng)
+        {
+            int people = s.People.Count;
+            if (!s.Fed || people < 2) return;
+            HouseholdRules rules = s.HouseholdRules;
+
+            double beds = s.ShelterCapacity;
+            double room = rules.CrowdedFertility + (1.0 - rules.CrowdedFertility) * SimMath.Clamp01(beds / people);
+            double store = s.Food >= people * MealsADay * SurplusDays ? 1.0
+                         : s.Food >= people * MealsADay * 5 ? 0.5 : 0.0;
+            double expected = people * rules.BirthsPerPersonYear / world.Clock.DaysPerYear * room * store;
+
+            int births = Whole(expected, rng);
+            for (int b = 0; b < births; b++)
+            {
+                Agent parent = s.People[rng.NextInt(s.People.Count)];
+                Agent child = s.Add(world.Streams);
+                RecordId born = world.Annals.Write(world.Clock.Tick, BornKind, child.Id, s.Hearth, s.Founded,
+                                                   s.People.Count, 0, new[] { parent.Id });
+                Settlements.Households.Born(s, child, parent, world.Clock.Tick, world.Annals, born);
+            }
+        }
+
+        /// <summary>Deaths that are not hunger (S2N): a small chance a year for everyone.</summary>
+        static void Age(Settlement s, SimWorld world, RngStream rng)
+        {
+            if (s.People.Count == 0) return;
+            double expected = s.People.Count * s.HouseholdRules.DeathsPerPersonYear / world.Clock.DaysPerYear;
+            int deaths = Whole(expected, rng);
+            for (int d = 0; d < deaths && s.People.Count > 0; d++)
+            {
+                int who = rng.NextInt(s.People.Count);
+                world.Annals.Write(world.Clock.Tick, DiedKind, s.People[who].Id, s.Hearth, s.Founded, 0);
+                s.Remove(who, world.Streams);
+            }
+        }
+
+        /// <summary>An expected count as a whole number: the whole part, and the fraction as a chance of one more.</summary>
+        static int Whole(double expected, RngStream rng)
+        {
+            int whole = (int)expected;
+            double frac = expected - whole;
+            if (rng.NextInt(1000000) < (int)(frac * 1000000.0)) whole++;
+            return whole;
         }
 
         /// <summary>What the settlement would like in the store: a season of meals.</summary>

@@ -296,7 +296,7 @@ namespace Godless.Sim.Collective
             if (_kind[task].Verb == "forage")
             {
                 if (s.Catchment == null || s.Catchment.FoodPerLabourTick <= 0.0) return false;
-                s.Food += s.Catchment.FoodPerLabourTick;
+                s.Food += s.Catchment.Forage(1.0);
                 return true;
             }
 
@@ -388,7 +388,7 @@ namespace Godless.Sim.Collective
                     if (shortfall <= 0.0) { _demand[t] = 0.0; continue; }
                     double days = s.People.Count > 0 ? s.Food / (s.People.Count * Subsistence.MealsADay) : 30.0;
                     double urgency = days >= 30.0 ? 1.0 : 1.0 + 9.0 * (30.0 - days) / 30.0;
-                    double rate = s.Catchment != null && s.Catchment.FoodPerLabourTick > 0.0 ? s.Catchment.FoodPerLabourTick : 1.0;
+                    double rate = s.Catchment != null && s.Catchment.ForageRateNow > 0.0 ? s.Catchment.ForageRateNow : 1.0;
                     _demand[t] = shortfall / rate * urgency;
                     continue;
                 }

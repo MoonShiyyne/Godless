@@ -64,7 +64,7 @@ namespace Godless.Sim.Tests
                 BiomeTable biomes = BiomeTable.FromContent(Content);
                 VoxelTypes types = VoxelTypes.FromContent(Content);
                 var store = new ChunkStore();
-                Map = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types);
+                Map = TestIslands.Generate(store, new StreamRegistry(seed), biomes, types);
 
                 bool[] solid = TerrainBrush.SolidTable(Content, types);
                 var wet = new bool[types.Count];
@@ -130,7 +130,7 @@ namespace Godless.Sim.Tests
                 BiomeTable biomes = BiomeTable.FromContent(Content);
                 VoxelTypes types = VoxelTypes.FromContent(Content);
                 World = new SimWorld(7, Content, types);
-                World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types);
+                World.Island = TestIslands.Generate(World.Voxels.Store, World.Streams, biomes, types);
 
                 ConstraintFields fields;
                 ParcelGrid grid = Founding.Survey(World, Content, biomes, out fields);
