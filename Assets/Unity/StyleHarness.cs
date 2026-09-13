@@ -57,8 +57,10 @@ namespace Godless.Unity
             long target = _boot.World.Clock.TicksInYears(years[_next]);
             if (_boot.World.Clock.Tick < target)
             {
-                int budget = 0;
-                while (_boot.World.Clock.Tick < target && budget++ < 4000) _boot.World.Tick();
+                // The same tick path the player's speed uses; a plate is
+                // allowed to be in a hurry, but not to be a different world.
+                long owed = target - _boot.World.Clock.Tick;
+                _boot.RunTicks((int)System.Math.Min(owed, 4000));
                 MarkEverythingDirty();
                 return;
             }

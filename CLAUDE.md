@@ -106,6 +106,21 @@ added Parts 16, 09 and 10. Do not file that material under `Culture/`.
   .NET 8 runtime, so a `net8.0` project builds clean and then dies at
   `dotnet run` — the failure surfaces a step later wearing a different mask.
 
+## Speed is a display decision
+
+The player can pause and run at 1x to 16x (`Assets/Sim/Harness/TickPacer.cs`,
+driven by `Assets/Unity/Input/SimSpeed.cs`). None of it reaches the
+simulation: a tick is a tick, and the pacer only decides how many whole ticks
+are due this frame. Same seed plus same tick count gives the same world,
+however those ticks were spread — `HowTheTicksAreSpreadCannotChangeTheWorld`
+holds that line, and the L1 guard makes it hard to break, since `Assets/Sim`
+cannot see `Time.deltaTime` at all.
+
+So: never pass a speed, a frame time or a real duration into a system. A
+faster speed is added by extending `TickPacer.Multipliers` and nothing else.
+Anything that needs to *happen* faster or slower belongs in the clock's ticks,
+not in the pacer.
+
 ## The loop
 
     Tools/verify.sh         # guard + full suite, one exit code: commit only on this

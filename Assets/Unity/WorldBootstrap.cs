@@ -39,8 +39,14 @@ namespace Godless.Unity
 
         [SerializeField] int people = 20;
 
-        [Tooltip("Simulated days a second. Zero pauses; the sim is deterministic either way.")]
-        [SerializeField] float daysPerSecond = 4f;
+        [Tooltip("Simulated days a real second at 1x. Speed never reaches the simulation; it only decides how many whole ticks run this frame.")]
+        [SerializeField] float daysPerSecondAt1x = 2f;
+
+        [Tooltip("Speed to start at, as an index into TickPacer.Multipliers (0 paused, 1 is 1x).")]
+        [SerializeField] int startSpeed = 1;
+
+        [Tooltip("Ticks a frame when the renderer is keeping up. Lower if a fast speed makes the frame stutter.")]
+        [SerializeField] int ticksPerFrame = 16;
 
         public SimWorld World { get; private set; }
         public WorldRenderer View { get; private set; }
@@ -50,10 +56,12 @@ namespace Godless.Unity
 
         public Settlement Town { get; private set; }
 
+        /// <summary>How fast the world runs while somebody is watching. Never seen by the simulation.</summary>
+        public TickPacer Pacer { get; private set; }
+
         float _smoothedFrame = 1f / 60f;
         float _worstFrame;
         float _loadSeconds;
-        float _tickDebt;
         int _deltaCursor;
 
         void Start()
@@ -74,6 +82,7 @@ namespace Godless.Unity
             }
 
             World = new SimWorld((ulong)seed, content.Database, types);
+            Pacer = new TickPacer(daysPerSecondAt1x, World.Clock.TicksPerDay, startSpeed);
             World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types);
 
             // The untouched island is history's baseline (S04): everything the
@@ -141,16 +150,40 @@ namespace Godless.Unity
         /// which chunks the people changed. The sim never touches Unity and
         /// Unity never touches the voxels: it reads the delta log, which is
         /// there for exactly this (S04).
+        ///
+        /// How many ticks is the pacer's business and nobody else's — the
+        /// world does not know what speed it is being watched at.
         /// </summary>
         void RunSim(float dt)
         {
-            if (World == null || Town == null || daysPerSecond <= 0f) return;
+            if (World == null || Town == null || Pacer == null) return;
 
-            _tickDebt += dt * daysPerSecond * World.Clock.TicksPerDay;
-            int ticks = Mathf.Min(Mathf.FloorToInt(_tickDebt), 64);
-            if (ticks <= 0) return;
-            _tickDebt -= ticks;
+            Pacer.Advance(dt);
+            int ticks = Pacer.Take(FrameBudget());
+            if (ticks > 0) RunTicks(ticks);
+        }
 
+        /// <summary>
+        /// Ticks this frame can afford. A fast speed must not outrun the
+        /// mesher: the queue is the honest signal that the picture is falling
+        /// behind the world, and the ticks it cannot afford stay owed rather
+        /// than being lost.
+        /// </summary>
+        int FrameBudget()
+        {
+            int waiting = View.ChunksQueued + View.ChunksInFlight;
+            if (waiting > 24) return 1;
+            if (waiting > 8) return Mathf.Max(1, ticksPerFrame / 4);
+            return ticksPerFrame;
+        }
+
+        /// <summary>
+        /// Runs whole ticks and hands the renderer what changed. Public so a
+        /// tool can wind the world on (S29's style plate) without pretending
+        /// to be a frame.
+        /// </summary>
+        public void RunTicks(int ticks)
+        {
             for (int i = 0; i < ticks; i++) World.Tick();
 
             IReadOnlyList<VoxelDelta> log = World.Voxels.Log.All();
@@ -174,11 +207,14 @@ namespace Godless.Unity
             {
                 int standing = 0, under = 0;
                 foreach (Project project in Town.Projects) { if (project.Complete) standing++; else under++; }
-                text += "\n\nyear " + World.Clock.Year + " day " + World.Clock.DayOfYear
+                text += "\n\n" + Pacer.Label + (Pacer.Behind > 2.0 ? "  (the picture is behind the world)" : "")
+                      + "   year " + World.Clock.Year + " day " + World.Clock.DayOfYear
                       + "   " + Town.People.Count + " people, " + Town.ShelterCapacity + " sleeping places"
                       + "\nhouses: " + standing + " standing, " + under + " going up"
                       + "   intents " + Town.Intents.Intents.Count;
             }
+
+            if (GetComponent<SimSpeed>() != null) text += "\n" + SimSpeed.Keys;
 
             TerrainEditor editor = GetComponent<TerrainEditor>();
             if (editor != null) text += "\n" + editor.Status + "\nstrokes " + editor.Strokes;

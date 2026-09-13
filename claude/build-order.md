@@ -45,6 +45,13 @@ course until there are roofs. Food decides how many people there are to do
 it. `sim settle --days 400` walks it end to end, and the Island scene shows
 the same thing happening while you watch.
 
+**Speed** (`TickPacer`): paused, 1x, 2x, 4x, 8x, 16x, driven from the Unity
+side only. A tick is a tick — the pacer decides how many whole ticks are due
+this frame and the simulation never learns a speed exists, which is what
+`HowTheTicksAreSpreadCannotChangeTheWorld` pins down. A faster speed later
+(the Silence wants two hundred unattended years) is one number in
+`TickPacer.Multipliers`.
+
 **Next: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.
