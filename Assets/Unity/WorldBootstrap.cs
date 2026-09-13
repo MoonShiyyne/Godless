@@ -36,6 +36,9 @@ namespace Godless.Unity
 
         [SerializeField] bool showStats = true;
 
+        [Tooltip("Frames a second the Editor and player may render. 0 leaves it to the platform. Vsync is turned off so this is the cap that holds.")]
+        [SerializeField] int maxFramesPerSecond = 100;
+
         [Header("Settlement (stratum 1)")]
         [Tooltip("Put twenty people on the island and let them build.")]
         [SerializeField] bool settle = true;
@@ -75,6 +78,11 @@ namespace Godless.Unity
 
         void Start()
         {
+            // A cap on rendering only. It changes how many frames there are to
+            // spread ticks across, never how many ticks run: the pacer works
+            // from real seconds, so a capped frame simply takes more of them.
+            ApplyFrameCap();
+
             var watch = System.Diagnostics.Stopwatch.StartNew();
 
             string root = Path.Combine(Application.dataPath, "Content");
@@ -146,6 +154,19 @@ namespace Godless.Unity
             Founding.AddSystems(World, content, Parcels, fields, biomes);
             _deltaCursor = World.Voxels.Log.Count;
             Debug.Log("Godless: " + people + " people settled at parcel (" + px + ", " + pz + ")");
+        }
+
+        void ApplyFrameCap()
+        {
+            // Vsync overrides targetFrameRate when it is on, so a cap without
+            // this line is a cap at the monitor's refresh rate instead.
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = maxFramesPerSecond > 0 ? maxFramesPerSecond : -1;
+        }
+
+        void OnValidate()
+        {
+            if (Application.isPlaying) ApplyFrameCap();
         }
 
         void FrameCamera()
