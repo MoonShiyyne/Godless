@@ -31,6 +31,9 @@ namespace Godless.Unity
         [Tooltip("Which world in Assets/Content to generate. Empty is the built-in island with every biome. See `sim maps`.")]
         [SerializeField] string map = "green-shore";
 
+        [Tooltip("Grow the woods, reed beds and rock that settlements gather from and use up (S2F). Off gives the bare island stratum 1 was built on.")]
+        [SerializeField] bool plantDeposits = true;
+
         [Tooltip("Place the main camera over the island on start.")]
         [SerializeField] bool frameCamera = true;
 
@@ -112,7 +115,9 @@ namespace Godless.Unity
 
             World = new SimWorld((ulong)seed, content.Database, types);
             Pacer = new TickPacer(daysPerSecondAt1x, World.Clock.TicksPerDay, startSpeed);
-            World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types, choice.Preset);
+            World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types, choice.Preset,
+                                                    plantDeposits ? choice.Features : null);
+            foreach (string problem in choice.Features.Problems) Debug.LogWarning("content: " + problem);
             Ground = GroundPalette.From(World.Island, biomes, types);
             Map = choice.Preset;
 

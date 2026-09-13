@@ -1,0 +1,12 @@
+{
+  "type": "feature",
+  "id": "sand",
+  "tell": "Sand dug from the beach, leaving hollows the tide never quite fills.",
+  "shape": "bed",
+  "voxel": "sand",
+  "size": { "least": 2, "most": 4 },
+  "yields": { "material": "sand", "perVoxel": 1 },
+  "spacing": 9,
+  "density": { "shore": 0.35 },
+  "regrowDays": 0
+}

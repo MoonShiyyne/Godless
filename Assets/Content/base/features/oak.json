@@ -1,0 +1,19 @@
+{
+  "type": "feature",
+  "id": "oak",
+  "tell": "Oak woods on the temperate ground. A village's clearing spreads out from its fire as the nearest trees come down, and grows back over years once nobody cuts there.",
+
+  "shape": "tree",
+  "voxel": "oak-tree",
+  "crown": "leaves",
+  "size": { "least": 7, "most": 11 },
+  "crownRadius": 3,
+
+  // A trunk voxel is half a metre of bole: about eight voxels of sawn timber.
+  "yields": { "material": "oak", "perVoxel": 8 },
+
+  // One candidate a spacing-square, taken at this chance by biome.
+  "spacing": 5,
+  "density": { "temperate": 0.55, "flood-plain": 0.08 },
+  "regrowDays": 2880
+}

@@ -49,6 +49,13 @@ namespace Godless.Sim.World
         /// <summary>The map this island was made from, for anything that needs its numbers again.</summary>
         public WorldPreset Map { get; internal set; }
 
+        /// <summary>
+        /// What grows and lies on the island to be gathered (S2F), or null on an
+        /// island generated bare. Whether it has any is part of what the island
+        /// is: a save records it.
+        /// </summary>
+        public DepositMap Deposits { get; internal set; }
+
         /// <summary>Water stands here up to, not including, this height. Zero where the column is dry.</summary>
         public int WaterLevelAt(int x, int z) { return _water[z * ChunkStore.SizeX + x]; }
 
@@ -111,8 +118,14 @@ namespace Godless.Sim.World
         /// wetness of the air and the biomes it admits. Null is the plain
         /// island the generator made before maps existed.
         /// </param>
+        /// <param name="features">
+        /// What to grow and lay on the land once it is shaped (S2F). Null makes a
+        /// bare island, which is what everything before S2F was built and
+        /// tested against.
+        /// </param>
         public static IslandMap Generate(ChunkStore store, StreamRegistry streams,
-                                         BiomeTable biomes, VoxelTypes voxelTypes, WorldPreset map = null)
+                                         BiomeTable biomes, VoxelTypes voxelTypes, WorldPreset map = null,
+                                         FeatureTable features = null)
         {
             WorldPreset preset = map ?? WorldPreset.Default();
             ulong seed = StableHash.Combine(streams.WorldSeed, StableHash.OfString(StreamId));
@@ -190,6 +203,10 @@ namespace Godless.Sim.World
 
             // S0B: rivers, lakes and the water table, from the heights above.
             Hydrology.Apply(island, store, biomes, water, preset);
+
+            // S2F: the woods, the reed beds and the rock, on the finished land.
+            if (features != null && features.Count > 0)
+                island.Deposits = FeaturePlanter.Plant(island, store, features, streams.WorldSeed);
             return island;
         }
 

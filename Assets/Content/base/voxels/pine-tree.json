@@ -1,0 +1,12 @@
+{
+  "type": "voxel",
+  "id": "pine-tree",
+  "solid": true,
+  "hardness": 3,
+  "ground": false,
+  "scenery": true,
+  "value": 22,
+  "hue": 20,
+  "saturation": 30,
+  "class": "vegetation"
+}

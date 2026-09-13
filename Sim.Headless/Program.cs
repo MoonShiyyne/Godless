@@ -60,6 +60,7 @@ namespace Godless.Sim.Headless
         static int Run(Args cli)
         {
             bool withIsland = cli.Text("island", "false") != "false";
+            bool bare = cli.Text("bare", "false") != "false";
 
             ulong first; int count;
             // Generating an island costs about half a second, so the default
@@ -86,7 +87,8 @@ namespace Godless.Sim.Headless
                 runner = new BatchRunner(seed =>
                 {
                     var world = new SimWorld(seed, content.Database, types);
-                    world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types, map.Preset);
+                    world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types, map.Preset,
+                                                            bare ? null : map.Features);
                     return world;
                 });
                 runner.Collect(IslandInvariants.Collector(biomes));
@@ -309,7 +311,8 @@ namespace Godless.Sim.Headless
 
             var store = new ChunkStore();
             var watch = Stopwatch.StartNew();
-            IslandMap map = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types, choice.Preset);
+            IslandMap map = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types, choice.Preset,
+                                                    cli.Text("bare", "false") != "false" ? null : choice.Features);
             watch.Stop();
 
             // Terminal cells are about twice as tall as wide.
@@ -369,6 +372,28 @@ namespace Godless.Sim.Headless
 
             Console.WriteLine("\nwater (S0B): " + riverCols.ToString(c) + " river columns, " + lakeCols.ToString(c)
                 + " lake columns; " + Pct(floodCols, land) + " of land stands within a voxel of its water and floods first");
+
+            if (map.Deposits != null)
+            {
+                // S2F: what grows and lies on it, per kind, and what it is worth.
+                var perKind = new long[map.Deposits.Kinds.Count];
+                var units = new long[map.Deposits.Kinds.Count];
+                for (int f = 0; f < map.Deposits.Count; f++)
+                {
+                    int k = map.Deposits.Kinds.IndexOf(map.Deposits.KindOf(f).Id);
+                    perKind[k]++;
+                    units[k] += map.Deposits.Remaining(f);
+                }
+                Console.WriteLine("\ndeposits (S2F):");
+                for (int k = 0; k < perKind.Length; k++)
+                {
+                    FeatureKind kind = map.Deposits.Kinds[k];
+                    Console.WriteLine("  " + kind.Name.PadRight(9) + perKind[k].ToString(c).PadLeft(7) + " "
+                        + kind.Shape.ToString().ToLowerInvariant() + (perKind[k] == 1 ? "" : "s") + ", "
+                        + units[k].ToString(c) + " voxels of " + kind.Yields.ToString().Replace("voxel.", "")
+                        + (kind.Renews ? ", back in " + kind.RegrowDays.ToString(c) + " days" : ", never back"));
+                }
+            }
             Console.WriteLine("land " + Pct(land, total) + " of the map, "
                 + (store.MemoryBytes / 1024).ToString(c) + " KB across "
                 + store.AllocatedChunks.ToString(c) + "/" + ChunkStore.ChunkCount.ToString(c)
@@ -399,7 +424,8 @@ namespace Godless.Sim.Headless
             catch (System.Exception e) { Console.Error.WriteLine(e.Message); return 1; }
             BiomeTable biomes = choice.Biomes;
             var store = new ChunkStore();
-            IslandMap island = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types, choice.Preset);
+            IslandMap island = IslandGenerator.Generate(store, new StreamRegistry(seed), biomes, types, choice.Preset,
+                                                       cli.Text("bare", "false") != "false" ? null : choice.Features);
 
             bool[] solid = TerrainBrush.SolidTable(content.Database, types);
             var wet = new bool[types.Count];
@@ -753,7 +779,8 @@ namespace Godless.Sim.Headless
             if (biomes.Count == 0) { Console.Error.WriteLine("no biomes declared — nowhere to settle"); return 1; }
 
             var world = new SimWorld(seed, db, types);
-            IslandMap island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types, choice.Preset);
+            IslandMap island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types, choice.Preset,
+                                                       cli.Text("bare", "false") != "false" ? null : choice.Features);
             world.Island = island;
             world.BeginHistory();
 
@@ -789,8 +816,11 @@ namespace Godless.Sim.Headless
 
             // S11: what the land within hauling range offers to build with.
             MaterialTable materials = MaterialTable.FromContent(db, biomes);
-            s.Catchment = Catchment.Survey(island, biomes, materials, hx, hz);
+            s.Catchment = island.Deposits != null
+                ? Catchment.FromDeposits(island, biomes, materials, island.Deposits, hx, hz)
+                : Catchment.Survey(island, biomes, materials, hx, hz);
             s.Stock = new MaterialStock(materials);
+            int[] depositsAtFounding = DepositsInReach(island, materials, hx, hz, true);
             var offered = new List<string>();
             for (int m = 0; m < materials.Count; m++)
                 if (s.Catchment.Offers(m))
@@ -823,7 +853,9 @@ namespace Godless.Sim.Headless
                                      NegotiationTable.FromContent(db, genes)));
 
             // S1A: hands that lay the voxels, allocated like any other work.
-            var construction = new Construction(world.Voxels, materials, types, tileset, palette);
+            var construction = new Construction(world.Voxels, materials, types, tileset, palette,
+                                                deposits: island.Deposits, ticksPerDay: world.Clock.TicksPerDay);
+            world.Add(new DepositSystem(grid));
             world.Add(new TaskSystem(construction, grid));
             world.BeginHistory();
 
@@ -955,6 +987,26 @@ namespace Godless.Sim.Headless
                         + "% of each one's gathering was their own main material");
                 Console.WriteLine("  " + s.Tasks.IdleTicks.ToString(c) + " working ticks found nothing that needed doing");
             }
+            if (island.Deposits != null)
+            {
+                // S2F: what is left in reach, against what was there.
+                int[] now = DepositsInReach(island, materials, hx, hz, false);
+                Console.WriteLine("\nwhat is left within reach (S2F), of what stood at founding:");
+                for (int m = 0; m < materials.Count; m++)
+                {
+                    if (depositsAtFounding[m] == 0) continue;
+                    int nearest = s.Catchment.NearestSource(m);
+                    string walk = nearest < 0 ? "none left in reach"
+                        : "nearest " + ((int)System.Math.Sqrt((double)(island.Deposits.X(nearest) - hx) * (island.Deposits.X(nearest) - hx)
+                                        + (double)(island.Deposits.Z(nearest) - hz) * (island.Deposits.Z(nearest) - hz))).ToString(c)
+                          + " voxels out, a tick brings " + s.Catchment.YieldPerLabourTick(m).ToString("0.00", c);
+                    Console.WriteLine("  " + materials[m].Name.PadRight(8) + (now[m] * 100L / depositsAtFounding[m]).ToString(c).PadLeft(4)
+                        + "%  (" + now[m].ToString(c) + " of " + depositsAtFounding[m].ToString(c) + ")  " + walk);
+                }
+                Console.WriteLine("  " + world.Annals.OfKind(Catchment.ExhaustedKind).Count.ToString(c)
+                    + " material(s) worked out of reach; foraging now feeds " + s.Catchment.FoodPerLabourTick.ToString("0.00", c)
+                    + " a tick");
+            }
             Console.WriteLine("\nroofs now: " + s.ShelterCapacity.ToString(c) + " sleeping places for " + s.People.Count.ToString(c)
                 + " people (" + s.Born.ToString(c) + " born, " + s.Died.ToString(c) + " lost); "
                 + s.Food.ToString("0", c) + " meals in the store, land feeds "
@@ -982,6 +1034,19 @@ namespace Godless.Sim.Headless
         {
             if (whole <= 0) return "0.0%";
             return (100.0 * part / whole).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        }
+
+        /// <summary>Material units per material in features within haul range; with <paramref name="initial"/>, what they started with.</summary>
+        static int[] DepositsInReach(IslandMap island, MaterialTable materials, int hx, int hz, bool initial)
+        {
+            var units = new int[materials.Count];
+            if (island.Deposits == null) return units;
+            foreach (int f in island.Deposits.Within(hx, hz, materials.DepositRangeVoxels))
+            {
+                int m = materials.IndexOf(island.Deposits.KindOf(f).Yields);
+                if (m >= 0) units[m] += initial ? island.Deposits.Initial(f) : island.Deposits.Remaining(f);
+            }
+            return units;
         }
 
         static char GlyphFor(string biomeId)

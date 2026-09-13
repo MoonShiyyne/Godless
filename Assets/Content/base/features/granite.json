@@ -1,0 +1,12 @@
+{
+  "type": "feature",
+  "id": "granite",
+  "tell": "Granite boulders on the high ground. Broken up for building, they are gone for good: an old settlement stands in a field of rubble pits.",
+  "shape": "boulder",
+  "voxel": "granite",
+  "size": { "least": 2, "most": 3 },
+  "yields": { "material": "granite", "perVoxel": 1 },
+  "spacing": 7,
+  "density": { "highland": 0.35, "alpine": 0.25, "mesa": 0.18 },
+  "regrowDays": 0
+}

@@ -1,0 +1,12 @@
+{
+  "type": "feature",
+  "id": "grass",
+  "tell": "Tall grass on open lowland, cut for thatch and back within the season.",
+  "shape": "tuft",
+  "voxel": "grass",
+  "size": { "least": 1, "most": 2 },
+  "yields": { "material": "thatch", "perVoxel": 3 },
+  "spacing": 3,
+  "density": { "temperate": 0.35, "flood-plain": 0.25 },
+  "regrowDays": 150
+}

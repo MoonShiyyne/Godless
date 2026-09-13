@@ -1,0 +1,15 @@
+{
+  "type": "feature",
+  "id": "reeds",
+  "tell": "Reed beds along the water, cut for roofing and grown back within the year.",
+  "shape": "tuft",
+  "voxel": "reeds",
+  "size": { "least": 2, "most": 3 },
+  "yields": { "material": "reed", "perVoxel": 3 },
+  "spacing": 3,
+  "density": { "shore": 0.45, "flood-plain": 0.55 },
+
+  // Reed grows with its feet wet: only within this many voxels of the water.
+  "maxAboveWater": 2,
+  "regrowDays": 300
+}

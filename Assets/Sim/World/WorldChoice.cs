@@ -24,6 +24,9 @@ namespace Godless.Sim.World
         /// <summary>Only the biomes this map admits, in the order the table gives them.</summary>
         public BiomeTable Biomes { get; private set; }
 
+        /// <summary>What grows and lies on the land (S2F), built against this map's biomes.</summary>
+        public FeatureTable Features { get; private set; }
+
         /// <summary>Every map the content declares, for a listing or an error message.</summary>
         public WorldTable Maps { get; private set; }
 
@@ -45,6 +48,7 @@ namespace Godless.Sim.World
             {
                 choice.Preset = WorldPreset.Default();
                 choice.Biomes = all;
+                choice.Features = FeatureTable.FromContent(content, all, Voxels.VoxelTypes.FromContent(content));
                 return choice;
             }
 
@@ -56,6 +60,7 @@ namespace Godless.Sim.World
             choice.Biomes = preset.Biomes.Count == 0 ? all : BiomeTable.FromContent(content, preset.Biomes);
             if (choice.Biomes.Count == 0)
                 throw new ContentException("map '" + name + "' admits no biome that content declares.");
+            choice.Features = FeatureTable.FromContent(content, choice.Biomes, Voxels.VoxelTypes.FromContent(content));
             return choice;
         }
 

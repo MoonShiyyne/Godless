@@ -1,0 +1,15 @@
+{
+  "type": "voxel",
+  "id": "reeds",
+  "solid": true,
+  "hardness": 0,
+
+  // Standing reed at the water's edge. Cut, it is reed in the yard; left a
+  // year, it is back.
+  "ground": false,
+  "scenery": true,
+  "value": 55,
+  "hue": 70,
+  "saturation": 40,
+  "class": "vegetation"
+}

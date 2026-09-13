@@ -1,0 +1,12 @@
+{
+  "type": "voxel",
+  "id": "needles",
+  "solid": true,
+  "hardness": 0,
+  "ground": false,
+  "scenery": true,
+  "value": 26,
+  "hue": 150,
+  "saturation": 30,
+  "class": "vegetation"
+}

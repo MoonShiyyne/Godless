@@ -1,0 +1,12 @@
+{
+  "type": "feature",
+  "id": "mud",
+  "tell": "Mud flats beside the channels, dug out a basket at a time.",
+  "shape": "bed",
+  "voxel": "mud",
+  "size": { "least": 2, "most": 4 },
+  "yields": { "material": "mud", "perVoxel": 1 },
+  "spacing": 9,
+  "density": { "flood-plain": 0.4 },
+  "regrowDays": 0
+}

@@ -1,0 +1,16 @@
+{
+  "type": "voxel",
+  "id": "oak-tree",
+  "solid": true,
+  "hardness": 3,
+
+  // S2F. A standing oak's trunk. Not ground — nothing plans on it and a
+  // walker passes between trees — and not a building material: felling it is
+  // what turns it into one (8 voxels of oak in the yard per voxel of trunk).
+  "ground": false,
+  "scenery": true,
+  "value": 30,
+  "hue": 25,
+  "saturation": 35,
+  "class": "vegetation"
+}

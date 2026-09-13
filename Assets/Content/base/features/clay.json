@@ -1,0 +1,12 @@
+{
+  "type": "feature",
+  "id": "clay",
+  "tell": "Clay beds in the dry country, dug into pits that stay.",
+  "shape": "bed",
+  "voxel": "clay",
+  "size": { "least": 2, "most": 4 },
+  "yields": { "material": "clay", "perVoxel": 1 },
+  "spacing": 11,
+  "density": { "mesa": 0.35 },
+  "regrowDays": 0
+}

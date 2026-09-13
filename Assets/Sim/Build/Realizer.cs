@@ -209,6 +209,13 @@ namespace Godless.Sim.Build
                     if (catchment == null || !catchment.Offers(m)) continue;
                     double yield = catchment.YieldPerLabourTick(m);
 
+                    // On an island with real deposits, a quick material that
+                    // runs out a fifth of the way up the wall is worth a fifth
+                    // of its rate (S2F): seventy voxels of sand on the beach
+                    // do not make a sand house.
+                    if (catchment.HasDeposits && need > 0 && catchment.Sources(m) < need)
+                        yield *= (double)catchment.Sources(m) / need;
+
                     // A few source columns at the far edge of the haul range
                     // round to nothing per tick. Counting those as available
                     // is how a house ends up needing four voxels of a stone

@@ -1,0 +1,14 @@
+{
+  "type": "voxel",
+  "id": "grass",
+  "solid": true,
+  "hardness": 0,
+
+  // Tall grass: cut and dried, it is thatch.
+  "ground": false,
+  "scenery": true,
+  "value": 60,
+  "hue": 80,
+  "saturation": 45,
+  "class": "vegetation"
+}

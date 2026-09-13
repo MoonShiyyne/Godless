@@ -74,7 +74,9 @@ namespace Godless.Sim.Settlements
                                                      world.Clock.Tick, world.Annals, RecordId.None);
             settlement.ShelterCapacity = roofs;
             settlement.Stock = new MaterialStock(materials);
-            settlement.Catchment = Catchment.Survey(world.Island, biomes, materials, hx, hz);
+            settlement.Catchment = world.Island != null && world.Island.Deposits != null
+                ? Catchment.FromDeposits(world.Island, biomes, materials, world.Island.Deposits, hx, hz)
+                : Catchment.Survey(world.Island, biomes, materials, hx, hz);
 
             // People arrive with food and nothing else: a season and a half of
             // it, which is what stands between a hard first year and a
@@ -109,7 +111,10 @@ namespace Godless.Sim.Settlements
                                      SitingTable.FromContent(content, genes, IntentKindTable.FromContent(content, rules.Needs)),
                                      tiles, materials, palette, grid, fields,
                                      NegotiationTable.FromContent(content, genes)))
-                 .Add(new TaskSystem(new Construction(world.Voxels, materials, world.VoxelTypes, tiles, palette), grid));
+                 .Add(new DepositSystem(grid))
+                 .Add(new TaskSystem(new Construction(world.Voxels, materials, world.VoxelTypes, tiles, palette,
+                                                      deposits: world.Island != null ? world.Island.Deposits : null,
+                                                      ticksPerDay: world.Clock.TicksPerDay), grid));
         }
 
         /// <summary>The parcel grid and the fields an island needs before anybody can settle it.</summary>

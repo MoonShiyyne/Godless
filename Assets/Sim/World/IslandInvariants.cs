@@ -62,7 +62,32 @@ namespace Godless.Sim.World
                 into.Record("island.dominant-biome-fraction", sampled > 0 ? (double)largest / sampled : 1.0);
 
                 CollectWater(world, map, into);
+                CollectDeposits(world, map, into);
             };
+        }
+
+        /// <summary>
+        /// S2F's claims about a planted island: every deposit stands on ground
+        /// and out of the water, and nothing a biome promises is missing from
+        /// it. A bare island records nothing and passes trivially.
+        /// </summary>
+        static void CollectDeposits(SimWorld world, IslandMap map, RunResult into)
+        {
+            DepositMap deposits = map.Deposits;
+            if (deposits == null) return;
+
+            bool[] ground = TerrainBrush.SolidTable(world.Content, world.VoxelTypes);
+            long misplaced = 0;
+            for (int f = 0; f < deposits.Count; f++)
+            {
+                int x = deposits.X(f), y = deposits.Y(f), z = deposits.Z(f);
+                if (map.WaterLevelAt(x, z) > 0) { misplaced++; continue; }
+                if (deposits.KindOf(f).Shape == FeatureShape.Bed) continue;   // a bed is the ground
+                if (!IsSolid(ground, world.Voxels.Store.Get(x, y - 1, z))) misplaced++;
+            }
+            into.Record("deposits.count", deposits.Count);
+            into.Record("deposits.misplaced", misplaced);
+            into.Record("deposits.unpromised", deposits.Kinds.Problems.Count);
         }
 
         /// <summary>
@@ -164,6 +189,16 @@ namespace Godless.Sim.World
 
                 Invariant.PerRun("S09", "no single biome swallows the island",
                     run => run.Metric("island.dominant-biome-fraction") <= 0.9),
+
+                // S2F. A tree in a river, or a boulder hanging over a hole, is a
+                // deposit nobody can reach and a picture nobody believes.
+                Invariant.PerRun("S2F", "every deposit stands on dry ground",
+                    run => run.Metric("deposits.misplaced") == 0.0),
+
+                // And a biome that promises a material has it lying there, or
+                // its settlements plan houses in something that does not exist.
+                Invariant.PerRun("S2F", "every material a biome promises is grown or laid in it",
+                    run => run.Metric("deposits.unpromised") == 0.0),
 
                 // S0B. Floods, drainage in site scoring and every water verb
                 // read this. An island with no river reaching the sea has no

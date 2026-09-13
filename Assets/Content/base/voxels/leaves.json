@@ -1,0 +1,15 @@
+{
+  "type": "voxel",
+  "id": "leaves",
+  "solid": true,
+  "hardness": 0,
+
+  // A broadleaf crown. It comes down with the tree and yields nothing: what
+  // the player sees go is the canopy, and the clearing it leaves.
+  "ground": false,
+  "scenery": true,
+  "value": 42,
+  "hue": 100,
+  "saturation": 38,
+  "class": "vegetation"
+}

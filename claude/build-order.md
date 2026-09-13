@@ -75,7 +75,62 @@ Three bugs this surfaced, all of them older than the maps:
 - `role.hearth` admitted only stone, so a settlement in an oak wood with no
   quarry could not build at all. It takes fired earth now.
 
-**Next: G1 itself.** Two tests, and the plan asks for three strangers rather
+## Stratum 2 opened ahead of G1 — owner's call, 2026-09-13
+
+The owner asked for a simulation that reacts to itself: deposits that run
+out and are replaced by permanent works, buildings by use, upkeep, people you
+can see, bridges, boats and terraforming. That is stratum-2-and-later work,
+and G1 has not been run. It is recorded here as a decision rather than a
+drift: G1's instruments (`sim separate`) still run against the bare island
+they were built for, and nothing below changes what they measure.
+
+The design supplies the shape so none of this becomes a tech tree: "nothing
+is researched; things are survived" (Part 21), permanent works arrive from a
+recorded failure, and infrastructure follows the army-ant rule — joined where
+traffic is high, abandoned when it falls (Part 16).
+
+| ID | System | Deps | Tell |
+|----|--------|------|------|
+| S2F | Deposits and depletion | S09, S11, S1C | A clearing grows out from the fire; a material worked out of reach stops being gathered, on record |
+| S2G | People in the world | S13, S2F | You can watch who is felling, who is building, who is at the fire |
+| S2H | Stores and spoilage | S1E, S18 | Food rots without a granary; the granary is the second building type |
+| S2I | Fields, quarries, mines, fishing | S2F, S2H | The forest is gone and fields are tilled where it stood; the rubble is gone and a quarry face opens |
+| S2L | Upkeep and decay | S1A, S2F | A house nobody repairs loses its roof, then its walls |
+| S2M | Bridges and boats | S13, S2L | A bridge appears where the walk round was long, and falls when the far bank is abandoned |
+| S2J | Live water after terrain edits | S0B, S07 | Dam a river and it finds another way to the sea |
+
+### What S2F shipped
+
+- Deposits are voxels. `Assets/Content/base/features`: trees (oak, pine), tufts
+  (grass for thatch, reeds), boulders (granite, slate) and beds (clay, mud,
+  sand), each with a biome density, a yield and a regrowth time. Planted at
+  worldgen after hydrology, one candidate per spacing cell, ground features
+  first. A load-time check refuses a biome that promises a material no feature
+  grows there.
+- Trees and tufts are `"scenery": true, "ground": false`: opaque to look at,
+  invisible to planning and pathing, and exempt from the palette's contrast
+  rule, which exists for walls against roofs.
+- A settlement's catchment reads what is left. Gathering takes the nearest
+  feature with anything in it, so the clearing grows outward; a tick brings
+  in `rate / (1 + distance / travelScaleVoxels)`, so the far wood is worth
+  less; renewables grow back into air only, so a house built over a wood
+  stays a house. Every voxel that leaves cites the settlement's
+  `deposit.worked` record; the last in reach writes `deposit.exhausted`,
+  which is the failure S2I will read.
+- Foraging lives off what is standing: a felled wood feeds a quarter of what
+  it did.
+- A house begun in a wood clears its site into the yard. A plan whose material
+  is gone from the land is remade from what can be had, and one already half
+  built is finished in something else — the wall records the day the sand ran
+  out.
+- Bare islands (every test before S2F, and G1's instruments) are unchanged:
+  the planter only runs when asked, and a save records whether it did.
+- Measured, green shore seed 7, ten years: the beach sand in reach is gone in
+  the first year, the nearest oaks come down and regrow within the decade, and
+  the settlement's houses are oak and thatch rather than the sand-and-reed
+  plan it first drew against an empty yard.
+
+**Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.
 

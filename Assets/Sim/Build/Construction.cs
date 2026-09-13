@@ -42,9 +42,15 @@ namespace Godless.Sim.Build
         readonly int _perTick;
 
         /// <param name="voxelsPerTick">Voxels one builder lays in a tick. A house is days of work.</param>
+        readonly DepositMap _deposits;
+        readonly int _ticksPerDay;
+
         public Construction(VoxelWorld voxels, MaterialTable materials, VoxelTypes types,
-                            TileSet tiles, Palette palette, int voxelsPerTick = 4)
+                            TileSet tiles, Palette palette, int voxelsPerTick = 4,
+                            DepositMap deposits = null, int ticksPerDay = SimClock.DefaultTicksPerDay)
         {
+            _deposits = deposits;
+            _ticksPerDay = ticksPerDay;
             _voxels = voxels;
             _materials = materials;
             _types = types;
@@ -69,6 +75,37 @@ namespace Godless.Sim.Build
             return left;
         }
 
+        /// <summary>
+        /// Whether everything still to lay can ever be had: in the yard, or
+        /// still growing or lying within reach. Only an island with real
+        /// deposits can say no (S2F).
+        /// </summary>
+        public static bool Obtainable(Settlement settlement, Project project)
+        {
+            Catchment c = settlement.Catchment;
+            if (c == null || !c.HasDeposits || project.Built == null) return true;
+            double left = 1.0 - project.Placed / (double)System.Math.Max(1, Order(project).Count);
+            for (int m = 0; m < project.Built.Cost.Length; m++)
+            {
+                long still = (long)(project.Built.Cost[m] * left);
+                if (still <= 0 || settlement.Stock.Of(m) >= still) continue;
+                if (c.YieldPerLabourTick(m) <= 0.0) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Remakes the materials of what is not yet built from what can be had
+        /// now. What stands keeps what it was made of.
+        /// </summary>
+        void Rethink(Settlement settlement, Project project, RngStream rng, string ranOut)
+        {
+            Structure fresh = Realizer.Realize(project.Plan, _tiles, _materials, settlement.Stock, _palette, _types,
+                                               rng, settlement.Catchment);
+            if (ranOut != null) fresh.Note("finished in what was left after the " + ranOut + " in reach ran out");
+            project.Built = fresh;
+        }
+
         /// <summary>Whether there is enough in the yard to be worth starting, or it is started already.</summary>
         public static bool Ready(Settlement settlement, Project project)
         {
@@ -91,7 +128,11 @@ namespace Godless.Sim.Build
         {
             Project project = null;
             foreach (Project p in settlement.Projects)
-                if (!p.Complete && Ready(settlement, p)) { project = p; break; }
+            {
+                if (p.Complete) continue;
+                if (!Obtainable(settlement, p)) Rethink(settlement, p, rng, null);
+                if (Ready(settlement, p)) { project = p; break; }
+            }
             if (project == null) return false;
 
             if (Walk(agent, grid, project)) return true;
@@ -144,6 +185,13 @@ namespace Godless.Sim.Build
                     if (project.Built.Compromises.Count > 0 && project.Placed == 0)
                         project.Built = Realizer.Realize(project.Plan, _tiles, _materials, settlement.Stock,
                                                          _palette, _types, rng, settlement.Catchment);
+
+                    // And a material that is gone from the land for good is
+                    // not waited for (S2F): the rest of the building goes up in
+                    // whatever there is, so the wall itself records the day
+                    // the sand ran out.
+                    else if (!Obtainable(settlement, project))
+                        Rethink(settlement, project, rng, _materials[material].Name);
                     return;
                 }
 
@@ -176,7 +224,26 @@ namespace Godless.Sim.Build
                                          project.Built.TotalVoxels, project.Plan.Capacity,
                                          new[] { project.Intent.Kind.Id });
 
+            ClearSite(settlement, project, tick);
             Groundworks(project, tick, annals);
+        }
+
+        /// <summary>
+        /// Whatever grows or lies where the house will stand comes off first,
+        /// into the yard (S2F): a house built in a wood starts as a clearing.
+        /// </summary>
+        void ClearSite(Settlement settlement, Project project, long tick)
+        {
+            if (_deposits == null) return;
+            Int3 lo = World(project, 0, 0, 0);
+            Int3 hi = World(project, project.Plan.Width - 1, 0, project.Plan.Depth - 1);
+            int[] got = _deposits.Clear(lo.X - 1, lo.Z - 1, hi.X + 1, hi.Z + 1, _voxels, tick, project.Begun, _ticksPerDay);
+            for (int k = 0; k < got.Length; k++)
+            {
+                if (got[k] <= 0) continue;
+                int m = _materials.IndexOf(_deposits.Kinds[k].Yields);
+                if (m >= 0) settlement.Stock.Add(m, got[k]);
+            }
         }
 
         void Finish(Settlement settlement, Project project, long tick, Annalist annals)

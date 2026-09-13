@@ -22,15 +22,22 @@ namespace Godless.Sim.World
     /// </summary>
     public static class TerrainBrush
     {
-        /// <summary>Which runtime voxel ids are solid, read from content.</summary>
+        /// <summary>
+        /// Which runtime voxel ids are ground, read from content: solid, and
+        /// not declared "ground": false. A standing tree is solid to look at
+        /// and to the camera's ray, but nobody plans a house on its crown and
+        /// a walker goes between trunks (S2F).
+        /// </summary>
         public static bool[] SolidTable(ContentDatabase content, VoxelTypes types)
         {
             var solid = new bool[types.Count];
             foreach (string name in content.Ids("voxel"))
             {
                 ushort id;
-                if (types.TryGetId(Symbol.For("voxel." + name), out id))
-                    solid[id] = content.Get("voxel", name)["solid"].AsBool(true);
+                if (!types.TryGetId(Symbol.For("voxel." + name), out id)) continue;
+                JsonValue doc = content.Get("voxel", name);
+                bool isSolid = doc["solid"].AsBool(true);
+                solid[id] = isSolid && doc["ground"].AsBool(isSolid);
             }
             return solid;
         }

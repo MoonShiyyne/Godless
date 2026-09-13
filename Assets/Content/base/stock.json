@@ -13,5 +13,17 @@
   // Source columns within range (of about 5000) at which a material gathers
   // at its full rate. A settlement beside a copse gathers timber slowly; one
   // in the forest, at full speed.
-  "fullYieldColumns": 3000
+  "fullYieldColumns": 3000,
+
+  // S2F. On an island with real deposits, distance from the fire at which a
+  // tick of gathering brings in half what it would beside it — the other half
+  // is the walk. The nearest trees are worth most, so they go first, and the
+  // clearing grows outward from the fire.
+  "travelScaleVoxels": 32,
+
+  // S2F. How far people will walk for real deposits. Longer than the haul
+  // range above, which still governs a bare island's biome sum (and G1's
+  // measurement against it): here the walk itself prices distance, so the
+  // far wood is reachable and worth less, rather than invisible.
+  "depositRangeVoxels": 96
 }

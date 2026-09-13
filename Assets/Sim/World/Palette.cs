@@ -69,6 +69,12 @@ namespace Godless.Sim.World
             foreach (string id in content.Ids("voxel"))
             {
                 JsonValue v = content.Get("voxel", id);
+
+                // Scenery — a standing tree, a reed bed — is never part of a
+                // wall, so it is not held to the rules that keep walls reading
+                // against roofs. It is what a clearing is cut out of (S2F).
+                if (v["scenery"].AsBool(false)) continue;
+
                 palette._materials.Add(new Material
                 {
                     Id = Symbol.For("voxel." + id),

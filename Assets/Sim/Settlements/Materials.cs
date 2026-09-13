@@ -1,6 +1,9 @@
 using System.Collections.Generic;
+using Godless.Sim.Annals;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
+using Godless.Sim.Deltas;
+using Godless.Sim.Voxels;
 using Godless.Sim.World;
 
 namespace Godless.Sim.Settlements
@@ -53,6 +56,16 @@ namespace Godless.Sim.Settlements
         /// <summary>Source columns in range at which a material gathers at its full rate.</summary>
         public int FullYieldColumns { get; private set; }
 
+        /// <summary>
+        /// Distance from the fire, in voxels, at which a tick of gathering brings
+        /// in half what it would at the fireside (S2F): the rest of the tick is
+        /// the walk. What makes the far trees worth less than the near ones.
+        /// </summary>
+        public int TravelScaleVoxels { get; private set; } = 24;
+
+        /// <summary>How far people walk for real deposits (S2F), in voxels from the fire.</summary>
+        public int DepositRangeVoxels { get; private set; } = 64;
+
         public static MaterialTable FromContent(ContentDatabase content, BiomeTable biomes)
         {
             var problems = new List<string>();
@@ -89,16 +102,22 @@ namespace Godless.Sim.Settlements
                         problems.Add("biome '" + biome.Name + "' offers '" + biome.MaterialNames[i]
                                      + "', but no voxel of that name declares how to gather it.");
 
-            int haul = 64, full = 1500;
+            int haul = 64, full = 1500, travel = 24, depositRange = -1;
             if (content.Contains("stock", "base"))
             {
                 JsonValue stock = content.Get("stock", "base");
                 haul = stock["haulRangeVoxels"].AsInt32(haul);
                 full = stock["fullYieldColumns"].AsInt32(full);
+                travel = stock["travelScaleVoxels"].AsInt32(travel);
+                depositRange = stock["depositRangeVoxels"].AsInt32(haul);
             }
             if (full < 1) full = 1;
+            if (travel < 1) travel = 1;
 
-            return new MaterialTable(loaded.ToArray(), problems, haul, full);
+            var table = new MaterialTable(loaded.ToArray(), problems, haul, full);
+            table.TravelScaleVoxels = travel;
+            table.DepositRangeVoxels = depositRange > 0 ? depositRange : haul;
+            return table;
         }
 
         public int IndexOf(Symbol voxel)
@@ -116,8 +135,25 @@ namespace Godless.Sim.Settlements
     /// </summary>
     public sealed class Catchment
     {
+        public static readonly Symbol WorkedKind = Symbol.For("deposit.worked");
+        public static readonly Symbol ExhaustedKind = Symbol.For("deposit.exhausted");
+
         readonly long[] _sources;
         readonly double[] _yield;
+
+        // S2F. Null on a bare island, where the catchment is the biome sum it
+        // always was.
+        DepositMap _deposits;
+        MaterialTable _materials;
+        int _hearthX, _hearthZ;
+        List<int>[] _nearest;       // per material: features in range yielding it, nearest first
+        int[] _cursor;              // per material: first of those with anything left
+        double[] _carry;            // per material: fractions of a voxel gathered and not yet whole
+        RecordId[] _worked;         // per material: the record every cut cites
+        bool[] _exhausted;          // per material: whether the last in reach has been recorded
+        List<int> _vegetation;      // trees and tufts in range, for foraging
+        int _vegetationAtFounding;
+        double _foodAtFounding;
 
         Catchment(long[] sources, double[] yield, int haul, double food = 0.0)
         {
@@ -126,6 +162,9 @@ namespace Godless.Sim.Settlements
             HaulRangeVoxels = haul;
             FoodPerLabourTick = food;
         }
+
+        /// <summary>Whether this catchment reads real deposits (S2F) rather than a biome sum.</summary>
+        public bool HasDeposits { get { return _deposits != null; } }
 
         public int HaulRangeVoxels { get; private set; }
 
@@ -142,6 +181,158 @@ namespace Godless.Sim.Settlements
         public double YieldPerLabourTick(int material) { return _yield[material]; }
 
         public bool Offers(int material) { return _sources[material] > 0; }
+
+        /// <summary>The nearest feature with this material left in it, or -1. S2F only.</summary>
+        public int NearestSource(int material)
+        {
+            if (_deposits == null) return -1;
+            List<int> list = _nearest[material];
+            int c = _cursor[material];
+            while (c < list.Count && !_deposits.Available(list[c])) c++;
+            _cursor[material] = c;
+            return c < list.Count ? list[c] : -1;
+        }
+
+        /// <summary>
+        /// A catchment over real deposits (S2F). The biome survey still sets the
+        /// best the land could ever feed a forager; what is standing decides how
+        /// much of that is left.
+        /// </summary>
+        public static Catchment FromDeposits(IslandMap map, BiomeTable biomes, MaterialTable materials,
+                                             DepositMap deposits, int hearthX, int hearthZ)
+        {
+            Catchment c = Survey(map, biomes, materials, hearthX, hearthZ);
+            c._deposits = deposits;
+            c._materials = materials;
+            c._hearthX = hearthX;
+            c._hearthZ = hearthZ;
+            c._nearest = new List<int>[materials.Count];
+            c._cursor = new int[materials.Count];
+            c._carry = new double[materials.Count];
+            c._worked = new RecordId[materials.Count];
+            c._exhausted = new bool[materials.Count];
+            c._vegetation = new List<int>();
+            for (int m = 0; m < materials.Count; m++) { c._nearest[m] = new List<int>(); c._worked[m] = RecordId.None; }
+
+            foreach (int f in deposits.Within(hearthX, hearthZ, materials.DepositRangeVoxels))
+            {
+                FeatureKind kind = deposits.KindOf(f);
+                int m = materials.IndexOf(kind.Yields);
+                if (m >= 0) c._nearest[m].Add(f);
+                if (kind.Shape == FeatureShape.Tree || kind.Shape == FeatureShape.Tuft) c._vegetation.Add(f);
+            }
+
+            c._foodAtFounding = c.FoodPerLabourTick;
+            c._vegetationAtFounding = c.StandingVegetation();
+            c.Refresh();
+            return c;
+        }
+
+        int StandingVegetation()
+        {
+            int v = 0;
+            foreach (int f in _vegetation)
+                if (_deposits.Standing(f)) v += _deposits.KindOf(f).Shape == FeatureShape.Tree ? 3 : 1;
+            return v;
+        }
+
+        /// <summary>A tick of labour's worth at this distance from the fire: the rest is the walk.</summary>
+        double Travel(int feature)
+        {
+            double dx = _deposits.X(feature) - _hearthX, dz = _deposits.Z(feature) - _hearthZ;
+            double d = SimMath.Sqrt(dx * dx + dz * dz);
+            return 1.0 / (1.0 + d / _materials.TravelScaleVoxels);
+        }
+
+        /// <summary>
+        /// Re-reads what is left: what each material is worth a tick now, and
+        /// what the cleared land still feeds a forager. Daily, and after
+        /// anything grows back. A no-op on a bare island.
+        /// </summary>
+        public void Refresh()
+        {
+            if (_deposits == null) return;
+            for (int m = 0; m < _materials.Count; m++)
+            {
+                _cursor[m] = 0;
+                long left = 0;
+                foreach (int f in _nearest[m]) left += _deposits.Remaining(f);
+                _sources[m] = left;
+                int nearest = NearestSource(m);
+                _yield[m] = nearest < 0 ? 0.0 : _materials[m].PerLabourTick * Travel(nearest);
+                if (nearest >= 0) _exhausted[m] = false;
+            }
+
+            // Foraging lives off what grows. A felled wood feeds a quarter of
+            // what it did, which is the pressure that will ask for fields (S2I).
+            double standing = _vegetationAtFounding > 0 ? (double)StandingVegetation() / _vegetationAtFounding : 0.0;
+            FoodPerLabourTick = _foodAtFounding * (0.25 + 0.75 * SimMath.Clamp01(standing));
+        }
+
+        /// <summary>
+        /// A tick of gathering against the real deposits (S2F): the nearest
+        /// feature with anything left gives up the tick's worth, its voxels
+        /// leave the world citing this settlement's work, and the yard gains
+        /// what was carried. Returns the feature worked, or -1 when there is
+        /// nothing left in reach.
+        /// </summary>
+        public int Harvest(int material, double labourTicks, MaterialStock stock, VoxelWorld world, long tick,
+                           int ticksPerDay, Annalist annals, Symbol settlement, Int3 hearth, RecordId founded)
+        {
+            if (_deposits == null) { stock.Gather(material, labourTicks, this); return -1; }
+
+            int feature = NearestSource(material);
+            if (feature < 0) { Exhausted(material, tick, annals, settlement, hearth); return -1; }
+
+            if (!_worked[material].Exists)
+                _worked[material] = annals.Write(tick, WorkedKind, settlement, hearth, founded, 0, 0,
+                                                 new[] { _materials[material].Voxel });
+
+            double got = _carry[material] + labourTicks * _materials[material].PerLabourTick * Travel(feature);
+            int whole = (int)got;
+            _carry[material] = got - whole;
+
+            int taken = 0;
+            while (taken < whole)
+            {
+                int f = NearestSource(material);
+                if (f < 0) { _carry[material] = 0.0; break; }
+                taken += _deposits.Take(f, whole - taken, world, tick, _worked[material], ticksPerDay);
+            }
+            if (taken > 0) stock.Add(material, taken);
+
+            // The yield follows the walk to whatever is nearest now.
+            int next = NearestSource(material);
+            _yield[material] = next < 0 ? 0.0 : _materials[material].PerLabourTick * Travel(next);
+            if (next < 0) Exhausted(material, tick, annals, settlement, hearth);
+            return feature;
+        }
+
+        void Exhausted(int material, long tick, Annalist annals, Symbol settlement, Int3 hearth)
+        {
+            _yield[material] = 0.0;
+            if (_exhausted[material]) return;
+            _exhausted[material] = true;
+            annals.Write(tick, ExhaustedKind, settlement, hearth,
+                         _worked[material].Exists ? _worked[material] : RecordId.None, 0, 0,
+                         new[] { _materials[material].Voxel });
+        }
+
+        /// <summary>The record every cut of this material cites, or None before the first.</summary>
+        public RecordId WorkRecord(int material) { return _worked != null ? _worked[material] : RecordId.None; }
+
+        public ulong Digest()
+        {
+            var d = new Digest();
+            for (int m = 0; m < _sources.Length; m++)
+            {
+                d.Add(_sources[m]);
+                d.Add(System.BitConverter.DoubleToInt64Bits(_yield[m]));
+                if (_carry != null) d.Add(System.BitConverter.DoubleToInt64Bits(_carry[m]));
+            }
+            d.Add(System.BitConverter.DoubleToInt64Bits(FoodPerLabourTick));
+            return d.Value;
+        }
 
         /// <summary>
         /// A catchment from source counts directly. For tests, and for the

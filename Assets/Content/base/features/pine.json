@@ -1,0 +1,15 @@
+{
+  "type": "feature",
+  "id": "pine",
+  "tell": "Dark pine on the cold wet slopes, felled from the fire outward like the oak, and slower to come back.",
+  "shape": "tree",
+  "voxel": "pine-tree",
+  "crown": "needles",
+  "size": { "least": 9, "most": 14 },
+  "crownRadius": 2,
+  "crownShape": "cone",
+  "yields": { "material": "pine", "perVoxel": 6 },
+  "spacing": 4,
+  "density": { "pine-forest": 0.6, "highland": 0.04 },
+  "regrowDays": 3600
+}

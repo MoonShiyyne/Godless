@@ -47,6 +47,9 @@ namespace Godless.Sim.Drives
 
         public void PlaceAt(int px, int pz) { ParcelX = px; ParcelZ = pz; }
 
+        /// <summary>The deposit feature this person last worked (S2F), or -1.</summary>
+        public int WorkingAt { get; internal set; } = -1;
+
         /// <summary>Ticks spent on productive activity, ever.</summary>
         public long ProductiveTicks { get; internal set; }
 

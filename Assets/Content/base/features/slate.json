@@ -1,0 +1,12 @@
+{
+  "type": "feature",
+  "id": "slate",
+  "tell": "Slate outcrops above the treeline, split for roofs and walls until there is none left in reach.",
+  "shape": "boulder",
+  "voxel": "slate",
+  "size": { "least": 2, "most": 3 },
+  "yields": { "material": "slate", "perVoxel": 1 },
+  "spacing": 7,
+  "density": { "alpine": 0.35, "highland": 0.15, "pine-forest": 0.12 },
+  "regrowDays": 0
+}

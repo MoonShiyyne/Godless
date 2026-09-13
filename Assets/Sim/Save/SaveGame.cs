@@ -40,7 +40,7 @@ namespace Godless.Sim.Save
     public static class SaveGame
     {
         const uint Magic = 0x534C4447; // "GDLS" little-endian
-        const uint Version = 3;   // 3 names the map (S09 presets); 2 added annal contributors (S14); 1 and 2 still read
+        const uint Version = 4;   // 4 records planted deposits (S2F); 3 names the map (S09 presets); 2 added annal contributors (S14)
 
         public static void Write(Stream stream, SimWorld world, bool containsCodeMod = false)
         {
@@ -60,6 +60,10 @@ namespace Godless.Sim.Save
             // biomes — rebuilds a different island under the same deltas.
             w.Write(world.Island != null && world.Island.Map != null && !world.Island.Map.IsDefault
                     ? world.Island.Map.Name : "");
+
+            // Whether the woods and the rock were grown on it (S2F). They come
+            // from the seed like the land does, but only if they were asked for.
+            w.Write(world.Island != null && world.Island.Deposits != null);
 
             w.Write(world.Voxels.Store.Digest());
             w.Write(world.Annals.Digest());
@@ -122,6 +126,7 @@ namespace Godless.Sim.Save
             bool codeMod = r.ReadBoolean();
             bool hasIsland = r.ReadBoolean();
             string mapName = version >= 3 ? r.ReadString() : "";
+            bool planted = version >= 4 && r.ReadBoolean();
             ulong expectedWorld = r.ReadUInt64();
             ulong expectedAnnals = r.ReadUInt64();
 
@@ -149,16 +154,17 @@ namespace Godless.Sim.Save
                 // A named map brings its own biome subset with it; the table
                 // the caller handed in is the one for an unnamed world.
                 WorldPreset preset = null;
-                if (mapName.Length > 0)
+                FeatureTable features = null;
+                if (mapName.Length > 0 || planted)
                 {
                     WorldChoice choice;
                     try { choice = WorldChoice.Pick(content, mapName); }
                     catch (Godless.Sim.Content.ContentException e)
                     { throw new SaveException("this save was made on map '" + mapName + "': " + e.Message); }
-                    preset = choice.Preset;
-                    biomes = choice.Biomes;
+                    if (mapName.Length > 0) { preset = choice.Preset; biomes = choice.Biomes; }
+                    if (planted) features = choice.Features;
                 }
-                world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, voxelTypes, preset);
+                world.Island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, voxelTypes, preset, features);
             }
 
             // The regenerated island is history's baseline. Without this the
