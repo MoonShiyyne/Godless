@@ -283,6 +283,24 @@ Registered alongside the block above:
   broad delta 111; a bare island houses 6 of 8 families by day 700.
 - Invariants (S2V, settled batch): every need lies between 0 and 1; no need is
   at its worst for more than half a settlement.
+- **People in detail cells:** seven posed figures are content
+  (`models/person-stand`, `-walk-a`, `-walk-b`, `-work`, `-sit`, `-kneel`,
+  `-lie`), 1.75 m of 12.5 cm cells with `clothes`, `skin` and `hair` slots. The
+  view dresses them in the colour of what they are doing, gives each person a
+  skin and hair of their own, turns them the way they walked, and lays a
+  sleeper on their bed under its cover. `NeedsTests.EveryPoseHasAFigure` holds
+  every pose an activity names to a figure.
+- **Beds are allotted once a tick** (`Places.AllotBeds`): family by family,
+  sharing a home's beds in family order, then the sheltered without one take
+  the spare beds. Before, two households in one house both slept in its first
+  bed, and guests lay in a heap in the middle of the first house.
+- **The cutaway (C):** every building opens a metre above its lowest floor, in
+  the voxel shader from a per-column height map; the hill a house is backed
+  into is never cut, anyone upstairs is hidden with the upstairs, and back
+  faces draw as a dark cross-section so a cut solid reads solid. Back faces are
+  told by their normals: **`VFACE` in a surface shader broke ordinary drawing
+  on Metal** (lost faces, dark slabs, shadow acne), visible only with the
+  cutaway off.
 
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
