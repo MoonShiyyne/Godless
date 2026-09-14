@@ -88,6 +88,7 @@ namespace Godless.Unity
             // S2G still shows its people.
             if (showPeople && GetComponent<PeopleView>() == null) gameObject.AddComponent<PeopleView>();
             if (GetComponent<DetailRenderer>() == null) gameObject.AddComponent<DetailRenderer>();
+            if (GetComponent<CutawayView>() == null) gameObject.AddComponent<CutawayView>();
         }
 
         void Start()
@@ -278,7 +279,7 @@ namespace Godless.Unity
                       + "   intents " + Town.Intents.Intents.Count;
             }
 
-            if (GetComponent<SimSpeed>() != null) text += "\n" + SimSpeed.Keys;
+            if (GetComponent<SimSpeed>() != null) text += "\n" + SimSpeed.Keys + (GetComponent<CutawayView>() != null ? "   " + CutawayView.Keys : "");
 
             TerrainEditor editor = GetComponent<TerrainEditor>();
             if (editor != null) text += "\n" + editor.Status + "\nstrokes " + editor.Strokes;

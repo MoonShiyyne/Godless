@@ -12,15 +12,17 @@
     "f": {
       "slot": "frame"
     },
+    // A woven cover in madder red and a pale pillow, so a bed reads against
+    // the timber floor it stands on.
     "b": {
-      "hue": 28,
-      "saturation": 30,
-      "value": 55
+      "hue": 6,
+      "saturation": 50,
+      "value": 52
     },
     "p": {
       "hue": 40,
-      "saturation": 15,
-      "value": 82
+      "saturation": 10,
+      "value": 90
     }
   },
   "layers": [

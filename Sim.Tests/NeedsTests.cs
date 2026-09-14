@@ -56,6 +56,25 @@ namespace Godless.Sim.Tests
             Assert.Equal(ActionPlace.Bed, rules.Activities[rules.Activities.IndexOf("sleep")].At);
         }
 
+        /// <summary>Every pose an activity asks for has a figure to draw it, dressed by the view.</summary>
+        [Fact]
+        public void EveryPoseHasAFigure()
+        {
+            DriveRules rules = DriveRules.FromContent(Content);
+            Voxels.DetailModelTable models = Voxels.DetailModelTable.FromContent(Content);
+            Assert.Empty(models.Problems);
+            var poses = new HashSet<string> { "stand", "work", "lie" };
+            foreach (Activity a in rules.Activities.All) poses.Add(a.Pose);
+            foreach (string pose in poses)
+            {
+                Voxels.DetailModel figure = models.Find("person-" + pose);
+                Assert.True(figure != null, "no person-" + pose + " model for the '" + pose + "' pose");
+                foreach (string slot in new[] { "clothes", "skin", "hair" }) Assert.Contains(slot, figure.Slots);
+            }
+            Assert.NotNull(models.Find("person-walk-a"));
+            Assert.NotNull(models.Find("person-walk-b"));
+        }
+
         /// <summary>People are seen doing their errands where those errands are done, and it keeps them well.</summary>
         [Fact]
         public void PeopleDrinkAtTheWaterAndEatAtTheStore()

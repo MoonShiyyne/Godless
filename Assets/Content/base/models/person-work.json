@@ -1,0 +1,142 @@
+{
+  // S2V. A person in detail cells, 12.5 cm each, facing +z. Clothes, skin and hair are slots the view fills.
+  "type": "model",
+  "id": "person-work",
+  "tell": "People are small figures of their own, 1.75 m tall in 12.5 cm cells, dressed in the colour of what they are doing and posed for it: walking, bent to work, sitting to eat, kneeling at the water, lying in their own bed.",
+  "size": {
+    "x": 7,
+    "y": 14,
+    "z": 5
+  },
+  "paint": {
+    "c": {
+      "slot": "clothes"
+    },
+    "s": {
+      "slot": "skin"
+    },
+    "h": {
+      "slot": "hair"
+    },
+    "t": {
+      "hue": 30,
+      "saturation": 22,
+      "value": 32
+    },
+    "f": {
+      "hue": 22,
+      "saturation": 30,
+      "value": 17
+    },
+    "e": {
+      "hue": 20,
+      "saturation": 30,
+      "value": 10
+    },
+    "w": {
+      "hue": 32,
+      "saturation": 45,
+      "value": 42
+    }
+  },
+  "layers": [
+    [
+      ".......",
+      ".ff.ff.",
+      ".ff.ff.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".tt.tt.",
+      ".tt.tt.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".tt.tt.",
+      ".tt.tt.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".tt.tt.",
+      ".tt.tt.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".tt.tt.",
+      ".tt.tt.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".tt.tt.",
+      ".tt.tt.",
+      ".......",
+      "...w..."
+    ],
+    [
+      ".......",
+      ".ccccc.",
+      ".ccccc.",
+      ".......",
+      "...w..."
+    ],
+    [
+      ".......",
+      ".ccccc.",
+      ".ccccc.",
+      ".......",
+      "...w..."
+    ],
+    [
+      ".......",
+      "ccccccc",
+      "ccccccc",
+      ".csssc.",
+      "......."
+    ],
+    [
+      ".......",
+      "ccccccc",
+      "ccccccc",
+      "...w...",
+      "......."
+    ],
+    [
+      ".......",
+      "ccccccc",
+      "ccccccc",
+      "...w...",
+      "......."
+    ],
+    [
+      ".......",
+      "..hhh..",
+      "..sss..",
+      "..sss..",
+      "......."
+    ],
+    [
+      ".......",
+      "..hhh..",
+      "..sss..",
+      "..ese..",
+      "......."
+    ],
+    [
+      ".......",
+      "..hhh..",
+      "..hhh..",
+      "..hhh..",
+      "......."
+    ]
+  ]
+}

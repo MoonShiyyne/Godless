@@ -6,11 +6,17 @@
 // sRGB bytes, which Unity does not convert. Without GammaToLinearSpace every
 // material renders pale and the S0A value separation — the contrast rule —
 // is quietly flattened on screen.
+//
+// S2V. The cutaway: while it is on, a column-by-column height map says where
+// each building is opened, and anything cuttable above it is not drawn — nor
+// does it cast a shadow, so a bed under a removed roof is lit. People draw
+// with this shader too, uncuttable and instanced.
 Shader "Godless/VoxelVertexColor"
 {
     Properties
     {
         _Tint ("Tint", Color) = (1, 1, 1, 1)
+        _Cuttable ("Cuttable", Float) = 1
     }
     SubShader
     {
@@ -18,14 +24,23 @@ Shader "Godless/VoxelVertexColor"
         LOD 200
 
         CGPROGRAM
-        #pragma surface surf Lambert vertex:vert fullforwardshadows
+        #pragma surface surf Lambert vertex:vert fullforwardshadows addshadow
+        #pragma multi_compile_instancing
         #pragma target 3.0
 
         fixed4 _Tint;
+        float _Cuttable;
+
+        // Set globally by CutawayView.
+        sampler2D _GodlessCutMap;
+        float4 _GodlessCutSize;
+        float _GodlessCutOn;
 
         struct Input
         {
             float4 vcol;
+            float3 worldPos;
+            float3 worldNormal;
         };
 
         void vert(inout appdata_full v, out Input o)
@@ -36,6 +51,16 @@ Shader "Godless/VoxelVertexColor"
 
         void surf(Input IN, inout SurfaceOutput o)
         {
+            if (_GodlessCutOn > 0.5 && _Cuttable > 0.5)
+            {
+                // A hair inside the voxel this face belongs to, so a wall's
+                // outer face and a floor's top answer for their own column.
+                float3 p = IN.worldPos - IN.worldNormal * 0.01;
+                float2 uv = (floor(p.xz) + 0.5) * _GodlessCutSize.zw;
+                float cut = tex2Dlod(_GodlessCutMap, float4(uv, 0, 0)).r;
+                clip(cut - p.y);
+            }
+
             float3 c = IN.vcol.rgb * _Tint.rgb;
             #ifndef UNITY_COLORSPACE_GAMMA
             c = GammaToLinearSpace(c);
