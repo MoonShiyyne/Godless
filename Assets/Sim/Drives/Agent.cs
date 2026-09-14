@@ -109,6 +109,14 @@ namespace Godless.Sim.Drives
         /// <summary>The deposit feature this person last worked (S2F), or -1.</summary>
         public int WorkingAt { get; internal set; } = -1;
 
+        // S2X: the last load carried — from where, to where, what, and the place's name.
+        public int HaulFromX { get; internal set; }
+        public int HaulFromZ { get; internal set; }
+        public int HaulToX { get; internal set; }
+        public int HaulToZ { get; internal set; }
+        public string HaulWhat { get; internal set; } = "";
+        public string HaulTo { get; internal set; } = "";
+
         /// <summary>Ticks spent on productive activity, ever.</summary>
         public long ProductiveTicks { get; internal set; }
 

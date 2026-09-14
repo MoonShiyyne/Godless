@@ -59,7 +59,7 @@ namespace Godless.Sim.Collective
         public IReadOnlyList<string> Problems { get { return _problems; } }
 
         /// <summary>Verbs the simulation knows how to carry out.</summary>
-        public static readonly string[] KnownVerbs = { "gather", "build", "forage" };
+        public static readonly string[] KnownVerbs = { "gather", "build", "forage", "haul", "farm" };
 
         public static TaskKindTable FromContent(ContentDatabase content)
         {

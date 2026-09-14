@@ -52,6 +52,9 @@ namespace Godless.Sim.Build
         public IReadOnlyList<RecordId> Causes { get; internal set; }
 
         public long RaisedTick { get; internal set; }
+
+        /// <summary>The tick planning is next worth trying, after a day it found nowhere or no one to build for.</summary>
+        internal long RetryAt;
         public IntentStatus Status { get; internal set; }
 
         /// <summary>The most recent record in this intent's life.</summary>

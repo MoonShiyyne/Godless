@@ -42,6 +42,9 @@ namespace Godless.Sim.Collective
         /// <summary>Where rubble's detail lives, so salvage can take it away (S2T).</summary>
         public Voxels.DetailLayer Details;
         public int TicksPerDay = Core.SimClock.DefaultTicksPerDay;
+
+        /// <summary>How loads are carried (S2X). Null where nothing is heaped and everything goes straight to the yard.</summary>
+        public HaulRules Hauling;
     }
 
     public sealed class TaskBoard
@@ -61,6 +64,7 @@ namespace Godless.Sim.Collective
         long[][] _work;                     // per agent, per task
         int[] _current;                     // per agent; -1 = free
         List<ulong> _rows = new List<ulong>();   // which person each row belongs to
+        readonly bool _hauls;               // a haul task exists, so what is cut is heaped for it (S2X)
         readonly ActivityTable _activities;
         long _idle;
 
@@ -92,6 +96,7 @@ namespace Godless.Sim.Collective
             }
 
             _kind = kind.ToArray();
+            foreach (TaskKind k in _kind) if (k.Verb == "haul") _hauls = true;
             _material = material.ToArray();
             _id = id.ToArray();
             int tasks = _kind.Length, people = s.People.Count;
@@ -201,7 +206,7 @@ namespace Godless.Sim.Collective
         {
             int tasks = _kind.Length;
             if (tasks == 0) return;
-            ComputeDemand(s);
+            ComputeDemand(s, work);
 
             var workers = new int[tasks];
             IReadOnlyList<Agent> people = s.People;
@@ -296,6 +301,12 @@ namespace Godless.Sim.Collective
                 return work.Builder.Work(s, agent, work.Grid, work.Tick, work.Annals, rng);
             }
 
+            if (_kind[task].Verb == "haul")
+            {
+                if (work == null || work.Hauling == null) return false;
+                return Hauling.Carry(s, agent, work.Hauling, work.Details, work.Tick);
+            }
+
             if (_kind[task].Verb == "forage")
             {
                 if (s.Catchment == null || s.Catchment.FoodPerLabourTick <= 0.0) return false;
@@ -320,7 +331,8 @@ namespace Godless.Sim.Collective
                 {
                     // S2F: the nearest tree with anything left comes down.
                     int worked = s.Catchment.Harvest(m, agent.LabourShare, s.Stock, work.Voxels, work.Tick, work.TicksPerDay,
-                                                     work.Annals, s.Id, s.Hearth, s.Founded);
+                                                     work.Annals, s.Id, s.Hearth, s.Founded,
+                                                     _hauls && work.Hauling != null ? s : null);
                     if (worked < 0) return false;
                     agent.WorkingAt = worked;
                     return true;
@@ -341,7 +353,7 @@ namespace Godless.Sim.Collective
         /// Gathering demand: what is commissioned plus a reserve, less what is
         /// held, split across materials by how readily the land gives each up.
         /// </summary>
-        void ComputeDemand(Settlement s)
+        void ComputeDemand(Settlement s, WorkSite work)
         {
             int count = s.Stock.Materials.Count;
             if (_ordered == null || _ordered.Length != count) _ordered = new double[count];
@@ -381,13 +393,24 @@ namespace Godless.Sim.Collective
 
             double yieldSum = 0.0;
             long held = 0;
-            for (int m = 0; m < count; m++) { yieldSum += s.Catchment.YieldPerLabourTick(m); held += s.Stock.Of(m); }
+            // Held includes what lies in heaps waiting to be carried (S2X): it is cut already.
+            var heaped = new double[count];
+            foreach (Pile p in s.Piles) if (!p.IsFood && p.Material < count) heaped[p.Material] += p.Amount;
+            for (int m = 0; m < count; m++) { yieldSum += s.Catchment.YieldPerLabourTick(m); held += s.Stock.Of(m) + (long)heaped[m]; }
 
             for (int t = 0; t < _kind.Length; t++)
             {
                 // Every demand in the same unit — ticks of work it would take
                 // — so a settlement can weigh a house against a meal.
                 if (_kind[t].Verb == "build") { _demand[t] = Construction.Remaining(s) / 4.0; continue; }
+                if (_kind[t].Verb == "haul")
+                {
+                    // Loads lying about, food counting for more while the store is low.
+                    double loads = work != null ? Hauling.Loads(s, work.Hauling) : 0.0;
+                    if (loads > 0.0 && s.Food < Subsistence.Wanted(s) * 0.5 && Hauling.Piled(s, -1) > 0.0) loads *= 2.0;
+                    _demand[t] = loads;
+                    continue;
+                }
                 if (_kind[t].Verb == "forage")
                 {
                     // Demand for food and demand for timber are both numbers,
@@ -396,7 +419,7 @@ namespace Godless.Sim.Collective
                     // store and starve beside a full yard, which is what
                     // happened. An emptying store multiplies its own demand,
                     // so hunger takes the hands it needs and gives them back.
-                    double shortfall = Subsistence.Wanted(s) - s.Food;
+                    double shortfall = Subsistence.Wanted(s) - s.Food - Hauling.Piled(s, -1);
                     if (shortfall <= 0.0) { _demand[t] = 0.0; continue; }
                     double days = s.People.Count > 0 ? s.Food / (s.People.Count * Subsistence.MealsADay) : 30.0;
                     double urgency = days >= 30.0 ? 1.0 : 1.0 + 9.0 * (30.0 - days) / 30.0;
@@ -412,7 +435,7 @@ namespace Godless.Sim.Collective
                     ? _kind[t].ReserveVoxels * (yieldSum > 0.0 ? s.Catchment.YieldPerLabourTick(m) / yieldSum : 0.0)
                       + _ordered[m] + share
                     : _kind[t].ReserveVoxels + commissioned + designed;
-                double d = m >= 0 ? want - s.Stock.Of(m) : want - held;
+                double d = m >= 0 ? want - s.Stock.Of(m) - heaped[m] : want - held;
                 double per = m >= 0 ? s.Catchment.YieldPerLabourTick(m) : 1.0;
 
                 // Nothing of it left in reach: wanting it does not make it
@@ -451,12 +474,15 @@ namespace Godless.Sim.Collective
 
         readonly Construction _builder;
         readonly World.ParcelGrid _grid;
+        readonly HaulRules _hauling;
 
         /// <param name="builder">What a build task does, or null in a world with nothing to build.</param>
-        public TaskSystem(Construction builder = null, World.ParcelGrid grid = null)
+        /// <param name="hauling">How loads are carried (S2X), or null for a world where everything goes straight to the yard.</param>
+        public TaskSystem(Construction builder = null, World.ParcelGrid grid = null, HaulRules hauling = null)
         {
             _builder = builder;
             _grid = grid;
+            _hauling = hauling;
         }
 
         public Symbol Id { get { return SystemId; } }
@@ -468,6 +494,7 @@ namespace Godless.Sim.Collective
             {
                 Builder = _builder, Grid = _grid, Annals = world.Annals, Tick = world.Clock.Tick,
                 Voxels = world.Voxels, TicksPerDay = world.Clock.TicksPerDay, Details = world.Details,
+                Hauling = _hauling,
             };
             foreach (Settlement s in world.Settlements)
                 if (s.Tasks != null) s.Tasks.Step(s, rng, work);

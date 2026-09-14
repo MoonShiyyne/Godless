@@ -389,7 +389,8 @@ namespace Godless.Sim.Settlements
         /// nothing left in reach.
         /// </summary>
         public int Harvest(int material, double labourTicks, MaterialStock stock, VoxelWorld world, long tick,
-                           int ticksPerDay, Annalist annals, Symbol settlement, Int3 hearth, RecordId founded)
+                           int ticksPerDay, Annalist annals, Symbol settlement, Int3 hearth, RecordId founded,
+                           Settlement heapFor = null)
         {
             if (_deposits == null) { stock.Gather(material, labourTicks, this); return -1; }
 
@@ -411,7 +412,12 @@ namespace Godless.Sim.Settlements
                 if (f < 0) { _carry[material] = 0.0; break; }
                 taken += _deposits.Take(f, whole - taken, world, tick, _worked[material], ticksPerDay);
             }
-            if (taken > 0) stock.Add(material, taken);
+            // Where there is anyone to carry it (S2X), what was cut lies by the stump.
+            if (taken > 0)
+            {
+                if (heapFor != null) Hauling.Drop(heapFor, _deposits.X(feature), _deposits.Z(feature), material, taken, _worked[material]);
+                else stock.Add(material, taken);
+            }
 
             // The yield follows the walk to whatever is nearest now.
             int next = NearestSource(material);

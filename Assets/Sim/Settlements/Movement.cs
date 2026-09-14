@@ -267,8 +267,9 @@ namespace Godless.Sim.Settlements
                     }
                 }
 
+                string workPose;
                 if (act != null && act.Productive && s.Tasks != null
-                    && Working(s, i, a, deposits, world.Clock.TotalDays, out gx, out gz, out doing))
+                    && Working(s, i, a, deposits, world.Clock.TotalDays, world.Clock.Tick, out gx, out gz, out doing, out workPose))
                 {
                     // A builder has already walked this tick (S1A does its own).
                     if (s.Tasks.CurrentTask(i) >= 0 && s.Tasks.KindOf(s.Tasks.CurrentTask(i)).Verb == "build")
@@ -279,8 +280,8 @@ namespace Godless.Sim.Settlements
                         continue;
                     }
                     Go(s, world, a, gx, gz);
-                    a.Doing = (a.Arrived ? doing : "going to work") + After(a);
-                    a.Pose = a.Arrived ? "work" : "walk";
+                    a.Doing = (a.Arrived || workPose == "carry" ? doing : "going to work") + After(a);
+                    a.Pose = a.Arrived ? workPose : (workPose == "carry" ? "carry" : "walk");
                     continue;
                 }
 
@@ -347,14 +348,23 @@ namespace Godless.Sim.Settlements
         }
 
         /// <summary>Where a worker's task puts them, and what to call it.</summary>
-        static bool Working(Settlement s, int i, Agent a, DepositMap deposits, long day,
-                            out int gx, out int gz, out string doing)
+        static bool Working(Settlement s, int i, Agent a, DepositMap deposits, long day, long tick,
+                            out int gx, out int gz, out string doing, out string pose)
         {
-            gx = s.Hearth.X; gz = s.Hearth.Z; doing = "";
+            gx = s.Hearth.X; gz = s.Hearth.Z; doing = ""; pose = "work";
             int task = s.Tasks.CurrentTask(i);
             if (task < 0) return false;
 
             TaskKind kind = s.Tasks.KindOf(task);
+
+            // S2X: a tick at the heap, a tick at where it goes, turn about —
+            // the loads in between are too many to draw one by one.
+            if (kind.Verb == "haul")
+            {
+                if ((tick + i) % 2 == 0) { gx = a.HaulFromX; gz = a.HaulFromZ; doing = "loading " + a.HaulWhat; }
+                else { gx = a.HaulToX; gz = a.HaulToZ; doing = "carrying " + a.HaulWhat + " to " + a.HaulTo; pose = "carry"; }
+                return true;
+            }
             if (kind.Verb == "build")
             {
                 doing = "building";

@@ -1,0 +1,30 @@
+{
+  // S2X. A small stack of what was cut or broken, in its own material.
+  "type": "model",
+  "id": "heap-stack-small",
+  "tell": "Heaps wait where the work was done: sacks where a field was cut, stacks of whatever was felled or broken by the stump or the rock, until someone carries them in.",
+  "size": {
+    "x": 4,
+    "y": 2,
+    "z": 4
+  },
+  "paint": {
+    "m": {
+      "slot": "material"
+    }
+  },
+  "layers": [
+    [
+      "mmm.",
+      "mmm.",
+      "mmm.",
+      "mmm."
+    ],
+    [
+      ".mm.",
+      ".mm.",
+      ".mm.",
+      ".mm."
+    ]
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  // S2X. A big heap of sacks: a field's harvest nobody has fetched yet.
+  "type": "model",
+  "id": "heap-sacks-large",
+  "tell": "Heaps wait where the work was done: sacks where a field was cut, stacks of whatever was felled or broken by the stump or the rock, until someone carries them in.",
+  "size": {
+    "x": 4,
+    "y": 4,
+    "z": 4
+  },
+  "paint": {
+    "s": {
+      "hue": 36,
+      "saturation": 35,
+      "value": 62
+    },
+    "t": {
+      "hue": 30,
+      "saturation": 40,
+      "value": 40
+    }
+  },
+  "layers": [
+    [
+      "ssss",
+      "ssss",
+      "ssss",
+      "ssss"
+    ],
+    [
+      "ssss",
+      "ssss",
+      "ssss",
+      "ssss"
+    ],
+    [
+      "s.s.",
+      ".s.s",
+      "s.s.",
+      ".s.s"
+    ],
+    [
+      "t..t",
+      "....",
+      "..t.",
+      ".t.."
+    ]
+  ]
+}

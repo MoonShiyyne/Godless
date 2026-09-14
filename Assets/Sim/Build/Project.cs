@@ -128,6 +128,9 @@ namespace Godless.Sim.Build
         /// </summary>
         public const int GivesUpAfterDays = 240;
 
+        /// <summary>Days between attempts to plan an intent that could not be planned.</summary>
+        public const int RetryAfterDays = 5;
+
         readonly GrammarTable _grammars;
         readonly SitingTable _siting;
         readonly TileSet _tiles;
@@ -159,9 +162,13 @@ namespace Godless.Sim.Build
                 {
                     if (intent.Status != IntentStatus.Open) continue;
                     if (intent.Kind.Purpose == IntentPurpose.Farm) continue;   // fields are the farm system's (S2I)
+                    if (world.Clock.Tick < intent.RetryAt) continue;
                     Project project = Plan(s, intent, world, rng);
                     if (project == null)
                     {
+                        // The whole search again tomorrow finds the same nothing;
+                        // a few days on, families and ground may have changed.
+                        intent.RetryAt = world.Clock.Tick + RetryAfterDays * world.Clock.TicksPerDay;
                         long waited = world.Clock.Tick - intent.RaisedTick;
                         if (waited > GivesUpAfterDays * world.Clock.TicksPerDay)
                             s.Intents.Abandon(intent, world.Clock.Tick, world.Annals, s.Founded);
@@ -227,7 +234,12 @@ namespace Godless.Sim.Build
                 : grammar.Build(s.Genome, _palette, ParcelGrid.Size * rule.SearchRadius,
                                 ParcelGrid.Size * rule.SearchRadius, intent.BudgetVoxels);
 
-            DwellingProgram.Candidate chosen = DwellingProgram.Search(s, intent, plan, rule, _grid, _fields, program);
+            // A family a bed or two short does not send one or two of its own off
+            // to a hut of their own: it waits for room it can add to its home —
+            // so there is no house apart to search for.
+            bool waitsForRoom = program != null && program.Crowded != null && program.Beds < 4;
+            DwellingProgram.Candidate chosen = waitsForRoom ? null
+                : DwellingProgram.Search(s, intent, plan, rule, _grid, _fields, program);
 
             // S2P: a crowded family would sooner add to the home it has — a wing
             // beside it, a storey on it — than move part of itself out. Which it
@@ -237,9 +249,7 @@ namespace Godless.Sim.Build
             double apart = chosen == null ? double.NegativeInfinity : chosen.Score + rule.Weight("apart", s.Genome);
             if (addition != null && addition.Score >= apart) return Add(s, intent, addition, world, rng);
 
-            // A family a bed or two short does not send one or two of its own off
-            // to a hut of their own: it waits for room it can add to its home.
-            if (program != null && program.Crowded != null && program.Beds < 4) return null;
+            if (waitsForRoom) return null;
             if (chosen == null) return null;
             plan = chosen.Plan;
             Site site = chosen.Site;

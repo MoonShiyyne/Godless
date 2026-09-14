@@ -1,0 +1,42 @@
+{
+  // S2X. A tall stack: timber or stone piling up faster than anyone carries it.
+  "type": "model",
+  "id": "heap-stack-large",
+  "tell": "Heaps wait where the work was done: sacks where a field was cut, stacks of whatever was felled or broken by the stump or the rock, until someone carries them in.",
+  "size": {
+    "x": 4,
+    "y": 4,
+    "z": 4
+  },
+  "paint": {
+    "m": {
+      "slot": "material"
+    }
+  },
+  "layers": [
+    [
+      "mmmm",
+      "mmmm",
+      "mmmm",
+      "mmmm"
+    ],
+    [
+      "mmmm",
+      "mmmm",
+      "mmmm",
+      "mmmm"
+    ],
+    [
+      ".mmm",
+      ".mmm",
+      ".mmm",
+      ".mmm"
+    ],
+    [
+      "..mm",
+      "..mm",
+      "..mm",
+      "..mm"
+    ]
+  ]
+}

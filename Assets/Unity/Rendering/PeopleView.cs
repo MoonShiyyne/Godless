@@ -41,8 +41,8 @@ namespace Godless.Unity
         const int Batch = 1023;
         const float HeightVoxels = 3.5f;
 
-        enum Pose { Stand, WalkA, WalkB, Work, Sit, Kneel, Lie }
-        static readonly string[] PoseModels = { "person-stand", "person-walk-a", "person-walk-b", "person-work", "person-sit", "person-kneel", "person-lie" };
+        enum Pose { Stand, WalkA, WalkB, Work, Sit, Kneel, Lie, Carry }
+        static readonly string[] PoseModels = { "person-stand", "person-walk-a", "person-walk-b", "person-work", "person-sit", "person-kneel", "person-lie", "person-carry" };
 
         static readonly Color32[] Skins =
         {
@@ -171,6 +171,8 @@ namespace Godless.Unity
         /// <summary>The figure for what someone is doing; between ticks, a walk in two steps.</summary>
         static Pose PoseOf(Agent a, bool moving, int index)
         {
+            // Someone carrying keeps their arms full on the way (S2X).
+            if (a.Pose == "carry") return Pose.Carry;
             if (moving) return ((int)(Time.time * 4f) + index) % 2 == 0 ? Pose.WalkA : Pose.WalkB;
             if (a.Doing != null && a.Doing.StartsWith("asleep")) return Pose.Lie;
             switch (a.Pose)
@@ -321,6 +323,9 @@ namespace Godless.Unity
             new Color32(214, 170, 60, 255),    // 11 eating
             new Color32(170, 90, 170, 255),    // 12 talking
             new Color32(120, 160, 150, 255),   // 13 resting
+            new Color32(196, 160, 110, 255),   // 14 hauling
+            new Color32(150, 190, 60, 255),    // 15 sowing and tending fields
+            new Color32(230, 190, 40, 255),    // 16 harvesting
         };
 
         static int ColourIndex(string doing)
@@ -341,6 +346,9 @@ namespace Godless.Unity
             if (doing.StartsWith("eating")) return 11;
             if (doing.StartsWith("talking")) return 12;
             if (doing.StartsWith("resting")) return 13;
+            if (doing.StartsWith("carrying") || doing.StartsWith("loading")) return 14;
+            if (doing.StartsWith("sowing") || doing.StartsWith("tending")) return 15;
+            if (doing.StartsWith("harvesting")) return 16;
             return 0;
         }
 

@@ -1,0 +1,17 @@
+{
+  "type": "task",
+  "id": "haul",
+  "tell": "Nobody is told to fetch the timber in, yet the stacks by the stumps go down, and it is always the same few carrying.",
+
+  "verb": "haul",
+
+  // Heaps are few loads next to a house's thousands of voxels, so the call
+  // grows fast per load: a heap left lying is noticed within a day.
+  "threshold": { "min": 0.03, "max": 0.8 },
+  "learn": 0.03,
+  "forget": 0.004,
+  "quitChance": 0.08,
+
+  "stimulusGrowth": 0.01,
+  "workDone": 0.03
+}

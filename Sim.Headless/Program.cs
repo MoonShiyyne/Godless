@@ -883,7 +883,8 @@ namespace Godless.Sim.Headless
             construction.Island = island;
             Profiled(world, cli, new DepositSystem(grid));
             Profiled(world, cli, new SupportSystem(solid, materials, DetailModelTable.FromContent(db), grid));
-            Profiled(world, cli, new TaskSystem(construction, grid));
+            Profiled(world, cli, new TaskSystem(construction, grid, HaulRules.FromContent(db)));
+            Profiled(world, cli, new HaulingSystem(HaulRules.FromContent(db), FoodRules.FromContent(db), DetailModelTable.FromContent(db), grid));
             Profiled(world, cli, new MovementSystem(grid, rules));
             world.BeginHistory();
 

@@ -102,6 +102,13 @@ namespace Godless.Sim.Settlements
                 into.Record("needs.out-of-range", outOfRange);
                 into.Record("needs.worst-pinned-percent", worstPinned);
 
+                // S2X: a heap holds something, and one drawn is drawn by a detail that exists.
+                long badHeaps = 0;
+                foreach (Settlement s in world.Settlements)
+                    foreach (Pile p in s.Piles)
+                        if (!(p.Amount >= 0.0) || (p.Detail >= 0 && world.Details.Get(p.Detail) == null)) badHeaps++;
+                into.Record("heaps.broken", badHeaps);
+
                 into.Record("rubble.floating", floatingRubble);
                 into.Record("beds.floating", floatingBeds);
 
@@ -148,6 +155,10 @@ namespace Godless.Sim.Settlements
                     run => run.Metric("needs.out-of-range") == 0.0),
                 Invariant.PerRun("S2V", "no need is at its worst for most of a settlement",
                     run => run.Metric("needs.worst-pinned-percent") <= 50.0),
+
+                // S2X. What waits to be carried is a real heap, drawn where it lies.
+                Invariant.PerRun("S2X", "every heap holds something and is drawn by a detail that exists",
+                    run => run.Metric("heaps.broken") == 0.0),
 
                 // S2T. A fallen building's rubble lies on something; S2S, a bed stands on a floor.
                 Invariant.PerRun("S2T", "every heap of rubble rests on something",

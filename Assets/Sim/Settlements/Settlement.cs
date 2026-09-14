@@ -63,6 +63,10 @@ namespace Godless.Sim.Settlements
         /// <summary>Meals in the store (S1E).</summary>
         public double Food { get; set; }
 
+        // Heaps waiting to be carried in (S2X), in the order they were started.
+        internal readonly List<Pile> PileList = new List<Pile>();
+        public IReadOnlyList<Pile> Piles { get { return PileList; } }
+
         /// <summary>Meals lost to rot so far (S2H).</summary>
         public double FoodSpoiled { get; internal set; }
 

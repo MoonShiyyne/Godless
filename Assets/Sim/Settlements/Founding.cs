@@ -127,7 +127,9 @@ namespace Godless.Sim.Settlements
                      Details = world.Details,
                      Models = DetailModelTable.FromContent(content),
                      GroundTable = TerrainBrush.SolidTable(content, world.VoxelTypes),
-                 }, grid))
+                 }, grid, HaulRules.FromContent(content)))
+                 .Add(new HaulingSystem(HaulRules.FromContent(content), FoodRules.FromContent(content),
+                                        DetailModelTable.FromContent(content), grid))
                  .Add(new MovementSystem(grid, rules));
         }
 

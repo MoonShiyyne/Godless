@@ -1,0 +1,142 @@
+{
+  // S2X. A person carrying a load in both arms, facing +z.
+  "type": "model",
+  "id": "person-carry",
+  "tell": "People are small figures of their own, 1.75 m tall in 12.5 cm cells, dressed in the colour of what they are doing and posed for it: walking, bent to work, sitting to eat, kneeling at the water, lying in their own bed, and carrying loads in their arms.",
+  "size": {
+    "x": 7,
+    "y": 14,
+    "z": 5
+  },
+  "paint": {
+    "c": {
+      "slot": "clothes"
+    },
+    "s": {
+      "slot": "skin"
+    },
+    "h": {
+      "slot": "hair"
+    },
+    "t": {
+      "hue": 30,
+      "saturation": 22,
+      "value": 32
+    },
+    "f": {
+      "hue": 22,
+      "saturation": 30,
+      "value": 17
+    },
+    "e": {
+      "hue": 20,
+      "saturation": 30,
+      "value": 10
+    },
+    "l": {
+      "hue": 36,
+      "saturation": 35,
+      "value": 62
+    }
+  },
+  "layers": [
+    [
+      ".......",
+      ".ff.ff.",
+      ".ff.ff.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".tt.tt.",
+      ".tt.tt.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".tt.tt.",
+      ".tt.tt.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".tt.tt.",
+      ".tt.tt.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".tt.tt.",
+      ".tt.tt.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".tt.tt.",
+      ".tt.tt.",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      ".ccccc.",
+      ".ccccc.",
+      ".lllll.",
+      ".lllll."
+    ],
+    [
+      ".......",
+      ".ccccc.",
+      ".ccccc.",
+      "clllllc",
+      "sllllls"
+    ],
+    [
+      ".......",
+      "ccccccc",
+      "ccccccc",
+      ".lllll.",
+      ".lllll."
+    ],
+    [
+      ".......",
+      "ccccccc",
+      "ccccccc",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      "ccccccc",
+      "ccccccc",
+      ".......",
+      "......."
+    ],
+    [
+      ".......",
+      "..hhh..",
+      "..sss..",
+      "..sss..",
+      "......."
+    ],
+    [
+      ".......",
+      "..hhh..",
+      "..sss..",
+      "..ese..",
+      "......."
+    ],
+    [
+      ".......",
+      "..hhh..",
+      "..hhh..",
+      "..hhh..",
+      "......."
+    ]
+  ]
+}

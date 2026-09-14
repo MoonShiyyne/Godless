@@ -145,7 +145,7 @@ namespace Godless.Sim.Build
             for (int m = 0; m < project.Built.Cost.Length; m++)
             {
                 long still = owed[m];
-                if (still <= 0 || settlement.Stock.Of(m) >= still) continue;
+                if (still <= 0 || settlement.Stock.Of(m) + (long)Hauling.Piled(settlement, m) >= still) continue;
                 if (c.YieldPerLabourTick(m) <= 0.0) return false;
             }
             return true;
