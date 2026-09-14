@@ -247,11 +247,16 @@ namespace Godless.Sim.Build
             // somebody's house. Flooded once, rather than pathed per candidate.
             if (reachable == null) reachable = Reachable(settlement, grid);
 
+            // S2P: a culture that would sooner build out than up leaves room to:
+            // two parcels of daylight round a new house instead of one, which is
+            // the yard its wings will go into. A culture that builds up packs tight.
+            int gap = rule.Weight("wing", genome) > rule.Weight("storey", genome) + 0.1 ? 2 : 1;
+
             var best = new List<Site>();
             for (int pz = hz - rule.SearchRadius; pz <= hz + rule.SearchRadius; pz++)
                 for (int px = hx - rule.SearchRadius; px <= hx + rule.SearchRadius; px++)
                 {
-                    if (!Fits(settlement, grid, px, pz, wide, deep, reachable)) continue;
+                    if (!Fits(settlement, grid, px, pz, wide, deep, reachable, gap)) continue;
 
                     scope.X = px; scope.Z = pz;
                     if (rule.Allow.Eval(scope) <= 0.0) continue;
@@ -319,7 +324,7 @@ namespace Godless.Sim.Build
         /// between it and its neighbours, and a way to the fire that does not
         /// go through somebody else's house.
         /// </summary>
-        static bool Fits(Settlement settlement, ParcelGrid grid, int px, int pz, int wide, int deep, bool[] reachable)
+        static bool Fits(Settlement settlement, ParcelGrid grid, int px, int pz, int wide, int deep, bool[] reachable, int gap = 1)
         {
             for (int dz = 0; dz < deep; dz++)
                 for (int dx = 0; dx < wide; dx++)
@@ -332,8 +337,8 @@ namespace Godless.Sim.Build
 
             // The footprint and the ring round it: unclaimed, so houses do not
             // grow into each other and the gaps between them stay walkable.
-            for (int dz = -1; dz <= deep; dz++)
-                for (int dx = -1; dx <= wide; dx++)
+            for (int dz = -gap; dz < deep + gap; dz++)
+                for (int dx = -gap; dx < wide + gap; dx++)
                     if (settlement.IsClaimed(px + dx, pz + dz)) return false;
 
             for (int dz = -1; dz <= deep; dz++)

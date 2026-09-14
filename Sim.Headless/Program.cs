@@ -977,6 +977,29 @@ namespace Godless.Sim.Headless
                     + (project.Ground == null ? "" : ", " + project.Ground.Strategy.ToString().ToLowerInvariant()
                         + (project.Ground.Moved > 0 ? " (" + project.Ground.Moved.ToString(c) + " voxels of earth moved)" : "")));
                 if (project.Reasons.Count > 0) Console.WriteLine("      why: " + string.Join("; ", project.Reasons));
+                if (project.Host != null && cli.Text("inspect", "false") != "false")
+                {
+                    // Where the part's body and its host's body stand, and how much of the part is really there.
+                    int present = 0, expected = 0;
+                    for (int y = 0; y < project.Plan.Height; y++)
+                        for (int z = 0; z < project.Plan.Depth; z++)
+                            for (int x = 0; x < project.Plan.Width; x++)
+                            {
+                                ushort want = project.Built.At(x, y, z);
+                                if (want == 0) continue;
+                                expected++;
+                                if (world.Voxels.Get(Construction.World(project, x, y, z)) == want) present++;
+                            }
+                    Int3 a0 = Construction.World(project, Grammar.Margin, 0, Grammar.Margin);
+                    Int3 a1 = Construction.World(project, project.Plan.Width - 1 - Grammar.Margin, project.Plan.Height - 1, project.Plan.Depth - 1 - Grammar.Margin);
+                    Project h = project.Host;
+                    Int3 h0 = Construction.World(h, Grammar.Margin, 0, Grammar.Margin);
+                    Int3 h1 = Construction.World(h, h.Plan.Width - 1 - Grammar.Margin, h.Plan.Height - 1, h.Plan.Depth - 1 - Grammar.Margin);
+                    Console.WriteLine("      inspect: " + project.PartKind + " body x " + a0.X + ".." + a1.X + " z " + a0.Z + ".." + a1.Z
+                        + " y " + a0.Y + ".." + a1.Y + "; host body x " + h0.X + ".." + h1.X + " z " + h0.Z + ".." + h1.Z
+                        + " y " + h0.Y + ".." + h1.Y + "; " + present + " of " + expected + " voxels standing"
+                        + ", ground " + (project.Ground == null ? "none" : project.Ground.Strategy.ToString()));
+                }
                 foreach (string note in project.Built.Compromises) Console.WriteLine("      " + note);
             }
 

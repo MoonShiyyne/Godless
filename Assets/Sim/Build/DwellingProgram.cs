@@ -300,7 +300,10 @@ namespace Godless.Sim.Build
                     {
                         Kind = "wing", Host = host, Plan = plan, Site = site, DoorSide = side,
                         OffsetX = x0 - px * ParcelGrid.Size, OffsetZ = z0 - pz * ParcelGrid.Size,
-                        Score = score + rule.Weight("wing", genome),
+                        // Judged like the house it is part of: the ground beside a
+                        // home is the home's ground. Only a wing on ground far worse
+                        // than the house's own loses for it.
+                        Score = host.Site.Score + rule.Weight("wing", genome) - 0.5 * System.Math.Max(0.0, host.Site.Score - score - 1.0),
                     };
                     a.Ground = NegotiationTable.AtFloor(grid, x0, z0, wW, wD, host.Site.Ground,
                                                        host.Ground != null && host.Ground.Strategy == GroundStrategy.Stilt);

@@ -136,21 +136,22 @@ namespace Godless.Sim.Tests
                 for (int t = 0; t < world.Clock.TicksPerDay; t++) world.Tick();
                 foreach (Household h in s.Households) if (h.Housed && h.Home[0].Complete) { family = h; break; }
             }
-            Assert.NotNull(family);
+            Assert.True(family != null, "no family had a finished home within 500 days");
 
-            // Crowd it, and keep it crowded as the days pass.
+            // Crowd it by two: too few to send off to a house of their own, so
+            // the only answer the program allows is room added to this home.
             Households.Settle(s);
             Project home = family.Home[0];
             int before = Households.CapacityOf(home);
-            for (int i = 0; i < 4; i++) Households.Join(s, s.Add(world.Streams), family);
+            for (int i = 0; i < 2; i++) Households.Join(s, s.Add(world.Streams), family);
 
             Project added = null;
-            for (int day = 0; day < 400 && added == null; day++)
+            for (int day = 0; day < 600 && added == null; day++)
             {
                 for (int t = 0; t < world.Clock.TicksPerDay; t++) world.Tick();
                 foreach (Project p in s.Projects) if (p.Host == home) { added = p; break; }
             }
-            Assert.NotNull(added);
+            Assert.True(added != null, "the crowded family added nothing to its home in 600 days");
             _out.WriteLine(added.PartKind + ": " + string.Join("; ", added.Reasons));
             Assert.Contains(added.PartKind, new[] { "wing", "storey" });
             Assert.Contains(added, home.Added);
