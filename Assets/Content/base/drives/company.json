@@ -1,9 +1,15 @@
 {
   "type": "need",
   "id": "company",
-  "tell": "About once a week people go and find each other to talk, and the ones who do it gather in little knots by the fire.",
+  "tell": "People working side by side keep each other company; the ones who work alone go and find someone to talk to about once a week, wherever others are.",
   "start": 0.1,
   "drift": 0.021,
+
+  // S2V. Company is had out and about: felling beside someone, sowing the next
+  // plot over, queuing at the store. Each person within four voxels eases it a
+  // little each tick, up to three of them. Only those who work alone, or sit
+  // at home, need to go and find someone to talk to.
+  "nearOthers": { "relief": 0.012, "within": 4, "most": 3 },
   "threshold": 0.8,
   "urgencyPower": 2,
   "rises": {}

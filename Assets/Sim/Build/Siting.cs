@@ -256,11 +256,39 @@ namespace Godless.Sim.Build
             // the yard its wings will go into. A culture that builds up packs tight.
             int gap = rule.Weight("wing", genome) > rule.Weight("storey", genome) + 0.1 ? 2 : 1;
 
+            // Near first; a settlement that has filled the ground round its fire
+            // looks further out rather than giving up on the house (S2V). The
+            // score still prefers the nearer of two equal sites.
             var best = new List<Site>();
-            for (int pz = hz - rule.SearchRadius; pz <= hz + rule.SearchRadius; pz++)
-                for (int px = hx - rule.SearchRadius; px <= hx + rule.SearchRadius; px++)
+            int[] reaches = { rule.SearchRadius, rule.SearchRadius * 2, rule.SearchRadius * 3 };
+            foreach (int radius in reaches)
+            {
+                if (best.Count > 0) break;
+                int inner = radius == rule.SearchRadius ? -1 : radius - rule.SearchRadius;
+                ScanRing(settlement, rule, grid, reachable, scope, best, keep, hx, hz, radius, inner, wide, deep, gap, false);
+            }
+
+            // Nowhere at all but the fields (S2I): a house goes up on a plot or
+            // two, as a town grows over the land that fed it.
+            if (best.Count == 0)
+                ScanRing(settlement, rule, grid, reachable, scope, best, keep, hx, hz, rule.SearchRadius * 3, -1, wide, deep, gap, true);
+
+            // And a village out of room packs tighter: the yard a wing would
+            // have gone into becomes somebody's house.
+            if (best.Count == 0 && gap > 1)
+                ScanRing(settlement, rule, grid, reachable, scope, best, keep, hx, hz, rule.SearchRadius * 3, -1, wide, deep, 1, true);
+            return best;
+        }
+
+        static void ScanRing(Settlement settlement, SitingRule rule, ParcelGrid grid, bool[] reachable, ParcelScope scope,
+                             List<Site> best, int keep, int hx, int hz, int radius, int inner, int wide, int deep, int gap,
+                             bool overFields)
+        {
+            for (int pz = hz - radius; pz <= hz + radius; pz++)
+                for (int px = hx - radius; px <= hx + radius; px++)
                 {
-                    if (!Fits(settlement, grid, px, pz, wide, deep, reachable, gap)) continue;
+                    if (inner >= 0 && System.Math.Abs(px - hx) <= inner && System.Math.Abs(pz - hz) <= inner) continue;   // looked at already
+                    if (!Fits(settlement, grid, px, pz, wide, deep, reachable, gap, overFields)) continue;
 
                     scope.X = px; scope.Z = pz;
                     if (rule.Allow.Eval(scope) <= 0.0) continue;
@@ -284,7 +312,6 @@ namespace Godless.Sim.Build
                     best.Insert(at, site);
                     if (best.Count > keep) best.RemoveAt(best.Count - 1);
                 }
-            return best;
         }
 
         /// <summary>Settles a site's floor level, records the choice and claims the ground.</summary>
@@ -306,7 +333,13 @@ namespace Godless.Sim.Build
                                        (long)(site.Score * 1000.0), wide * deep, new[] { intent.Kind.Id });
 
             for (int dz = 0; dz < deep; dz++)
-                for (int dx = 0; dx < wide; dx++) settlement.ClaimParcel(site.ParcelX + dx, site.ParcelZ + dz, site.Record);
+                for (int dx = 0; dx < wide; dx++)
+                {
+                    // A plot built over is given up by its farm, on record (S2I).
+                    if (settlement.IsField(site.ParcelX + dx, site.ParcelZ + dz))
+                        Farms.Surrender(settlement, site.ParcelX + dx, site.ParcelZ + dz, site.Record);
+                    settlement.ClaimParcel(site.ParcelX + dx, site.ParcelZ + dz, site.Record);
+                }
         }
 
         /// <summary>One parcel's siting score for a rule, as the scorer computes it (S2P: wings are scored the same way).</summary>
@@ -325,6 +358,37 @@ namespace Godless.Sim.Build
                                      HearthX = settlement.HearthParcelX, HearthZ = settlement.HearthParcelZ };
         }
 
+        /// <summary>Tooling: over a square round a parcel, how many footprint positions each rule turns away.</summary>
+        public static string WhyNoSite(Settlement settlement, ParcelGrid grid, int hx, int hz, int radius, int wide, int deep, int gap, bool[] reachable)
+        {
+            int ground = 0, footprintClaimed = 0, ringClaimed = 0, noWayIn = 0, fits = 0;
+            for (int pz = hz - radius; pz <= hz + radius; pz++)
+                for (int px = hx - radius; px <= hx + radius; px++)
+                {
+                    bool bad = false;
+                    for (int dz = 0; dz < deep && !bad; dz++)
+                        for (int dx = 0; dx < wide && !bad; dx++)
+                        {
+                            int x = px + dx, z = pz + dz;
+                            if (!ParcelGrid.InBounds(x, z) || !grid.IsLand(x, z) || grid.WetColumns(x, z) > 4) bad = true;
+                        }
+                    if (bad) { ground++; continue; }
+                    bool inClaim = false, ringClaim = false;
+                    for (int dz = -gap; dz < deep + gap; dz++)
+                        for (int dx = -gap; dx < wide + gap; dx++)
+                        {
+                            bool inside = dx >= 0 && dz >= 0 && dx < wide && dz < deep;
+                            if (!settlement.IsClaimed(px + dx, pz + dz) || settlement.IsField(px + dx, pz + dz)) continue;
+                            if (inside) inClaim = true; else ringClaim = true;
+                        }
+                    if (inClaim) { footprintClaimed++; continue; }
+                    if (ringClaim) { ringClaimed++; continue; }
+                    if (!Fits(settlement, grid, px, pz, wide, deep, reachable, gap, true)) { noWayIn++; continue; }
+                    fits++;
+                }
+            return "ground " + ground + ", footprint claimed " + footprintClaimed + ", too close to a claim " + ringClaimed + ", no way in " + noWayIn + ", fits " + fits;
+        }
+
         /// <summary>Walkable-from-the-fire parcels, once per planning pass (S1B).</summary>
         public static bool[] ReachableFromFire(Settlement settlement, ParcelGrid grid) { return Reachable(settlement, grid); }
 
@@ -335,7 +399,8 @@ namespace Godless.Sim.Build
         /// between it and its neighbours, and a way to the fire that does not
         /// go through somebody else's house.
         /// </summary>
-        static bool Fits(Settlement settlement, ParcelGrid grid, int px, int pz, int wide, int deep, bool[] reachable, int gap = 1)
+        static bool Fits(Settlement settlement, ParcelGrid grid, int px, int pz, int wide, int deep, bool[] reachable, int gap = 1,
+                         bool overFields = false)
         {
             for (int dz = 0; dz < deep; dz++)
                 for (int dx = 0; dx < wide; dx++)
@@ -350,7 +415,13 @@ namespace Godless.Sim.Build
             // grow into each other and the gaps between them stay walkable.
             for (int dz = -gap; dz < deep + gap; dz++)
                 for (int dx = -gap; dx < wide + gap; dx++)
-                    if (settlement.IsClaimed(px + dx, pz + dz)) return false;
+                {
+                    bool inside = dx >= 0 && dz >= 0 && dx < wide && dz < deep;
+                    // A field may come right up to a house (S2I): that is a farmhouse.
+                    // And where nothing else is left, a house may stand on one.
+                    if (settlement.IsClaimed(px + dx, pz + dz)
+                        && (!settlement.IsField(px + dx, pz + dz) || (inside && !overFields))) return false;
+                }
 
             for (int dz = -1; dz <= deep; dz++)
                 for (int dx = -1; dx <= wide; dx++)
@@ -386,7 +457,9 @@ namespace Godless.Sim.Build
                         int nx = ax + dx, nz = az + dz;
                         if (!ParcelGrid.InBounds(nx, nz)) continue;
                         int next = nz * ParcelGrid.Width + nx;
-                        if (seen[next] || !grid.IsLand(nx, nz) || settlement.IsClaimed(nx, nz)) continue;
+                        // A field is walked across (S2I); a house, a store and the fire are not.
+                        if (seen[next] || !grid.IsLand(nx, nz)) continue;
+                        if (settlement.IsClaimed(nx, nz) && !settlement.IsField(nx, nz)) continue;
 
                         double climb = grid.Height[nx, nz] - grid.Height[ax, az];
                         if (climb < 0.0) climb = -climb;

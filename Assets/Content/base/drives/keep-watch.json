@@ -4,6 +4,6 @@
   "requires": ["day", "hearth"],
   "at": "fire",
   "relieves": { "safety": 0.2 },
-  "doing": "keeping watch by the fire",
+  "doing": "keeping watch",
   "pose": "stand"
 }

@@ -7,6 +7,6 @@
   "takes": 0.5,
   "at": "fire",
   "relieves": { "warmth": 0.4 },
-  "doing": "warming up at the fire",
+  "doing": "warming up",
   "pose": "sit"
 }

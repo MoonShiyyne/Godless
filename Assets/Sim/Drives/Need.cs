@@ -29,6 +29,15 @@ namespace Godless.Sim.Drives
         /// <summary>Added every tick regardless. Negative means it eases on its own.</summary>
         public double Drift { get; internal set; }
 
+        /// <summary>
+        /// Relief a tick from being near others while out and about (S2V): per
+        /// person within <see cref="NearWithin"/> voxels, counting at most
+        /// <see cref="NearMost"/>. Zero for a need company does nothing for.
+        /// </summary>
+        public double NearRelief { get; internal set; }
+        public int NearWithin { get; internal set; } = 4;
+        public int NearMost { get; internal set; } = 3;
+
         /// <summary>Per condition bit: added each tick the condition holds. Signed.</summary>
         internal double[] Rise;
 
@@ -126,6 +135,9 @@ namespace Godless.Sim.Drives
                     UrgencyPower = power,
                     Drift = doc["drift"].AsDouble(0.0),
                     Rise = rise,
+                    NearRelief = doc["nearOthers"]["relief"].AsDouble(0.0),
+                    NearWithin = doc["nearOthers"]["within"].AsInt32(4),
+                    NearMost = doc["nearOthers"]["most"].AsInt32(3),
                 });
             }
 

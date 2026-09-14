@@ -563,7 +563,10 @@ namespace Godless.Sim.Collective
                 Hauling = _hauling,
             };
             foreach (Settlement s in world.Settlements)
+            {
+                if (_builder != null && world.Clock.IsFirstTickOfDay) _builder.Review(s, world.Clock.Tick, rng);
                 if (s.Tasks != null) s.Tasks.Step(s, rng, work);
+            }
         }
     }
 }

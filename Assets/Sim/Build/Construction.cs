@@ -183,6 +183,21 @@ namespace Godless.Sim.Build
             project.Built = fresh;
         }
 
+        /// <summary>
+        /// Once a day, every unfinished project whose materials can no longer be
+        /// had is remade from what can (S2F). Without this only a builder's tick
+        /// remade one, and a project not ready to start never got a builder:
+        /// a house planned in slate after the slate ran out waited for ever.
+        /// </summary>
+        public void Review(Settlement settlement, long tick, RngStream rng)
+        {
+            foreach (Project p in settlement.Projects)
+            {
+                if (p.Complete || p.Destroyed || p.Built == null) continue;
+                if (p.RethoughtOn != tick / _ticksPerDay && !Obtainable(settlement, p)) Rethink(settlement, p, rng, null, tick);
+            }
+        }
+
         /// <summary>Whether there is enough in the yard to be worth starting, or it is started already.</summary>
         public static bool Ready(Settlement settlement, Project project)
         {

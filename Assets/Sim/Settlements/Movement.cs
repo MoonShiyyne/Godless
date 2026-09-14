@@ -71,7 +71,7 @@ namespace Godless.Sim.Settlements
 
             if (a.Path == null || a.PathGoal != goalParcel || a.PathStep >= a.Path.Count || a.Path[a.PathStep] != here)
             {
-                a.Path = ParcelPath.Find(grid, a.ParcelX, a.ParcelZ, goalX / ParcelGrid.Size, goalZ / ParcelGrid.Size);
+                a.Path = CachedPath(grid, here, goalParcel);
                 a.PathGoal = goalParcel;
                 a.PathStep = 0;
             }
@@ -97,6 +97,28 @@ namespace Godless.Sim.Settlements
             int cx, cz;
             if (DryIn(island, next % ParcelGrid.Width, next / ParcelGrid.Width, out cx, out cz)) { a.X = cx; a.Z = cz; }
             return false;
+        }
+
+        // A village walks the same few routes all day — fire to field, field to
+        // store — so a found path is kept on the grid. A house going up changes
+        // a parcel or two, not the way across the island, so paths outlive that
+        // many refreshes before they are all found again. The lists are only read.
+        const int PathsOutliveRefreshes = 200;
+        const int MostPathsKept = 50000;
+
+        static List<int> CachedPath(ParcelGrid grid, int from, int to)
+        {
+            if (grid.Version - grid.PathsVersion >= PathsOutliveRefreshes || grid.Paths.Count >= MostPathsKept)
+            {
+                grid.Paths.Clear();
+                grid.PathsVersion = grid.Version;
+            }
+            long key = (long)from * (ParcelGrid.Width * ParcelGrid.Depth) + to;
+            List<int> path;
+            if (grid.Paths.TryGetValue(key, out path)) return path;
+            path = ParcelPath.Find(grid, from % ParcelGrid.Width, from / ParcelGrid.Width, to % ParcelGrid.Width, to / ParcelGrid.Width);
+            grid.Paths[key] = path;
+            return path;
         }
 
         /// <summary>Whether a straight walk between two parcels stays on land and never climbs a wall.</summary>
@@ -194,6 +216,9 @@ namespace Godless.Sim.Settlements
 
         readonly NeedTable _needs;
 
+        /// <summary>Voxels from the hearth that count as being at the fire, for the record of where the day goes.</summary>
+        public const int NearFire = 12;
+
         public MovementSystem(ParcelGrid grid, DriveRules rules)
         {
             _grid = grid;
@@ -221,6 +246,11 @@ namespace Godless.Sim.Settlements
             for (int i = 0; i < people.Count; i++)
             {
                 Agent a = people[i];
+                if (!night)
+                {
+                    s.DaylightTicks++;
+                    if (System.Math.Abs(a.X - s.Hearth.X) <= NearFire && System.Math.Abs(a.Z - s.Hearth.Z) <= NearFire) s.DaylightAtFire++;
+                }
                 Activity act = a.Activity >= 0 ? _activities[a.Activity] : null;
                 a.Talking = false;
                 a.ForageDay = world.Clock.TotalDays;
@@ -269,7 +299,7 @@ namespace Godless.Sim.Settlements
 
                 string workPose;
                 if (act != null && act.Productive && s.Tasks != null
-                    && Working(s, i, a, deposits, world.Clock.TotalDays, world.Clock.Tick, out gx, out gz, out doing, out workPose))
+                    && Working(s, i, a, deposits, world.Island, world.Clock.TotalDays, world.Clock.Tick, out gx, out gz, out doing, out workPose))
                 {
                     // A builder has already walked this tick (S1A does its own).
                     if (s.Tasks.CurrentTask(i) >= 0 && s.Tasks.KindOf(s.Tasks.CurrentTask(i)).Verb == "build")
@@ -282,14 +312,27 @@ namespace Godless.Sim.Settlements
                     Go(s, world, a, gx, gz);
                     a.Doing = (a.Arrived || workPose == "carry" ? doing : "going to work") + After(a);
                     a.Pose = a.Arrived ? workPose : (workPose == "carry" ? "carry" : "walk");
+                    if (a.Arrived) { a.LastWorkX = a.X; a.LastWorkZ = a.Z; }
                     continue;
                 }
 
                 if (act == null || act.Productive)
                 {
-                    Movement.AtFire(s, i, out gx, out gz);
+                    // Nothing wanted of them this tick (S2V): at home if they have
+                    // one, else where they last worked, and the fire only for the
+                    // newly founded and the roofless who have never worked.
+                    string idle;
+                    Household family = Households.Of(s, a);
+                    if (family != null && family.Housed)
+                    {
+                        Project home = family.Home[0];
+                        Int3 c = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);
+                        gx = c.X + (i % 3) - 1; gz = c.Z + (i / 3 % 3) - 1; idle = "idle at home";
+                    }
+                    else if (a.LastWorkX >= 0) { gx = a.LastWorkX; gz = a.LastWorkZ; idle = "idle where they work"; }
+                    else { Movement.AtFire(s, i, out gx, out gz); idle = "idle at the fire"; }
                     Go(s, world, a, gx, gz);
-                    a.Doing = "idle at the fire";
+                    a.Doing = idle;
                     a.Pose = a.Arrived ? "stand" : "walk";
                     continue;
                 }
@@ -316,7 +359,73 @@ namespace Godless.Sim.Settlements
                     a.Pose = night ? "walk" : "walk";
                 }
             }
+            Company(s, needs, night);
         }
+
+        /// <summary>
+        /// Company out and about (S2V): everyone awake is placed, so whoever is
+        /// near whom is known — the woodcutters by the same stand of trees, the
+        /// hands in neighbouring plots, the queue at the store. Each person near
+        /// others has the needs that ease in company eased, and knows who the
+        /// nearest was.
+        /// </summary>
+        public static void Company(Settlement s, NeedTable needs, bool night)
+        {
+            IReadOnlyList<Agent> people = s.People;
+            int within = 4;
+            bool any = false;
+            for (int n = 0; n < needs.Count; n++)
+                if (needs[n].NearRelief > 0.0) { any = true; within = System.Math.Max(within, needs[n].NearWithin); }
+            if (night || !any)
+            {
+                foreach (Agent a in people) { a.Beside = 0; a.BesideWhom = -1; }
+                return;
+            }
+
+            // Everyone by cell of the reach, in person order; looked up, never walked (L2).
+            var cells = new Dictionary<long, List<int>>();
+            for (int i = 0; i < people.Count; i++)
+            {
+                long key = CellKey(people[i].X / within, people[i].Z / within);
+                List<int> list;
+                if (!cells.TryGetValue(key, out list)) { list = new List<int>(); cells[key] = list; }
+                list.Add(i);
+            }
+
+            for (int i = 0; i < people.Count; i++)
+            {
+                Agent a = people[i];
+                int cx = a.X / within, cz = a.Z / within, count = 0, nearest = -1, nearestD = int.MaxValue;
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        List<int> list;
+                        if (!cells.TryGetValue(CellKey(cx + dx, cz + dz), out list)) continue;
+                        foreach (int j in list)
+                        {
+                            if (j == i) continue;
+                            int d = System.Math.Max(System.Math.Abs(people[j].X - a.X), System.Math.Abs(people[j].Z - a.Z));
+                            if (d > within) continue;
+                            count++;
+                            if (d < nearestD || (d == nearestD && j < nearest)) { nearestD = d; nearest = j; }
+                        }
+                    }
+                a.Beside = count;
+                a.BesideWhom = nearest;
+                if (count == 0) continue;
+                for (int n = 0; n < needs.Count; n++)
+                {
+                    Need need = needs[n];
+                    if (need.NearRelief <= 0.0) continue;
+                    int near = System.Math.Min(count, need.NearMost);
+                    int reach = need.NearWithin;
+                    if (reach < within && nearestD > reach) continue;
+                    a.Levels[n] = SimMath.Clamp01(a.Levels[n] - need.NearRelief * near);
+                }
+            }
+        }
+
+        static long CellKey(int cx, int cz) { return ((long)cx << 32) ^ (uint)cz; }
 
         /// <summary>A tick of an activity's effect: its relief, the meal it eats, the food it brings in.</summary>
         static void Relieve(Settlement s, Agent a, Activity act, NeedTable needs)
@@ -348,7 +457,7 @@ namespace Godless.Sim.Settlements
         }
 
         /// <summary>Where a worker's task puts them, and what to call it.</summary>
-        static bool Working(Settlement s, int i, Agent a, DepositMap deposits, long day, long tick,
+        static bool Working(Settlement s, int i, Agent a, DepositMap deposits, IslandMap island, long day, long tick,
                             out int gx, out int gz, out string doing, out string pose)
         {
             gx = s.Hearth.X; gz = s.Hearth.Z; doing = ""; pose = "work";
@@ -384,7 +493,7 @@ namespace Godless.Sim.Settlements
             {
                 int spot = s.Catchment != null ? s.Catchment.ForageSpot(a.Id.Hash, day) : -1;
                 if (spot >= 0 && deposits != null) { gx = deposits.X(spot); gz = deposits.Z(spot); }
-                else Movement.AtFire(s, i + 16, out gx, out gz);
+                else Places.WildGround(s, island, a.Id.Hash, day, i, out gx, out gz);
                 doing = "foraging";
                 return true;
             }

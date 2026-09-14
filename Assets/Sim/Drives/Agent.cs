@@ -117,6 +117,14 @@ namespace Godless.Sim.Drives
         public string HaulWhat { get; internal set; } = "";
         public string HaulTo { get; internal set; } = "";
 
+        /// <summary>People within reach this tick, out and about (S2V): how many, and the nearest one's index.</summary>
+        public int Beside { get; internal set; }
+        public int BesideWhom { get; internal set; } = -1;
+
+        /// <summary>Where they last worked (S2V): the place their day is spent, so idling and errands start from there.</summary>
+        public int LastWorkX { get; internal set; } = -1;
+        public int LastWorkZ { get; internal set; } = -1;
+
         // S2I: the plot last worked — its middle column, its farm's record index, and the work.
         public int FieldX { get; internal set; } = -1;
         public int FieldZ { get; internal set; } = -1;

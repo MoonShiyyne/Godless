@@ -322,6 +322,70 @@ Registered alongside the block above:
   on Metal** (lost faces, dark slabs, shadow acne), visible only with the
   cutaway off.
 
+### What S2H, S2X and S2I shipped: stores, hauling, farms
+
+| ID | System | Deps | Tell |
+|----|--------|------|------|
+| S2H | Food stores and spoilage | S1E, S18, S2X | A harvest left in the open goes grey where it lies, and a windowless building on posts goes up where the food rotted |
+| S2X | Hauling | S2F, S1C | Stacks of logs by the stumps and sheaves in the stubble, and people walking between them and the yard with their arms full |
+| S2I | Farms (fields) | S2F, S2H, S2X, S2N | Squares of brown furrows away from the houses turning green, then gold, then stubble, with the same few people bent over them |
+
+- **Intent kinds have a purpose** (home, store, farm) and may be pressed by
+  something other than a need (`pressedBy`): rot presses for a store where it
+  rotted; the land picked clean with under half a season in hand presses for a
+  farm, alongside hunger.
+- **Stores:** food above fifty meals a person in the open rots 3% a day, in a
+  store 0.2%. A harvest is more than the larder by the fire takes in (fifteen
+  meals a person): without a store it waits in the field, rotting, which is
+  what raises the store — by the fire for a village, by the fields for a farm.
+- **Hauling:** on a real island what is cut or harvested lies in a heap where
+  the work was done, drawn as detail stacks and sacks; a haul task carries it
+  to the yard, food to the nearest store. Heaped material counts as held.
+- **Farms:** crops are content (`crops/`: wheat, barley, millet, taro), each a
+  suitability expression over height above the sea, water, damp, flood, snow
+  and sun, and its harvest, days, labour and soil use. A farm is laid on the
+  best ground in reach for the crop that suits it, clear of every house,
+  cleared and tilled; plots are sown, grow, ripen, are cut into heaps and rest,
+  each stage drawn as small-voxel plants. It grows by a few plots when food is
+  short, hands are free, the ground beside it is good and its harvest is not
+  rotting for want of a store; a farm hemmed in is the cause of the next.
+  Families whose hands farm build near their fields (`prefer.nearWork`).
+- **Hands go where they are wanted:** hungry people go to fields waiting to be
+  sown or cut and fetch harvest lying out (conditions `fields` and `harvest`,
+  activities that name their task). Foraging's call is capped (`stimulusCap`),
+  or at the food ceiling nothing else ever got a hand again.
+- Measured, twenty years, seed 7: green shore about 350 people on some thirty
+  farms of taro, wheat and barley; broad delta about 360 on taro; cold massif
+  about 110, mostly barley. The dry reach grows millet but can build no store
+  from what is in reach, and its harvests rot (known: its materials problem).
+- Invariants (settled batch): every plot lies on its own farm's claim, soil
+  between none and full, drawn by details that exist; no settlement holds less
+  than no food; every heap holds something and is drawn by a detail that exists.
+
+### Out and about (S2V, continued)
+
+- **Company is had near others:** everyone awake is placed each tick, and each
+  person within four voxels of others eases the needs content marks for it
+  (`nearOthers` on company) and knows who was nearest. Talking goes to whoever
+  is nearby, not the fire.
+- **Needs away from the fire:** eating at the nearest store, else at home;
+  warming at the home hearth; idle at home or where they last worked. Foragers
+  leave the ground round the fire alone while anything else stands. Daylight
+  spent within twelve voxels of the fire: 52% before, 2-6% now (`sim settle`
+  prints it).
+- **Building further out:** siting widens its search to twice and three times
+  its radius when nothing fits; fields are walked across and may come right up
+  to a house; a village out of room packs tighter, and as a last resort a house
+  takes a field plot. Green shore had built nothing after about 210 people:
+  every shelter intent was abandoned for want of a site.
+- **Materials further out:** a material worked out of reach widens the reach
+  half a step at a time, to three times; and every unfinished project whose
+  materials can no longer be had is remade daily — a house planned in slate
+  after the slate ran out used to wait for ever.
+- **Cost:** paths are kept on the parcel grid across refreshes, and farms share
+  one reachability flood a day. A twenty-year green shore of 350 people runs in
+  under a minute.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

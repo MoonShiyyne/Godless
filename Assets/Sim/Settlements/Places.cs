@@ -18,6 +18,28 @@ namespace Godless.Sim.Settlements
     /// </summary>
     public static class Places
     {
+        /// <summary>
+        /// Somewhere out on the land to forage when no tree or reed bed with
+        /// anything on it is in reach (S2V): the open ground and the shore feed
+        /// people too, so they range over it — a spot per person per day, a
+        /// walk out from the fire — rather than standing about the hearth.
+        /// </summary>
+        public static void WildGround(Settlement s, IslandMap island, ulong person, long day, int index, out int x, out int z)
+        {
+            ulong h = StableHash.Combine(person, (ulong)day);
+            for (int attempt = 0; attempt < 8; attempt++)
+            {
+                ulong r = StableHash.Combine(h, (ulong)attempt);
+                double angle = (r % 3600) / 3600.0 * 2.0 * 3.14159265358979;
+                int radius = 20 + (int)((r >> 16) % 60);
+                x = s.Hearth.X + (int)SimMath.Round(SimMath.Cos(angle) * radius);
+                z = s.Hearth.Z + (int)SimMath.Round(SimMath.Sin(angle) * radius);
+                if (x < 0 || z < 0 || x >= ChunkStore.SizeX || z >= ChunkStore.SizeZ) continue;
+                if (island == null || island.IsLand(x, z)) return;
+            }
+            Movement.AtFire(s, index + 16, out x, out z);
+        }
+
         /// <summary>Voxels from the target at which a person counts as arrived.</summary>
         public const int Reach = 3;
 
@@ -33,8 +55,21 @@ namespace Godless.Sim.Settlements
                     return true;
 
                 case ActionPlace.Fire:
+                {
+                    // Warmth at the hearth of their own home if they have one (S2V);
+                    // the settlement's fire is for those who do not.
+                    Household household = Households.Of(s, a);
+                    if (household != null && household.Housed && !a.Crowded)
+                    {
+                        Project home = household.Home[0];
+                        Int3 c = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);
+                        gx = c.X; gz = c.Z; where = " by the hearth at home";
+                        return true;
+                    }
                     Movement.AtFire(s, index, out gx, out gz);
+                    where = " by the fire";
                     return true;
+                }
 
                 case ActionPlace.Wild:
                 {
@@ -42,7 +77,7 @@ namespace Godless.Sim.Settlements
                     int spot = s.Catchment != null && island != null && island.Deposits != null
                         ? s.Catchment.ForageSpot(a.Id.Hash, a.ForageDay) : -1;
                     if (spot >= 0) { gx = island.Deposits.X(spot); gz = island.Deposits.Z(spot); return true; }
-                    Movement.AtFire(s, index + 16, out gx, out gz);
+                    WildGround(s, island, a.Id.Hash, a.ForageDay, index, out gx, out gz);
                     return true;
                 }
 
@@ -54,6 +89,15 @@ namespace Godless.Sim.Settlements
                     {
                         Int3 c = Stores.Door(store, index);
                         gx = c.X; gz = c.Z; where = " at the store";
+                        return true;
+                    }
+                    // No store: the family's own share at home, not a walk back to the fire (S2V).
+                    Household household = Households.Of(s, a);
+                    if (household != null && household.Housed)
+                    {
+                        Project home = household.Home[0];
+                        Int3 c = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);
+                        gx = c.X; gz = c.Z; where = " at home";
                         return true;
                     }
                     Movement.AtFire(s, index + 8, out gx, out gz);
@@ -124,16 +168,20 @@ namespace Godless.Sim.Settlements
 
                 case ActionPlace.People:
                 {
-                    // Whoever else is already talking, nearest first; the fire if nobody is.
-                    long best = long.MaxValue;
+                    // Whoever else is already talking, nearest first; else whoever is
+                    // nearest and awake (S2V) — a neighbour at work, not the fire.
+                    long best = long.MaxValue, bestAny = long.MaxValue;
                     bool found = false;
+                    int anyX = 0, anyZ = 0;
                     foreach (Agent other in s.People)
                     {
-                        if (other == a || other.Activity < 0 || !other.Talking) continue;
+                        if (other == a || other.Activity < 0) continue;
                         long dx = other.X - a.X, dz = other.Z - a.Z;
                         long d = dx * dx + dz * dz;
-                        if (d < best) { best = d; gx = other.X + 1; gz = other.Z; found = true; }
+                        if (other.Talking && d < best) { best = d; gx = other.X + 1; gz = other.Z; found = true; }
+                        if (d < bestAny && d > 0) { bestAny = d; anyX = other.X + 1; anyZ = other.Z; }
                     }
+                    if (!found && bestAny < long.MaxValue) { gx = anyX; gz = anyZ; found = true; }
                     if (!found) Movement.AtFire(s, index + 4, out gx, out gz);
                     return true;
                 }

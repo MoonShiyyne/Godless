@@ -1137,6 +1137,52 @@ namespace Godless.Sim.Headless
                         + ": " + p.Placed.ToString(c) + " laid, begun " + p.Begun.Exists + ", ready " + Construction.Ready(s, p)
                         + ", obtainable " + Construction.Obtainable(s, p) + "; owes " + string.Join(", ", bill));
                 }
+                Console.WriteLine("daylight at the fire: " + (s.DaylightTicks > 0 ? 100.0 * s.DaylightAtFire / s.DaylightTicks : 0.0).ToString("0.0", c)
+                    + "% of " + s.DaylightTicks.ToString(c) + " agent-ticks");
+
+                // Why a waiting house cannot be sited, if one is waiting.
+                foreach (BuildIntent open in s.Intents.Intents)
+                {
+                    if (open.Status != IntentStatus.Open || open.Kind.Purpose != IntentPurpose.Home) continue;
+                    GrammarTable grammarsNow = GrammarTable.FromContent(db, genes);
+                    SitingTable sitingNow = SitingTable.FromContent(db, genes, kinds);
+                    SitingRule rule = sitingNow.For(open.Kind.Name);
+                    Blueprint probe = grammarsNow.For(open.Kind.Name).Build(s.Genome, palette, 80, 80, open.BudgetVoxels,
+                        new Dictionary<string, double> { { "capacity", 6 } });
+                    bool[] reach = SiteScorer.ReachableFromFire(s, grid);
+                    int reachable = 0, claimedNear = 0;
+                    for (int qz = open.ParcelZ - rule.SearchRadius; qz <= open.ParcelZ + rule.SearchRadius; qz++)
+                        for (int qx = open.ParcelX - rule.SearchRadius; qx <= open.ParcelX + rule.SearchRadius; qx++)
+                        {
+                            if (!ParcelGrid.InBounds(qx, qz)) continue;
+                            if (reach[qz * ParcelGrid.Width + qx]) reachable++;
+                            if (s.IsClaimed(qx, qz)) claimedNear++;
+                        }
+                    int found = SiteScorer.Candidates(s, open, probe, rule, grid, constraints, s.Genome, 50, reach).Count;
+                    int land = 0, dry = 0, free = 0, allowed = 0, walk = 0;
+                    int far = rule.SearchRadius * 3;
+                    for (int qz = open.ParcelZ - far; qz <= open.ParcelZ + far; qz++)
+                        for (int qx = open.ParcelX - far; qx <= open.ParcelX + far; qx++)
+                        {
+                            if (!ParcelGrid.InBounds(qx, qz) || !grid.IsLand(qx, qz)) continue;
+                            land++;
+                            if (grid.WetColumns(qx, qz) > 4) continue;
+                            dry++;
+                            if (s.IsClaimed(qx, qz) && !s.IsField(qx, qz)) continue;
+                            free++;
+                            if (grid.Slope[qx, qz] >= 10) continue;
+                            allowed++;
+                            if (reach[qz * ParcelGrid.Width + qx]) walk++;
+                        }
+                    Console.WriteLine("  within " + far + ": land " + land + ", dry " + dry + ", free or field " + free + ", not a cliff " + allowed + ", walkable " + walk
+                        + "; plan " + probe.Width + "x" + probe.Depth);
+                    int pw = (probe.Width - 2 * Grammar.Margin + ParcelGrid.Size - 1) / ParcelGrid.Size, pd = (probe.Depth - 2 * Grammar.Margin + ParcelGrid.Size - 1) / ParcelGrid.Size;
+                    int ringGap = rule.Weight("wing", s.Genome) > rule.Weight("storey", s.Genome) + 0.1 ? 2 : 1;
+                    Console.WriteLine("  " + pw + "x" + pd + " parcels, gap " + ringGap + ": " + SiteScorer.WhyNoSite(s, grid, open.ParcelX, open.ParcelZ, far, pw, pd, ringGap, reach));
+                    Console.WriteLine("waiting house " + open.Record + " at parcel (" + open.ParcelX + ", " + open.ParcelZ + "), radius " + rule.SearchRadius
+                        + ": " + found + " sites for a family of 6; " + reachable + " parcels walkable from the fire, " + claimedNear + " claimed, in reach");
+                    break;
+                }
                 Console.WriteLine("stores (S2H): " + Stores.Capacity(s).ToString("0", c) + " meals kept in stores; "
                     + s.FoodSpoiled.ToString("0", c) + " meals rotted so far");
                 double heapedFood = Hauling.Piled(s, -1);

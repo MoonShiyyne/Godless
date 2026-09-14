@@ -65,6 +65,19 @@ namespace Godless.Sim.Settlements
 
         // Farms, in the order they were laid (S2I).
         internal readonly List<Farm> FarmList = new List<Farm>();
+
+        // Plots given up to buildings, waiting for their plants to be cleared (S2I).
+        internal readonly List<Plot> GivenUpPlots = new List<Plot>();
+
+        // The farm.laid record indices, so "is this claim a field?" is a lookup (S2I). Never iterated.
+        internal readonly HashSet<int> FarmRecords = new HashSet<int>();
+
+        /// <summary>Whether a parcel is claimed by one of the farms.</summary>
+        public bool IsField(int px, int pz)
+        {
+            int owner;
+            return World.ParcelGrid.InBounds(px, pz) && _claims.TryGetValue(pz * World.ParcelGrid.Width + px, out owner) && FarmRecords.Contains(owner);
+        }
         public IReadOnlyList<Farm> Farms { get { return FarmList; } }
 
         // Heaps waiting to be carried in (S2X), in the order they were started.
@@ -73,6 +86,10 @@ namespace Godless.Sim.Settlements
 
         /// <summary>Meals lying in the fields that there is somewhere to put, as of the last tick (S2X).</summary>
         public double HarvestToFetch { get; internal set; }
+
+        /// <summary>Daylight agent-ticks, and how many of them were spent within a stone's throw of the fire (S2V).</summary>
+        public long DaylightTicks { get; internal set; }
+        public long DaylightAtFire { get; internal set; }
 
         /// <summary>Meals rotting a day, lately: a slow average the farms read before they grow (S2I).</summary>
         public double RotPerDay { get; internal set; }

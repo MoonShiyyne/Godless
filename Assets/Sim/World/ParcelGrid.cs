@@ -48,6 +48,13 @@ namespace Godless.Sim.World
         /// <summary>Increments on every refresh, so a consumer can tell its cache is stale.</summary>
         public int Version { get; private set; }
 
+        // Paths walked on this grid, by their two ends (S2V), and the version
+        // they were found at. Kept on the grid so each world has its own and
+        // what one world walks never changes another's.
+        internal readonly System.Collections.Generic.Dictionary<long, System.Collections.Generic.List<int>> Paths =
+            new System.Collections.Generic.Dictionary<long, System.Collections.Generic.List<int>>();
+        internal int PathsVersion;
+
         ParcelGrid(bool[] solid, bool[] water)
         {
             _solid = solid;

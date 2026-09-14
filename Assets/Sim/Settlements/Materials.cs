@@ -254,26 +254,47 @@ namespace Godless.Sim.Settlements
         }
 
         /// <summary>
-        /// Where a forager goes today: one of the nearest dozen standing trees
-        /// or tufts, picked by the person and the day so the foragers spread
-        /// out and move on (S2G). -1 when nothing stands, or on a bare island.
+        /// Where a forager goes today: one of the nearest few dozen standing
+        /// trees or tufts out past the houses, picked by the person and the day
+        /// so the foragers spread out and move on (S2G). The grass regrowing
+        /// round the fire is left for when nothing else stands (S2V): foraging
+        /// the hearth kept half the village standing about it all day.
+        /// -1 when nothing stands, or on a bare island.
         /// </summary>
         public int ForageSpot(ulong person, long day)
         {
             if (_deposits == null) return -1;
-            int seen = 0, pick = (int)(StableHash.Combine(person, (ulong)day) % 12UL);
-            foreach (int f in _vegetation)
+            int pick = (int)(StableHash.Combine(person, (ulong)day) % 36UL);
+            for (int pass = 0; pass < 2; pass++)
             {
-                if (!_deposits.Standing(f)) continue;
-                if (seen++ == pick) return f;
+                int seen = 0, first = -1;
+                foreach (int f in _vegetation)
+                {
+                    if (!_deposits.Standing(f)) continue;
+                    if (pass == 0 && System.Math.Abs(_deposits.X(f) - _hearthX) <= ForageClearOfFire
+                                  && System.Math.Abs(_deposits.Z(f) - _hearthZ) <= ForageClearOfFire) continue;
+                    if (first < 0) first = f;
+                    if (seen++ == pick) return f;
+                }
+                if (seen > 0)
+                {
+                    int wrapped = pick % seen;
+                    seen = 0;
+                    foreach (int f in _vegetation)
+                    {
+                        if (!_deposits.Standing(f)) continue;
+                        if (pass == 0 && System.Math.Abs(_deposits.X(f) - _hearthX) <= ForageClearOfFire
+                                      && System.Math.Abs(_deposits.Z(f) - _hearthZ) <= ForageClearOfFire) continue;
+                        if (seen++ == wrapped) return f;
+                    }
+                    return first;
+                }
             }
-            if (seen == 0) return -1;
-            pick %= seen;
-            seen = 0;
-            foreach (int f in _vegetation)
-                if (_deposits.Standing(f) && seen++ == pick) return f;
             return -1;
         }
+
+        /// <summary>Voxels round the fire foragers leave alone while anything else stands (S2V).</summary>
+        public const int ForageClearOfFire = 16;
 
         int StandingVegetation()
         {
@@ -281,6 +302,30 @@ namespace Godless.Sim.Settlements
             foreach (int f in _vegetation)
                 if (_deposits.Standing(f)) v += _deposits.KindOf(f).Shape == FeatureShape.Tree ? 3 : 1;
             return v;
+        }
+
+        /// <summary>How many times its first reach a settlement will go for materials, at most.</summary>
+        public const int MostReachTimes = 3;
+
+        int _reach;
+
+        /// <summary>How far from the fire people now go for materials, in voxels.</summary>
+        public int Reach { get { return _reach == 0 && _materials != null ? _materials.DepositRangeVoxels : _reach; } }
+
+        /// <summary>Half a first reach further out for materials; foraging keeps to the land it always had.</summary>
+        void Widen()
+        {
+            int from = _reach, to = _reach + _materials.DepositRangeVoxels / 2;
+            long from2 = (long)from * from;
+            foreach (int f in _deposits.Within(_hearthX, _hearthZ, to))
+            {
+                long dx = _deposits.X(f) - _hearthX, dz = _deposits.Z(f) - _hearthZ;
+                if (dx * dx + dz * dz <= from2) continue;   // already in reach
+                int m = _materials.IndexOf(_deposits.KindOf(f).Yields);
+                if (m >= 0) _nearest[m].Add(f);
+            }
+            _reach = to;
+            for (int m = 0; m < _materials.Count; m++) _exhausted[m] = false;
         }
 
         /// <summary>A tick of labour's worth at this distance from the fire: the rest is the walk.</summary>
@@ -299,6 +344,16 @@ namespace Godless.Sim.Settlements
         public void Refresh()
         {
             if (_deposits == null) return;
+
+            // A material worked out of reach sends people further for it (S2V):
+            // the reach widens a step at a time, to three times what it was, and
+            // what lies further off yields less for the longer carry.
+            if (_reach == 0) _reach = _materials.DepositRangeVoxels;
+            bool outOfReach = false;
+            for (int m = 0; m < _materials.Count && !outOfReach; m++)
+                if (_nearest[m].Count > 0 && NearestSource(m) < 0) outOfReach = true;
+            if (outOfReach && _reach < _materials.DepositRangeVoxels * MostReachTimes) Widen();
+
             for (int m = 0; m < _materials.Count; m++)
             {
                 _cursor[m] = 0;

@@ -291,7 +291,7 @@ namespace Godless.Sim.Settlements
         {
             long sx = 0, sz = 0;
             foreach (Plot p in PlotList) { sx += p.ParcelX; sz += p.ParcelZ; }
-            int n = PlotList.Count > 0 ? PlotList.Count : 1;
+            int n = PlotList.Count > 0 ? PlotList.Count : 1;   // a farm built over entirely has no middle; the origin will do
             px = (int)(sx / n); pz = (int)(sz / n);
         }
     }
@@ -348,6 +348,25 @@ namespace Godless.Sim.Settlements
             s.Intents.Press(Shortage, s.HearthParcelX, s.HearthParcelZ, (wanted * 0.5 - inHand) / 10.0, s.ShortRecord);
         }
 
+        /// <summary>
+        /// A plot given up to a building (S2I): out of its farm, whatever grew on
+        /// it lost, its plants cleared the next time the fields are drawn. The
+        /// building's claim replaces the farm's.
+        /// </summary>
+        public static void Surrender(Settlement s, int px, int pz, RecordId by)
+        {
+            foreach (Farm f in s.FarmList)
+                for (int i = 0; i < f.PlotList.Count; i++)
+                {
+                    Plot p = f.PlotList[i];
+                    if (p.ParcelX != px || p.ParcelZ != pz) continue;
+                    f.PlotList.RemoveAt(i);
+                    p.Last = by;
+                    s.GivenUpPlots.Add(p);
+                    return;
+                }
+        }
+
         /// <summary>The farm a parcel belongs to, or null.</summary>
         public static Farm Owning(Settlement s, int px, int pz)
         {
@@ -370,8 +389,7 @@ namespace Godless.Sim.Settlements
                 for (int dx = -r; dx <= r; dx++)
                 {
                     int x = px + dx, z = pz + dz;
-                    if (!s.IsClaimed(x, z)) continue;
-                    if (Owning(s, x, z) == null) return false;   // a house's, a store's, or the fire's
+                    if (s.IsClaimed(x, z) && !s.IsField(x, z)) return false;   // a house's, a store's, or the fire's
                 }
             return true;
         }
@@ -389,11 +407,25 @@ namespace Godless.Sim.Settlements
 
         /// <summary>A farm laid for a cause other than an intent: a farm that could not grow while food was short.</summary>
         public static Farm Lay(Settlement s, RecordId cause, Symbol why, FarmRules rules, CropTable crops, ParcelGrid grid,
-                               ConstraintFields fields, SimWorld world)
+                               ConstraintFields fields, SimWorld world, bool[] reachable = null)
         {
             if (rules == null || crops == null || crops.Count == 0) return null;
-            bool[] reachable = SiteScorer.ReachableFromFire(s, grid);
-            int hx = s.HearthParcelX, hz = s.HearthParcelZ, radius = rules.SearchRadius;
+            if (reachable == null) reachable = SiteScorer.ReachableFromFire(s, grid);
+
+            // Near first; with the ground round the fire taken by houses and
+            // fields, further out (S2V), as the houses do.
+            for (int widen = 1; widen <= 3; widen++)
+            {
+                Farm farm = LayWithin(s, cause, why, rules, crops, grid, fields, world, reachable, rules.SearchRadius * widen);
+                if (farm != null) return farm;
+            }
+            return null;
+        }
+
+        static Farm LayWithin(Settlement s, RecordId cause, Symbol why, FarmRules rules, CropTable crops, ParcelGrid grid,
+                              ConstraintFields fields, SimWorld world, bool[] reachable, int radius)
+        {
+            int hx = s.HearthParcelX, hz = s.HearthParcelZ;
 
             // Every open parcel's best crop, and what it is worth a day.
             var seeds = new List<KeyValuePair<double, int>>();
@@ -446,6 +478,7 @@ namespace Godless.Sim.Settlements
                                                new[] { chosenCrop.Id, why });
             var farm = new Farm { Record = laid, Crop = chosenCrop, LaidDay = world.Clock.TotalDays };
             s.FarmList.Add(farm);
+            s.FarmRecords.Add(laid.Index);
             foreach (int p in chosen) Break(s, farm, rules, grid, fields, world, p % ParcelGrid.Width, p / ParcelGrid.Width, laid);
             return farm;
         }
@@ -528,7 +561,7 @@ namespace Godless.Sim.Settlements
         /// and says why either way.
         /// </summary>
         public static RecordId Consider(Settlement s, Farm farm, FarmRules rules, ParcelGrid grid, ConstraintFields fields,
-                                        SimWorld world, RecordId cause)
+                                        SimWorld world, RecordId cause, bool[] reachable = null)
         {
             if (farm.PlotList.Count >= rules.MostPlots) { farm.SpoiledWhenWeighed = s.FoodSpoiled; return Result(farm, Growth.Biggest, "as big as a farm grows"); }
 
@@ -550,7 +583,7 @@ namespace Godless.Sim.Settlements
             if (!HandsFor(s, rules, rules.PlotsPerGrowth)) return Result(farm, Growth.NoHands, "no hands to spare for more");
 
             // Ground: the best free neighbours that suit the crop.
-            bool[] reachable = SiteScorer.ReachableFromFire(s, grid);
+            if (reachable == null) reachable = SiteScorer.ReachableFromFire(s, grid);
             var start = new List<int>();
             foreach (Plot p in farm.PlotList) start.Add(p.ParcelZ * ParcelGrid.Width + p.ParcelX);
             List<int> field = Grow(s, rules, farm.Crop, grid, fields, reachable, start, rules.PlotsPerGrowth);
@@ -709,6 +742,9 @@ namespace Godless.Sim.Settlements
         public static void Show(Settlement s, DetailLayer details, DetailModelTable models, ParcelGrid grid, long tick)
         {
             if (details == null || models == null || grid == null) return;
+            foreach (Plot gone in s.GivenUpPlots)
+                foreach (int id in gone.DetailList) details.Remove(id, tick, gone.Last);
+            s.GivenUpPlots.Clear();
             foreach (Farm farm in s.FarmList)
                 foreach (Plot p in farm.PlotList)
                 {
@@ -790,11 +826,17 @@ namespace Godless.Sim.Settlements
             Farms.Day(s, _rules);
             long day = world.Clock.TotalDays;
 
+            // Walkable ground from the fire, found once today and only if some
+            // farm is weighing anything: every farm and every laying reads the same.
+            bool[] reachable = null;
+            System.Func<bool[]> reach = () => reachable ?? (reachable = SiteScorer.ReachableFromFire(s, _grid));
+
             // Hunger's intent: grow a farm that can, else lay a new one.
             if (s.Intents != null)
                 foreach (BuildIntent intent in s.Intents.Intents)
                 {
                     if (intent.Status != IntentStatus.Open || intent.Kind.Purpose != IntentPurpose.Farm) continue;
+                    if (world.Clock.Tick < intent.RetryAt) continue;
                     RecordId done = RecordId.None;
                     if (Farms.HarvestRotting(s))
                     {
@@ -804,12 +846,12 @@ namespace Godless.Sim.Settlements
                     }
                     foreach (Farm f in s.FarmList)
                     {
-                        done = Farms.Consider(s, f, _rules, _grid, _fields, world, intent.Record);
+                        done = Farms.Consider(s, f, _rules, _grid, _fields, world, intent.Record, reach());
                         if (done.Exists) break;
                     }
                     if (!done.Exists)
                     {
-                        Farm laid = Farms.Lay(s, intent, _rules, _crops, _grid, _fields, world);
+                        Farm laid = Farms.Lay(s, intent.Record, intent.Kind.Id, _rules, _crops, _grid, _fields, world, reach());
                         if (laid != null) done = laid.Record;
                     }
                     if (done.Exists)
@@ -819,6 +861,7 @@ namespace Godless.Sim.Settlements
                     }
                     else if (world.Clock.Tick - intent.RaisedTick > SiteSystem.GivesUpAfterDays * world.Clock.TicksPerDay)
                         s.Intents.Abandon(intent, world.Clock.Tick, world.Annals, s.Founded);
+                    else intent.RetryAt = world.Clock.Tick + SiteSystem.RetryAfterDays * world.Clock.TicksPerDay;
                 }
 
             // And every farm weighs growing on its own, now and then. A farm
@@ -829,12 +872,12 @@ namespace Godless.Sim.Settlements
             foreach (Farm f in s.FarmList)
                 if ((day - f.LaidDay) > 0 && (day - f.LaidDay) % _rules.GrowEveryDays == 0)
                 {
-                    if (Farms.Consider(s, f, _rules, _grid, _fields, world, RecordId.None).Exists) grew = true;
+                    if (Farms.Consider(s, f, _rules, _grid, _fields, world, RecordId.None, reach()).Exists) grew = true;
                     else if (f.LastGrowthResult == Growth.NoGround || f.LastGrowthResult == Growth.Biggest) hemmed = f;
                 }
             if (hemmed != null && !grew && hemmed.LastGrowthResult != Growth.NoRoom && Farms.Short(s) && !Farms.HarvestRotting(s)
                 && Farms.HandsFor(s, _rules, _rules.FirstPlots))
-                Farms.Lay(s, hemmed.Record, hemmed.Crop.Id, _rules, _crops, _grid, _fields, world);
+                Farms.Lay(s, hemmed.Record, hemmed.Crop.Id, _rules, _crops, _grid, _fields, world, reach());
         }
     }
 }
