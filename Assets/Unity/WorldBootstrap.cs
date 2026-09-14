@@ -479,7 +479,7 @@ namespace Godless.Unity
         // ── the screens before the world runs ───────────────────────────────
 
         GUIStyle _title, _body, _small, _button, _box;
-        Vector2 _mapScroll;
+        Vector2 _mapScroll, _siteScroll;
 
         void Styles()
         {
@@ -557,6 +557,7 @@ namespace Godless.Unity
                             + "\nRight-drag turn, WASD move, scroll zoom.", _small);
             GUILayout.Space(6);
 
+            _siteScroll = GUILayout.BeginScrollView(_siteScroll, GUILayout.ExpandHeight(true));
             if (_hover != null && (_chosen == null || _hover.ParcelX != _chosen.ParcelX || _hover.ParcelZ != _chosen.ParcelZ))
             {
                 GUILayout.Label("Under the pointer", new GUIStyle(_body) { fontStyle = FontStyle.Bold });
@@ -568,8 +569,9 @@ namespace Godless.Unity
                 GUILayout.Label("Chosen", new GUIStyle(_body) { fontStyle = FontStyle.Bold });
                 Report(_chosen, true);
             }
+            GUILayout.EndScrollView();
 
-            GUILayout.FlexibleSpace();
+            GUILayout.Space(6);
             GUI.enabled = _chosen != null && _chosen.CanSettle;
             if (GUILayout.Button("Light the fire here  (Enter)", GUILayout.Height(40))) FoundAt(_chosen.ParcelX, _chosen.ParcelZ);
             GUI.enabled = SuggestedX >= 0;
