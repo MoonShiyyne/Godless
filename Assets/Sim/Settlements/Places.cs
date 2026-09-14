@@ -68,11 +68,16 @@ namespace Godless.Sim.Settlements
 
                 case ActionPlace.Bed:
                 {
-                    Household family = Households.Of(s, a);
-                    if (a.ShelteredLastNight && family != null && family.Housed && !a.Crowded)
+                    Furnishing.Bed bed;
+                    if (s.BedByPerson.TryGetValue(a.Id.Hash, out bed))
                     {
-                        Furnishing.Bed bed;
-                        if (BedOf(family, a, out bed)) { gx = bed.Centre.X; gz = bed.Centre.Z; where = " in bed"; return true; }
+                        gx = bed.Centre.X; gz = bed.Centre.Z;
+                        where = s.BedGuests.Contains(a.Id.Hash) ? " in a spare bed" : " in bed";
+                        return true;
+                    }
+                    Household family = Households.Of(s, a);
+                    if (a.ShelteredLastNight && family != null && family.Housed)
+                    {
                         Project home = family.Home[0];
                         Int3 c = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);
                         gx = c.X; gz = c.Z; where = " at home";
@@ -174,23 +179,62 @@ namespace Godless.Sim.Settlements
             return list;
         }
 
-        /// <summary>The bed a person sleeps in: their place in the family's roll, among the family's beds.</summary>
-        public static bool BedOf(Household family, Agent a, out Furnishing.Bed bed)
+        /// <summary>The bed someone sleeps in tonight, as last allotted. False when they have none.</summary>
+        public static bool SleepsIn(Settlement s, Agent a, out Furnishing.Bed bed)
         {
-            bed = default(Furnishing.Bed);
-            int place = family.Members.IndexOf(a.Id.Hash);
-            if (place < 0) return false;
-            foreach (Project home in family.Homes)
+            return s.BedByPerson.TryGetValue(a.Id.Hash, out bed);
+        }
+
+        /// <summary>Whether tonight's bed is a spare one in someone else's home.</summary>
+        public static bool IsGuest(Settlement s, Agent a) { return s.BedGuests.Contains(a.Id.Hash); }
+
+        /// <summary>
+        /// Hands out the beds, once a tick. Each family first, in family
+        /// order, member by member, each taking the first free bed under the
+        /// family's roofs — so two families sharing a house share its beds
+        /// rather than both sleeping in the first. Then anyone sheltered who is
+        /// still without one takes a free bed in any standing house, in the
+        /// order people are listed. A bed sleeps one.
+        /// </summary>
+        public static void AllotBeds(Settlement s)
+        {
+            s.BedByPerson.Clear();
+            s.BedGuests.Clear();
+            var taken = new HashSet<int>();
+
+            foreach (Household h in s.Households)
+                foreach (ulong member in h.Members)
+                {
+                    Furnishing.Bed bed;
+                    if (FreeBed(h.Homes, taken, out bed)) s.BedByPerson[member] = bed;
+                }
+
+            var homes = new List<Project>();
+            foreach (Project p in s.Projects) if (p.Complete && p.Host == null) homes.Add(p);
+            foreach (Agent a in s.People)
             {
-                if (place < home.Beds.Count) { bed = home.Beds[place]; return true; }
-                place -= home.Beds.Count;
+                if (!a.ShelteredLastNight || s.BedByPerson.ContainsKey(a.Id.Hash)) continue;
+                Furnishing.Bed bed;
+                if (!FreeBed(homes, taken, out bed)) break;
+                s.BedByPerson[a.Id.Hash] = bed;
+                s.BedGuests.Add(a.Id.Hash);
+            }
+        }
+
+        static bool FreeBed(IReadOnlyList<Project> homes, HashSet<int> taken, out Furnishing.Bed bed)
+        {
+            foreach (Project home in homes)
+            {
+                foreach (Furnishing.Bed b in home.Beds)
+                    if (taken.Add(b.Instance)) { bed = b; return true; }
                 foreach (Project added in home.Added)
                 {
                     if (!added.Complete) continue;
-                    if (place < added.Beds.Count) { bed = added.Beds[place]; return true; }
-                    place -= added.Beds.Count;
+                    foreach (Furnishing.Bed b in added.Beds)
+                        if (taken.Add(b.Instance)) { bed = b; return true; }
                 }
             }
+            bed = default(Furnishing.Bed);
             return false;
         }
     }

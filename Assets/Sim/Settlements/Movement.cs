@@ -216,6 +216,7 @@ namespace Godless.Sim.Settlements
             if (s.Traffic == null) s.Traffic = new InfluenceMap(Settlement.TrafficField);
             bool families = s.Households.Count > 0;
             NeedTable needs = _needs;
+            Places.AllotBeds(s);
 
             for (int i = 0; i < people.Count; i++)
             {

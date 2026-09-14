@@ -148,6 +148,34 @@ namespace Godless.Sim.Tests
             Assert.True(s.Food < 1000.0);
         }
 
+        /// <summary>A bed sleeps one: owners and guests in spare beds never double up.</summary>
+        [Fact]
+        public void NoTwoSleepersShareABed()
+        {
+            SimWorld world = Settled(7);
+            Settlement s = world.Settlements[0];
+            int nights = 0, guests = 0;
+            for (int day = 0; day < 600; day++)
+                for (int t = 0; t < world.Clock.TicksPerDay; t++)
+                {
+                    world.Tick();
+                    if (world.Clock.TickOfDay != world.Clock.TicksPerDay - 1) continue;
+                    var taken = new HashSet<int>();
+                    bool any = false;
+                    foreach (Agent a in s.People)
+                    {
+                        Build.Furnishing.Bed bed;
+                        if (!Places.SleepsIn(s, a, out bed)) continue;
+                        Assert.True(taken.Add(bed.Instance), "two people in bed " + bed.Instance + " on day " + day);
+                        any = true;
+                        if (a.Doing.Contains("spare bed")) guests++;
+                    }
+                    if (any) nights++;
+                }
+            _out.WriteLine(nights + " nights checked, " + guests + " guest-nights in spare beds");
+            Assert.True(nights > 0, "nobody slept in a bed in 600 days");
+        }
+
         /// <summary>Each person sleeps in their own bed once the family has one.</summary>
         [Fact]
         public void TheHousedSleepInTheirOwnBeds()
@@ -162,10 +190,9 @@ namespace Godless.Sim.Tests
                     world.Tick();
                     if (world.Clock.TickOfDay != world.Clock.TicksPerDay - 1) continue;
                     foreach (Agent a in s.People)
-                        foreach (Household h in s.Households)
                         {
                             Build.Furnishing.Bed bed;
-                            if (!a.Arrived || !a.Doing.StartsWith("asleep") || !Places.BedOf(h, a, out bed)) continue;
+                            if (!a.Arrived || !a.Doing.StartsWith("asleep in bed") || !Places.SleepsIn(s, a, out bed)) continue;
                             Assert.True(System.Math.Abs(a.X - bed.Centre.X) <= Places.Reach && System.Math.Abs(a.Z - bed.Centre.Z) <= Places.Reach,
                                         a.Doing + " at " + a.X + "," + a.Z + ", bed at " + bed.Centre.X + "," + bed.Centre.Z);
                             checkedSleepers++;

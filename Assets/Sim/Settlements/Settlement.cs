@@ -98,6 +98,11 @@ namespace Godless.Sim.Settlements
         // S2V. Where the water is, found once.
         internal List<Int3> WaterPointList;
 
+        // Tonight's beds (S2V), allotted once a tick by Places.AllotBeds: who
+        // sleeps in which, and which of those are guests in a spare one.
+        internal readonly Dictionary<ulong, Build.Furnishing.Bed> BedByPerson = new Dictionary<ulong, Build.Furnishing.Bed>();
+        internal readonly HashSet<ulong> BedGuests = new HashSet<ulong>();
+
         // S2N. Families, in the order they formed.
         internal readonly List<Household> HouseholdList = new List<Household>();
         internal int NextHousehold;

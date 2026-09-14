@@ -123,7 +123,9 @@ namespace Godless.Unity
                     float yaw;
                     Pose pose = PoseOf(a, moving, i);
                     float bedYaw;
-                    if (pose == Pose.Lie && _bedYaw.TryGetValue(id, out bedYaw)) { yaw = bedYaw; at = to; }
+                    // Only a walk is drawn between two places; anyone else is where they are.
+                    if (!moving) at = to;
+                    if (pose == Pose.Lie && _bedYaw.TryGetValue(id, out bedYaw)) yaw = bedYaw;
                     else if (!_yaw.TryGetValue(id, out yaw)) yaw = (id % 360);
 
                     float distance = Vector3.Distance(cam.transform.position, at);
@@ -193,7 +195,8 @@ namespace Godless.Unity
                     // Asleep in their own bed: on it, the way it lies.
                     float bedYaw;
                     Vector3 onBed;
-                    if (a.Doing != null && a.Doing.StartsWith("asleep in bed") && OnBed(s, a, out onBed, out bedYaw))
+                    if (a.Doing != null && (a.Doing.StartsWith("asleep in bed") || a.Doing.StartsWith("asleep in a spare bed"))
+                        && OnBed(s, a, out onBed, out bedYaw))
                     {
                         now = onBed;
                         _bedYaw[id] = bedYaw;
@@ -223,9 +226,8 @@ namespace Godless.Unity
         {
             at = Vector3.zero;
             yaw = 0f;
-            Household family = Households.Of(s, a);
             Furnishing.Bed bed;
-            if (family == null || !Places.BedOf(family, a, out bed)) return false;
+            if (!Places.SleepsIn(s, a, out bed)) return false;
             DetailInstance inst = _boot.World.Details.Get(bed.Instance);
             if (inst == null) return false;
             DetailModel model = _models.Find(inst.Model);
