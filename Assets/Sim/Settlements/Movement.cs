@@ -210,7 +210,7 @@ namespace Godless.Sim.Settlements
             // Houses, in the order they were finished, filled in roll order by
             // whoever got a roof last night.
             var beds = new List<Project>();
-            foreach (Project p in s.Projects) if (p.Complete) beds.Add(p);
+            foreach (Project p in s.Projects) if (p.Complete && p.Host == null) beds.Add(p);
             int house = 0, usedInHouse = 0;
 
             for (int i = 0; i < people.Count; i++)

@@ -110,6 +110,58 @@ namespace Godless.Sim.Build
             }
         }
 
+        /// <summary>
+        /// The same building turned a quarter at a time about the vertical,
+        /// clockwise seen from above (S2O). Width and depth swap on odd turns.
+        /// </summary>
+        public Blueprint Rotated(int quarterTurns)
+        {
+            int q = ((quarterTurns % 4) + 4) % 4;
+            if (q == 0) return this;
+            bool odd = (q & 1) == 1;
+            var r = new Blueprint(odd ? Depth : Width, Height, odd ? Width : Depth) { Capacity = Capacity };
+            for (int y = 0; y < Height; y++)
+                for (int z = 0; z < Depth; z++)
+                    for (int x = 0; x < Width; x++)
+                    {
+                        Symbol role = At(x, y, z);
+                        if (role.IsNone) continue;
+                        int nx, nz;
+                        switch (q)
+                        {
+                            case 1: nx = Depth - 1 - z; nz = x; break;
+                            case 2: nx = Width - 1 - x; nz = Depth - 1 - z; break;
+                            default: nx = z; nz = Width - 1 - x; break;
+                        }
+                        r.Set(nx, y, nz, role);
+                    }
+            return r;
+        }
+
+        /// <summary>
+        /// Which side the door is on (S2O): 0 toward -z, 1 toward +x, 2 toward
+        /// +z, 3 toward -x. -1 when the building has no door.
+        /// </summary>
+        public int DoorSide()
+        {
+            Symbol door = Symbol.For("role.door");
+            long sx = 0, sz = 0, n = 0;
+            for (int y = 0; y < Height; y++)
+                for (int z = 0; z < Depth; z++)
+                    for (int x = 0; x < Width; x++)
+                        if (At(x, y, z) == door) { sx += 2 * x - (Width - 1); sz += 2 * z - (Depth - 1); n++; }
+            if (n == 0) return -1;
+            if (System.Math.Abs(sx) * Depth > System.Math.Abs(sz) * Width) return sx > 0 ? 1 : 3;
+            return sz > 0 ? 2 : 0;
+        }
+
+        /// <summary>A side as a unit step on the grid: 0 (0,-1), 1 (1,0), 2 (0,1), 3 (-1,0).</summary>
+        public static void SideStep(int side, out int dx, out int dz)
+        {
+            dx = side == 1 ? 1 : side == 3 ? -1 : 0;
+            dz = side == 2 ? 1 : side == 0 ? -1 : 0;
+        }
+
         public ulong Digest()
         {
             var d = new Digest();

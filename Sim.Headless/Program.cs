@@ -875,6 +875,8 @@ namespace Godless.Sim.Headless
             // S1A: hands that lay the voxels, allocated like any other work.
             var construction = new Construction(world.Voxels, materials, types, tileset, palette,
                                                 deposits: island.Deposits, ticksPerDay: world.Clock.TicksPerDay);
+            construction.GroundTable = solid;
+            construction.Island = island;
             Profiled(world, cli, new DepositSystem(grid));
             Profiled(world, cli, new TaskSystem(construction, grid));
             Profiled(world, cli, new MovementSystem(grid, rules));
@@ -974,6 +976,7 @@ namespace Godless.Sim.Headless
                     + "   " + (project.Complete ? "standing" : project.Placed + " of " + project.Built.TotalVoxels + " laid")
                     + (project.Ground == null ? "" : ", " + project.Ground.Strategy.ToString().ToLowerInvariant()
                         + (project.Ground.Moved > 0 ? " (" + project.Ground.Moved.ToString(c) + " voxels of earth moved)" : "")));
+                if (project.Reasons.Count > 0) Console.WriteLine("      why: " + string.Join("; ", project.Reasons));
                 foreach (string note in project.Built.Compromises) Console.WriteLine("      " + note);
             }
 

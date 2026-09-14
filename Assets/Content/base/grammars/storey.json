@@ -1,0 +1,50 @@
+{
+  "type": "grammar",
+  "id": "storey",
+  "builds": "shelter",
+  "part": "storey",
+  "tell": "A family with nowhere to spread builds up: the old roof comes off, a new storey goes on, and the roof goes back on top of it — the join between the old walls and the new is plain to see.",
+
+  // S2P. The program gives this the host house's own footprint ("width",
+  // "depth") and the beds it is for. One storey and a roof; no door, no
+  // hearth: those are downstairs.
+  "axiom": "Lot",
+  "let": {
+    "capacity": "3",
+    "width": "6",
+    "depth": "5",
+    "pitch": "lerp(0, 1.6, gene.roof_pitch)",
+    "overhang": "1",
+    "roofRise": "floor((floor((depth - 1) / 2) + overhang) * pitch) + 1",
+    "windowWidth": "round(lerp(1, 6, gene.aperture_ratio))",
+    "windowHeight": "round(lerp(1, 3, gene.aperture_ratio))",
+    "sill": "2",
+    "bodyHeight": "palette.floor",
+    "height": "bodyHeight + roofRise"
+  },
+
+  "rules": {
+    "Lot": { "op": "split", "axis": "v", "parts": [
+      { "size": "bodyHeight", "rule": "Body" },
+      { "size": "roofRise", "rule": "Roof" }
+    ] },
+    "Body": { "op": "split", "axis": "v", "parts": [
+      { "size": 1, "rule": "Floor" },
+      { "size": "~1", "rule": { "op": "comp", "front": "Facade", "back": "Facade", "ends": "Facade" } }
+    ] },
+    "Facade": { "op": "repeat", "axis": "u", "size": "palette.bay", "rule": "Bay" },
+    "Bay": { "op": "split", "axis": "v", "parts": [
+      { "size": "sill", "rule": "Wall" },
+      { "size": "windowHeight", "rule": "WindowBand" },
+      { "size": "~1", "rule": "Wall" }
+    ] },
+    "WindowBand": { "op": "split", "axis": "u", "parts": [
+      { "size": "~1", "rule": "Wall" },
+      { "size": "min(windowWidth, max(1, scope.u - 2))", "rule": { "op": "fill", "role": "window" } },
+      { "size": "~1", "rule": "Wall" }
+    ] },
+    "Wall": { "op": "fill", "role": "wall" },
+    "Floor": { "op": "fill", "role": "floor" },
+    "Roof": { "op": "roof", "pitch": "pitch", "overhang": "overhang", "role": "roof", "gable": "wall" }
+  }
+}

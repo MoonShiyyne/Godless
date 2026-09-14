@@ -64,6 +64,26 @@ namespace Godless.Sim.Build
             return run.Execute();
         }
 
+        /// <summary>
+        /// Runs the grammar with some of its lets decided from outside (S2O): a
+        /// dwelling program that knows the family needs nine beds sets
+        /// "capacity" to nine, and the grammar builds the rest of the house
+        /// around that. A let not in <paramref name="overrides"/> is computed as usual.
+        /// </summary>
+        public Blueprint Build(Genome genome, Palette palette, int lotWidth, int lotDepth, int budgetVoxels,
+                               IReadOnlyDictionary<string, double> overrides)
+        {
+            var run = new Run(this, genome, palette, lotWidth, lotDepth, budgetVoxels) { Overrides = overrides };
+            return run.Execute();
+        }
+
+        /// <summary>
+        /// A part of a building rather than a building (S2P): "wing" or
+        /// "storey". Empty for a whole building. A part is never what an intent
+        /// asks for; it is what a dwelling program adds to a home that stands.
+        /// </summary>
+        public string PartOf { get; internal set; }
+
         /// <summary>A let's value for a genome, without building. For tools and tests.</summary>
         public double Evaluate(string let, Genome genome, Palette palette, int lotWidth, int lotDepth, int budgetVoxels)
         {
@@ -116,6 +136,7 @@ namespace Godless.Sim.Build
             readonly Genome _genome;
             readonly Palette _palette;
             readonly int _lotWidth, _lotDepth, _budget;
+            public IReadOnlyDictionary<string, double> Overrides;
             readonly Dictionary<string, double> _memo = new Dictionary<string, double>();
             readonly HashSet<string> _resolving = new HashSet<string>();
             Blueprint _bp;
@@ -166,6 +187,9 @@ namespace Godless.Sim.Build
                     double v = _genome[Symbol.For(name)];
                     return double.IsNaN(v) ? 0.0 : v;
                 }
+
+                double given;
+                if (Overrides != null && Overrides.TryGetValue(name, out given)) return given;
 
                 double memo;
                 if (_memo.TryGetValue(name, out memo)) return memo;

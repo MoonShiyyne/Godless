@@ -24,6 +24,9 @@ namespace Godless.Sim.Settlements
         internal readonly List<Project> Homes = new List<Project>();
 
         public int Number { get; internal set; }
+
+        /// <summary>The family this one split from (S2N), by number, or -1 for founders.</summary>
+        public int Kin { get; internal set; } = -1;
         public Symbol Id { get; internal set; }
         public RecordId Formed { get; internal set; }
 
@@ -156,6 +159,7 @@ namespace Godless.Sim.Settlements
 
             if (s.HouseholdRules == null || h.Size <= s.HouseholdRules.SplitsAbove(s.Genome)) return;
             Household young = Form(s, tick, annals, birth);
+            young.Kin = h.Number;
             int leaving = h.Size / 2;
             var movers = h.Members.GetRange(h.Size - leaving, leaving);
             foreach (ulong id in movers)
@@ -175,7 +179,15 @@ namespace Godless.Sim.Settlements
 
             var homeless = new List<Household>();
             foreach (Household h in s.HouseholdList) if (!h.Housed) homeless.Add(h);
-            homeless.Sort((a, b) => b.Size != a.Size ? b.Size.CompareTo(a.Size) : a.Number.CompareTo(b.Number));
+
+            // The families the house was planned for come first (S2O), then
+            // the largest of anyone else with no roof.
+            homeless.Sort((a, b) =>
+            {
+                bool pa = home.ForFamilies.Contains(a.Number), pb = home.ForFamilies.Contains(b.Number);
+                if (pa != pb) return pa ? -1 : 1;
+                return b.Size != a.Size ? b.Size.CompareTo(a.Size) : a.Number.CompareTo(b.Number);
+            });
 
             foreach (Household h in homeless)
             {
@@ -196,6 +208,7 @@ namespace Godless.Sim.Settlements
             if (crowded == null) return 0;
 
             Household overflow = Form(s, tick, annals, cause);
+            overflow.Kin = crowded.Number;
             int leaving = System.Math.Min(crowded.Size - crowded.Beds, capacity);
             var movers = crowded.Members.GetRange(crowded.Size - leaving, leaving);
             foreach (ulong id in movers)
@@ -219,7 +232,7 @@ namespace Godless.Sim.Settlements
             if (!anyHomeless) return;
 
             var homes = new List<Project>();
-            foreach (Project p in s.Projects) if (p.Complete) homes.Add(p);
+            foreach (Project p in s.Projects) if (p.Complete && p.Host == null) homes.Add(p);
             if (homes.Count == 0) return;
 
             var occupied = new int[homes.Count];
@@ -270,7 +283,13 @@ namespace Godless.Sim.Settlements
             }
         }
 
-        public static int CapacityOf(Project home) { return home.Plan.Capacity; }
+        /// <summary>Beds under a home: its own, and every wing and storey added to it that stands (S2P).</summary>
+        public static int CapacityOf(Project home)
+        {
+            int beds = home.Plan.Capacity;
+            foreach (Project added in home.Additions) if (added.Complete) beds += added.Plan.Capacity;
+            return beds;
+        }
 
         /// <summary>
         /// Tonight's roofs. Each family sleeps under its own; whoever does not

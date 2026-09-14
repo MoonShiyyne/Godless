@@ -33,6 +33,32 @@ namespace Godless.Sim.Build
         public static readonly Symbol BegunKind = Symbol.For("structure.begun");
         public static readonly Symbol CompletedKind = Symbol.For("structure.completed");
         static readonly Symbol PostRole = Symbol.For("role.post");
+        static readonly Symbol WallRole = Symbol.For("role.wall");
+
+        /// <summary>Whether a body column is the back wall's: the side opposite the door.</summary>
+        static bool OnBack(Project project, int x, int z, int width, int depth)
+        {
+            if (project.DoorSide < 0) return false;
+            switch ((project.DoorSide + 2) % 4)
+            {
+                case 0: return z == 0;
+                case 1: return x == width - 1;
+                case 2: return z == depth - 1;
+                default: return x == 0;
+            }
+        }
+
+        /// <summary>Natural ground a wall can be made of: anything solid that no settlement laid.</summary>
+        bool IsHillside(ushort voxel)
+        {
+            if (voxel == VoxelTypes.AirId) return false;
+            if (_ground == null) return false;
+            return voxel < _ground.Length && _ground[voxel];
+        }
+
+        /// <summary>Which voxel ids are ground (TerrainBrush.SolidTable), for backing a house into a hill. Null disables it.</summary>
+        public bool[] GroundTable { get { return _ground; } set { _ground = value; } }
+        bool[] _ground;
 
         readonly VoxelWorld _voxels;
         readonly MaterialTable _materials;
@@ -45,7 +71,8 @@ namespace Godless.Sim.Build
         readonly DepositMap _deposits;
 
         /// <summary>The island builders walk on, so a straight walk never goes out to sea (S2G). May be null.</summary>
-        internal IslandMap _island;
+        public IslandMap Island { get { return _island; } set { _island = value; } }
+        IslandMap _island;
         readonly int _ticksPerDay;
 
         public Construction(VoxelWorld voxels, MaterialTable materials, VoxelTypes types,
@@ -193,6 +220,15 @@ namespace Godless.Sim.Build
                 if (material < 0) { project.Placed++; continue; }
 
                 Int3 at = World(project, x, y, z);
+
+                // The hill already stands where this piece of back wall goes (S2O).
+                if (project.EarthBacked && plan.At(x, y, z) == WallRole
+                    && OnBack(project, x - Grammar.Margin, z - Grammar.Margin, plan.Width - 2 * Grammar.Margin, plan.Depth - 2 * Grammar.Margin)
+                    && IsHillside(_voxels.Get(at)))
+                {
+                    project.Placed++;
+                    continue;
+                }
                 // Rethought today and still not to be had: a few voxels of a
                 // hearth stone the land no longer holds do not hold up a house.
                 // Use what the yard has, the same kind of thing if it can, and
@@ -258,8 +294,60 @@ namespace Godless.Sim.Build
                                          project.Built.TotalVoxels, project.Plan.Capacity,
                                          new[] { project.Intent.Kind.Id });
 
-            ClearSite(settlement, project, tick);
-            Groundworks(project, tick, annals);
+            if (project.PartKind == "storey") Unroof(settlement, project, tick);
+            else
+            {
+                ClearSite(settlement, project, tick);
+                Groundworks(project, tick, annals);
+            }
+        }
+
+        /// <summary>
+        /// A storey goes on where the roof was (S2P): the host's roof and gables
+        /// come off first, into the yard, citing the storey that took them.
+        /// </summary>
+        void Unroof(Settlement settlement, Project storey, long tick)
+        {
+            Project host = storey.Beneath ?? storey.Host;
+            if (host == null || !host.Complete) return;
+            int roofY = RoofBase(host.Plan);
+            if (roofY < 0) return;
+            for (int y = roofY; y < host.Plan.Height; y++)
+                for (int z = 0; z < host.Plan.Depth; z++)
+                    for (int x = 0; x < host.Plan.Width; x++)
+                    {
+                        ushort type = host.Built.At(x, y, z);
+                        if (type == VoxelTypes.AirId) continue;
+                        Int3 at = World(host, x, y, z);
+                        if (_voxels.Get(at) != type) continue;
+                        _voxels.Set(at, VoxelTypes.AirId, tick, storey.Begun);
+                        int m = _materials.IndexOf(_types.SymbolOf(type));
+                        if (m >= 0) settlement.Stock.Add(m, 1);
+                    }
+        }
+
+        /// <summary>The lowest course of a blueprint's roof, or -1 when it has none.</summary>
+        public static int RoofBase(Blueprint plan)
+        {
+            int lo, hi;
+            plan.Span(Symbol.For("role.roof"), out lo, out hi);
+            return lo;
+        }
+
+        /// <summary>Storeys in a blueprint: the distinct courses holding a floor.</summary>
+        public static int Storeys(Blueprint plan)
+        {
+            Symbol floor = Symbol.For("role.floor");
+            int n = 0;
+            for (int y = 0; y < plan.Height; y++)
+            {
+                bool any = false;
+                for (int z = 0; z < plan.Depth && !any; z++)
+                    for (int x = 0; x < plan.Width && !any; x++)
+                        if (plan.At(x, y, z) == floor) any = true;
+                if (any) n++;
+            }
+            return n;
         }
 
         /// <summary>
@@ -289,9 +377,11 @@ namespace Godless.Sim.Build
                                          project.Built.TotalVoxels, project.Plan.Capacity,
                                          new[] { project.Intent.Kind.Id });
 
-            // A family moves in (S2N): whoever had no roof, or the overflow of
-            // whoever was most crowded.
-            Households.MoveIn(settlement, project, project.Plan.Capacity, tick, annals, done);
+            // A wing or a storey (S2P) is more room in a home that stands: its
+            // beds are the host family's. A house of its own takes a family in
+            // (S2N): whoever had no roof, or the overflow of whoever was most crowded.
+            if (project.Host == null)
+                Households.MoveIn(settlement, project, project.Plan.Capacity, tick, annals, done);
             if (project.Intent.Outstanding) settlement.Intents.Resolve(project.Intent, tick, annals, done);
         }
 
@@ -313,8 +403,12 @@ namespace Godless.Sim.Build
                     int target = ground.LevelAt(x, z), was = ground.GroundAt(x, z);
                     if (target < 0 || was < 0 || target == was) continue;
 
-                    int worldX = project.Site.ParcelX * ParcelGrid.Size + x;
-                    int worldZ = project.Site.ParcelZ * ParcelGrid.Size + z;
+                    // Backed into the slope (S2O): the hillside under the back
+                    // wall is not dug away. It stands as that wall.
+                    if (project.EarthBacked && target < was && OnBack(project, x, z, ground.Width, ground.Depth)) continue;
+
+                    int worldX = project.Site.ParcelX * ParcelGrid.Size + project.OffsetX + x;
+                    int worldZ = project.Site.ParcelZ * ParcelGrid.Size + project.OffsetZ + z;
                     ushort surface = _voxels.Store.Get(worldX, was - 1, worldZ);
 
                     for (int y = System.Math.Min(target, was); y < System.Math.Max(target, was); y++)
@@ -336,9 +430,9 @@ namespace Godless.Sim.Build
         /// <summary>Where a blueprint cell stands in the world, once the site is under it.</summary>
         public static Int3 World(Project project, int x, int y, int z)
         {
-            int originX = project.Site.ParcelX * ParcelGrid.Size - Grammar.Margin;
-            int originZ = project.Site.ParcelZ * ParcelGrid.Size - Grammar.Margin;
-            return new Int3(originX + x, project.Site.Ground + y, originZ + z);
+            int originX = project.Site.ParcelX * ParcelGrid.Size - Grammar.Margin + project.OffsetX;
+            int originZ = project.Site.ParcelZ * ParcelGrid.Size - Grammar.Margin + project.OffsetZ;
+            return new Int3(originX + x, project.Site.Ground + project.OffsetY + y, originZ + z);
         }
 
         /// <summary>

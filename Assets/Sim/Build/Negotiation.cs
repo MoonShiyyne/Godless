@@ -178,6 +178,22 @@ namespace Godless.Sim.Build
             }
         }
 
+        /// <summary>
+        /// Ground for a part that must meet its host's floor (S2P): levelled to
+        /// that floor, or on posts to it if the host stands on posts. Columns
+        /// start at a world column, not a parcel, because a part is set against
+        /// a wall rather than on a parcel line.
+        /// </summary>
+        public static GroundPlan AtFloor(ParcelGrid grid, int worldX, int worldZ, int width, int depth, int floor, bool stilts)
+        {
+            var ground = new int[width * depth];
+            for (int z = 0; z < depth; z++)
+                for (int x = 0; x < width; x++)
+                    ground[z * width + x] = grid.GroundAt(Clamp(worldX + x, ChunkStore.SizeX), Clamp(worldZ + z, ChunkStore.SizeZ)) + 1;
+            if (stilts) return new GroundPlan { Strategy = GroundStrategy.Stilt, Level = null, Width = width, Depth = depth, Floor = floor, Ground = ground };
+            return new GroundPlan { Strategy = GroundStrategy.CutAndFill, Level = Flat(ground, width, depth, floor), Width = width, Depth = depth, Floor = floor, Ground = ground };
+        }
+
         static int Clamp(int v, int n) { return v < 0 ? 0 : (v >= n ? n - 1 : v); }
 
         static int[] Flat(int[] ground, int width, int depth, int level)

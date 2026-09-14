@@ -185,6 +185,36 @@ traffic is high, abandoned when it falls (Part 16).
   of times; `Sim.Tests/TestIslands.cs` makes each once and hands out deep
   copies. It is seven minutes now and still too slow.
 
+### What S2O and S2P shipped
+
+- **Dwelling programs** (`Build/DwellingProgram.cs`): the brief for a home
+  before its shape — the families it is for (several under one long roof in a
+  communal culture), their beds plus a quarter again to grow into, and the
+  family they are kin to. The grammar takes the program's `capacity` as an
+  override and builds the rest of the house round it.
+- **The search:** every quarter turn of the plan on the best six sites for its
+  footprint, weighed by content preferences over the genome
+  (`siting/shelter.json` → `prefer`): door to the fire, door to the sun,
+  stepping out downhill, backed into the slope, near kin. The winner's reasons
+  are kept on the project ("its door faces the fire; it is backed into the
+  slope"), and `sim settle` prints them.
+- **Using the ground:** a house backed into a slope leaves the hillside under
+  its back wall undug, and the wall cells the hill already fills are not built.
+- **Additions** (`grammars/wing.json`, `grammars/storey.json`, marked `part`):
+  a crowded family's program also tries a wing against each wall but the front
+  — at the house's floor, claimed as part of the house, daylight kept from
+  everyone else — and a storey where the walls carry and the culture builds
+  that high: the roof comes off into the yard and goes back on above the new
+  storey. Wing, storey or a house apart is the culture's weighing
+  (`prefer.wing/storey/apart`); a family only a bed or two short waits for room
+  it can add rather than sending one or two off to a hut.
+- Measured, green shore seed 7, ten years: 30 buildings for 139 people where
+  there had been 58 mostly two-bed huts in six years — second and third storeys,
+  wings on the south, east and west sides, a door to the fire or the sun on
+  every house and a reason for each.
+- Invariant (S2P, settled batch): every wing and storey belongs to a standing
+  house. The first full run caught a wing pressed against the hearth's parcel.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

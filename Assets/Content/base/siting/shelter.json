@@ -9,6 +9,27 @@
   // rise across the parcel, parcel.water and parcel.hearth are in parcels.
   "searchRadiusParcels": 20,
 
+  // S2O. Once the ground is scored, how the house sits on it. Each is a
+  // weight, in the same language, over the genome: the dwelling program tries
+  // every way round on the best few sites and adds these up. A communal
+  // culture turns its doors to the fire; one that lets the light in turns
+  // them to the sun; a culture that keeps low backs its houses into the
+  // hillside so the slope is the back wall; everyone would rather step out
+  // downhill than climb out of their own door.
+  "prefer": {
+    "doorToFire": "lerp(0.2, 1.4, gene.communal_ratio)",
+    "doorToSun": "lerp(0.1, 0.9, gene.aperture_ratio)",
+    "doorDownhill": "0.6",
+    "backIntoSlope": "lerp(1.2, 0.0, gene.elevation_bias)",
+    "nearKin": "lerp(0.02, 0.2, gene.communal_ratio)",
+
+    // S2P. What a crowded family would rather do than move out: add a wing
+    // beside the house, add a storey on top of it, or build again apart.
+    "wing": "lerp(0.4, 1.4, gene.communal_ratio)",
+    "storey": "lerp(-0.4, 1.6, gene.verticality)",
+    "apart": "lerp(0.9, 0.0, gene.communal_ratio)"
+  },
+
   // Hard requirements: dry land, not a bog, and not a cliff.
   "allow": "parcel.land * (parcel.wet < 5) * (parcel.slope < 10)",
 

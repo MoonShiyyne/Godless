@@ -49,7 +49,7 @@ namespace Godless.Sim.Settlements
         {
             return (world, into) =>
             {
-                long people = 0, inSea = 0, outside = 0, houses = 0;
+                long people = 0, inSea = 0, outside = 0, houses = 0, parts = 0, orphaned = 0;
                 IslandMap island = world.Island;
                 foreach (Settlement s in world.Settlements)
                 {
@@ -59,13 +59,23 @@ namespace Godless.Sim.Settlements
                         if (a.X < 0 || a.Z < 0 || a.X >= ChunkStore.SizeX || a.Z >= ChunkStore.SizeZ) { outside++; continue; }
                         if (island != null && !island.IsLand(a.X, a.Z)) inSea++;
                     }
-                    foreach (Build.Project p in s.Projects) if (p.Complete) houses++;
+                    foreach (Build.Project p in s.Projects)
+                    {
+                        if (p.Complete && p.Host == null) houses++;
+                        if (p.Host != null)
+                        {
+                            parts++;
+                            if (!p.Host.Complete || !s.Projects.Contains(p.Host) || !Contains(p.Host.Added, p)) orphaned++;
+                        }
+                    }
                 }
                 into.Record("settlements.count", world.Settlements.Count);
                 into.Record("people.count", people);
                 into.Record("people.in-sea", inSea);
                 into.Record("people.outside", outside);
                 into.Record("houses.standing", houses);
+                into.Record("houses.additions", parts);
+                into.Record("houses.orphaned-additions", orphaned);
 
                 long overfull = 0, worked = 0;
                 if (island != null && island.Deposits != null)
@@ -79,6 +89,12 @@ namespace Godless.Sim.Settlements
             };
         }
 
+        static bool Contains(IReadOnlyList<Build.Project> list, Build.Project p)
+        {
+            for (int i = 0; i < list.Count; i++) if (list[i] == p) return true;
+            return false;
+        }
+
         public static IReadOnlyList<Invariant> All()
         {
             return new List<Invariant>
@@ -89,6 +105,10 @@ namespace Godless.Sim.Settlements
                     run => run.Metric("people.in-sea") == 0.0),
                 Invariant.PerRun("S2G", "everybody is somewhere on the island",
                     run => run.Metric("people.outside") == 0.0),
+
+                // S2P. A wing or a storey is always part of a house that stands.
+                Invariant.PerRun("S2P", "every wing and storey belongs to a standing house",
+                    run => run.Metric("houses.orphaned-additions") == 0.0),
 
                 // S2F. Growing back restores what was cut, never more.
                 Invariant.PerRun("S2F", "no deposit holds more than it grew with",

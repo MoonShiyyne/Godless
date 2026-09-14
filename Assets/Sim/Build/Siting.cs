@@ -45,6 +45,36 @@ namespace Godless.Sim.Build
 
         /// <summary>How far from the hearth the settlement will look, in parcels.</summary>
         public int SearchRadius { get; internal set; }
+
+        /// <summary>
+        /// How a building would rather sit on the ground it gets, and what a
+        /// crowded family would rather do (S2O, S2P): weights over the genome,
+        /// by name. Missing ones weigh nothing.
+        /// </summary>
+        internal readonly Dictionary<string, Expr> Prefer = new Dictionary<string, Expr>();
+
+        public static readonly string[] Preferences =
+            { "doorToFire", "doorToSun", "doorDownhill", "backIntoSlope", "nearKin", "wing", "storey", "apart" };
+
+        /// <summary>A preference's weight for a genome, or zero if content gives none.</summary>
+        public double Weight(string name, Genome genome)
+        {
+            Expr e;
+            if (!Prefer.TryGetValue(name, out e)) return 0.0;
+            return e.Eval(new GenomeScope(genome));
+        }
+
+        sealed class GenomeScope : IExprScope
+        {
+            readonly Genome _g;
+            public GenomeScope(Genome g) { _g = g; }
+            public double Resolve(string name)
+            {
+                if (_g == null || !name.StartsWith("gene.", System.StringComparison.Ordinal)) return 0.0;
+                double v = _g[Symbol.For(name)];
+                return double.IsNaN(v) ? 0.0 : v;
+            }
+        }
     }
 
     /// <summary>
@@ -117,8 +147,28 @@ namespace Godless.Sim.Build
                 }
                 if (fault == null) fault = CheckNames(allow, genes) ?? CheckNames(score, genes);
 
+                var prefer = new Dictionary<string, Expr>();
+                JsonValue preferDoc = doc["prefer"];
+                foreach (string key in preferDoc.Keys)
+                {
+                    if (fault != null) break;
+                    if (System.Array.IndexOf(SitingRule.Preferences, key) < 0)
+                    { fault = "prefers '" + key + "', which is not something a building can prefer"; break; }
+                    try
+                    {
+                        Expr e = Expr.Parse(preferDoc[key].AsString("0"));
+                        var names = new List<string>();
+                        e.Names(names);
+                        foreach (string n in names)
+                            if (!n.StartsWith("gene.", System.StringComparison.Ordinal) || genes.IndexOf(Symbol.For(n)) < 0)
+                            { fault = "weighs '" + key + "' by '" + n + "', which is not a gene"; break; }
+                        prefer[key] = e;
+                    }
+                    catch (ExprException e) { fault = "has a broken preference '" + key + "': " + e.Message; }
+                }
+
                 if (fault != null) { problems.Add("siting '" + id + "' " + fault + "."); continue; }
-                loaded.Add(new SitingRule
+                var rule = new SitingRule
                 {
                     Id = Symbol.For("siting." + id),
                     Name = id,
@@ -127,7 +177,13 @@ namespace Godless.Sim.Build
                     Allow = allow,
                     Score = score,
                     SearchRadius = doc["searchRadiusParcels"].AsInt32(12),
-                });
+                };
+                foreach (string key in SitingRule.Preferences)
+                {
+                    Expr e;
+                    if (prefer.TryGetValue(key, out e)) rule.Prefer[key] = e;
+                }
+                loaded.Add(rule);
             }
 
             loaded.Sort((a, b) => a.Id.CompareTo(b.Id));
@@ -158,12 +214,26 @@ namespace Godless.Sim.Build
 
         /// <summary>
         /// The best parcel the building fits on, or null when the settlement
-        /// has nowhere left it will build. Writes the site.chosen record,
-        /// caused by the intent that asked for it, and claims the ground.
+        /// has nowhere left it will build. Chooses, records and claims.
         /// </summary>
         public static Site Choose(Settlement settlement, BuildIntent intent, Blueprint plan, SitingRule rule,
                                   ParcelGrid grid, ConstraintFields fields, Genome genome,
                                   long tick, Annalist annals)
+        {
+            List<Site> sites = Candidates(settlement, intent, plan, rule, grid, fields, genome, 1);
+            if (sites.Count == 0) return null;
+            Commit(settlement, intent, sites[0], grid, tick, annals);
+            return sites[0];
+        }
+
+        /// <summary>
+        /// The best few parcels a footprint fits on, best first, without
+        /// claiming anything (S2O): the dwelling program weighs each against
+        /// how the house would sit there before it commits to one.
+        /// </summary>
+        public static List<Site> Candidates(Settlement settlement, BuildIntent intent, Blueprint plan, SitingRule rule,
+                                            ParcelGrid grid, ConstraintFields fields, Genome genome, int keep,
+                                            bool[] reachable = null)
         {
             int wide = Parcels(plan.Width - 2 * Grammar.Margin);
             int deep = Parcels(plan.Depth - 2 * Grammar.Margin);
@@ -175,10 +245,9 @@ namespace Godless.Sim.Build
 
             // Ground you can still walk to from the fire without crossing
             // somebody's house. Flooded once, rather than pathed per candidate.
-            bool[] reachable = Reachable(settlement, grid);
+            if (reachable == null) reachable = Reachable(settlement, grid);
 
-            Site best = null;
-            double bestScore = double.NegativeInfinity;
+            var best = new List<Site>();
             for (int pz = hz - rule.SearchRadius; pz <= hz + rule.SearchRadius; pz++)
                 for (int px = hx - rule.SearchRadius; px <= hx + rule.SearchRadius; px++)
                 {
@@ -198,29 +267,50 @@ namespace Godless.Sim.Build
                             if (here < score) score = here;
                         }
 
-                    if (score > bestScore) { bestScore = score; best = new Site { ParcelX = px, ParcelZ = pz, ParcelsWide = wide, ParcelsDeep = deep, Score = score }; }
+                    // Keep the best few, strictly better first, so ties keep scan order.
+                    if (best.Count == keep && score <= best[best.Count - 1].Score) continue;
+                    var site = new Site { ParcelX = px, ParcelZ = pz, ParcelsWide = wide, ParcelsDeep = deep, Score = score };
+                    int at = best.Count;
+                    while (at > 0 && best[at - 1].Score < score) at--;
+                    best.Insert(at, site);
+                    if (best.Count > keep) best.RemoveAt(best.Count - 1);
                 }
+            return best;
+        }
 
-            if (best == null) return null;
-
+        /// <summary>Settles a site's floor level, records the choice and claims the ground.</summary>
+        public static void Commit(Settlement settlement, BuildIntent intent, Site site, ParcelGrid grid, long tick, Annalist annals)
+        {
+            int wide = site.ParcelsWide, deep = site.ParcelsDeep;
             int ground = 0;
             for (int dz = 0; dz < deep; dz++)
                 for (int dx = 0; dx < wide; dx++)
                 {
-                    int g = grid.MaxGround(best.ParcelX + dx, best.ParcelZ + dz);
+                    int g = grid.MaxGround(site.ParcelX + dx, site.ParcelZ + dz);
                     if (g > ground) ground = g;
                 }
-            best.Ground = ground + 1;
+            site.Ground = ground + 1;
 
-            var place = new Int3(best.ParcelX * ParcelGrid.Size + wide * ParcelGrid.Size / 2, best.Ground,
-                                 best.ParcelZ * ParcelGrid.Size + deep * ParcelGrid.Size / 2);
-            best.Record = annals.Write(tick, ChosenKind, settlement.Id, place, intent.Record,
-                                       (long)(best.Score * 1000.0), wide * deep, new[] { intent.Kind.Id });
+            var place = new Int3(site.ParcelX * ParcelGrid.Size + wide * ParcelGrid.Size / 2, site.Ground,
+                                 site.ParcelZ * ParcelGrid.Size + deep * ParcelGrid.Size / 2);
+            site.Record = annals.Write(tick, ChosenKind, settlement.Id, place, intent.Record,
+                                       (long)(site.Score * 1000.0), wide * deep, new[] { intent.Kind.Id });
 
             for (int dz = 0; dz < deep; dz++)
-                for (int dx = 0; dx < wide; dx++) settlement.ClaimParcel(best.ParcelX + dx, best.ParcelZ + dz, best.Record);
-            return best;
+                for (int dx = 0; dx < wide; dx++) settlement.ClaimParcel(site.ParcelX + dx, site.ParcelZ + dz, site.Record);
         }
+
+        /// <summary>One parcel's siting score for a rule, as the scorer computes it (S2P: wings are scored the same way).</summary>
+        public static double ScoreParcel(Settlement settlement, SitingRule rule, ParcelGrid grid, ConstraintFields fields,
+                                         Genome genome, int px, int pz)
+        {
+            var scope = new ParcelScope { Fields = fields, Grid = grid, Genome = genome, X = px, Z = pz,
+                                          HearthX = settlement.HearthParcelX, HearthZ = settlement.HearthParcelZ };
+            return rule.Score.Eval(scope);
+        }
+
+        /// <summary>Walkable-from-the-fire parcels, once per planning pass (S1B).</summary>
+        public static bool[] ReachableFromFire(Settlement settlement, ParcelGrid grid) { return Reachable(settlement, grid); }
 
         static int Parcels(int voxels) { return (voxels + ParcelGrid.Size - 1) / ParcelGrid.Size; }
 

@@ -37,7 +37,14 @@ namespace Godless.Sim.Build
         /// <summary>The grammar that builds this intent kind, or null. The first in stable-hash order.</summary>
         public Grammar For(string intentKind)
         {
-            foreach (Grammar g in _grammars) if (g.Builds == intentKind) return g;
+            foreach (Grammar g in _grammars) if (g.Builds == intentKind && string.IsNullOrEmpty(g.PartOf)) return g;
+            return null;
+        }
+
+        /// <summary>The grammar for a part — a wing, a storey — added to a building of this kind (S2P), or null.</summary>
+        public Grammar PartFor(string intentKind, string part)
+        {
+            foreach (Grammar g in _grammars) if (g.Builds == intentKind && g.PartOf == part) return g;
             return null;
         }
 
@@ -78,6 +85,7 @@ namespace Godless.Sim.Build
                     Id = Symbol.For("grammar." + _id),
                     Name = _id,
                     Builds = doc["builds"].AsString(""),
+                    PartOf = doc["part"].AsString(""),
                     Tell = doc["tell"].AsString("").Trim(),
                     Axiom = doc["axiom"].AsString("Lot"),
                     Rules = new Dictionary<string, Grammar.Op>(),

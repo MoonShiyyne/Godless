@@ -118,7 +118,11 @@ namespace Godless.Sim.Settlements
                  .Add(new DepositSystem(grid))
                  .Add(new TaskSystem(new Construction(world.Voxels, materials, world.VoxelTypes, tiles, palette,
                                                       deposits: world.Island != null ? world.Island.Deposits : null,
-                                                      ticksPerDay: world.Clock.TicksPerDay) { _island = world.Island }, grid))
+                                                      ticksPerDay: world.Clock.TicksPerDay)
+                 {
+                     Island = world.Island,
+                     GroundTable = TerrainBrush.SolidTable(content, world.VoxelTypes),
+                 }, grid))
                  .Add(new MovementSystem(grid, rules));
         }
 
