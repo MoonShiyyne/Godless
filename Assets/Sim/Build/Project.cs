@@ -47,6 +47,9 @@ namespace Godless.Sim.Build
 
         public bool Complete { get; internal set; }
 
+        /// <summary>Brought down (S2T). It is rubble now, and out of the settlement's buildings.</summary>
+        public bool Destroyed { get; internal set; }
+
         /// <summary>The day its materials were last remade from what can be had (S2F), so it is not remade every tick.</summary>
         internal long RethoughtOn = -1;
 
@@ -76,6 +79,13 @@ namespace Godless.Sim.Build
 
         /// <summary>Voxels its blueprint is shifted from its site's usual origin, so a part meets its host.</summary>
         internal int OffsetX, OffsetY, OffsetZ;
+
+        // ── S2S: what is inside ─────────────────────────────────────────────
+
+        internal readonly List<Furnishing.Bed> BedList = new List<Furnishing.Bed>();
+
+        /// <summary>The beds laid in it when it was finished, one per sleeping place where they fit.</summary>
+        public IReadOnlyList<Furnishing.Bed> Beds { get { return BedList; } }
 
         /// <summary>For a storey: the part whose roof comes off to make room for it — the host, or the storey below.</summary>
         internal Project Beneath;

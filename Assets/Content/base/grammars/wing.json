@@ -3,7 +3,7 @@
   "id": "wing",
   "builds": "shelter",
   "part": "wing",
-  "tell": "A crowded family builds a room onto the side of its house: one storey, its own roof, its own door, a season younger than the walls it leans on.",
+  "tell": "A crowded family builds a room onto the side of its house, with its own roof and door and a way through into the house. Against a tall house it is a low lean-to under the upper windows, unless the culture builds tall — then the wing rises the house's full height.",
 
   // S2P. A wing is a single storey room with its own roof and door. Its size
   // comes from the beds it is for (the program overrides "capacity"); its
@@ -12,6 +12,11 @@
   "axiom": "Lot",
   "let": {
     "capacity": "2",
+
+    // S2P. The program sets these against the house it joins: how many
+    // storeys to rise, and how steep a roof, so a wing on a tall house either
+    // matches its height or keeps under its upper windows.
+    "storeys": "1",
     "area": "capacity * 18 + 12",
     "width": "max(5, round(sqrt(area * 1.4)))",
     "depth": "max(4, round(area / width))",
@@ -23,7 +28,7 @@
     "windowWidth": "round(lerp(1, 4, gene.aperture_ratio))",
     "windowHeight": "round(lerp(1, 3, gene.aperture_ratio))",
     "sill": "2",
-    "bodyHeight": "palette.floor + 1",
+    "bodyHeight": "storeys * palette.floor + 1",
     "height": "raise + bodyHeight + roofRise"
   },
 
@@ -39,8 +44,17 @@
 
     "Body": { "op": "split", "axis": "v", "parts": [
       { "size": 1, "rule": "Floor" },
-      { "size": "~1", "rule": { "op": "comp", "front": "DoorFacade", "back": "Facade", "ends": "Facade" } }
+      { "size": "~1", "rule": { "op": "repeat", "axis": "v", "count": "storeys", "rule": "Storey" } }
     ] },
+    "Storey": [
+      { "op": "comp", "front": "Front", "back": "Facade", "ends": "Facade" },
+      { "op": "choose", "if": "index < count - 1", "then": "UpperFloor" }
+    ],
+    "UpperFloor": { "op": "split", "axis": "v", "parts": [
+      { "size": "~1", "rule": null },
+      { "size": 1, "rule": "Floor" }
+    ] },
+    "Front": { "op": "choose", "if": "index == 0", "then": "DoorFacade", "else": "Facade" },
 
     "DoorFacade": { "op": "split", "axis": "u", "parts": [
       { "size": "~1", "rule": "Facade" },

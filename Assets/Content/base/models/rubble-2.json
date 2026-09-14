@@ -1,0 +1,47 @@
+{
+  // S2T. A broken voxel's worth of a fallen building, in detail cells.
+  "type": "model",
+  "id": "rubble-2",
+  "tell": "A fallen building is a heap of what it was made of: oak rubble where an oak house stood, stone where a stone one did, lying where it fell until someone builds on it or carries it off.",
+  "size": {
+    "x": 4,
+    "y": 4,
+    "z": 4
+  },
+  "paint": {
+    "m": {
+      "slot": "material"
+    },
+    "d": {
+      "hue": 30,
+      "saturation": 10,
+      "value": 40
+    }
+  },
+  "layers": [
+    [
+      "m..m",
+      "..mm",
+      ".mmm",
+      "mmm."
+    ],
+    [
+      "m..m",
+      "mdm.",
+      "mm.m",
+      "d.m."
+    ],
+    [
+      "m..d",
+      "..md",
+      ".m.d",
+      "..md"
+    ],
+    [
+      "m...",
+      "....",
+      "....",
+      "...."
+    ]
+  ]
+}

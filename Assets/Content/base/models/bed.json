@@ -1,0 +1,68 @@
+{
+  // S2S. A bed, in detail cells: 12.5 cm each, so two metres by one.
+  "type": "model",
+  "id": "bed",
+  "tell": "One bed for each person a house sleeps, laid out on its floors in the house's own timber: a family of six has six beds, and when the house comes down so do they.",
+  "size": {
+    "x": 16,
+    "y": 4,
+    "z": 8
+  },
+  "paint": {
+    "f": {
+      "slot": "frame"
+    },
+    "b": {
+      "hue": 28,
+      "saturation": 30,
+      "value": 55
+    },
+    "p": {
+      "hue": 40,
+      "saturation": 15,
+      "value": 82
+    }
+  },
+  "layers": [
+    [
+      "f..............f",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "f..............f"
+    ],
+    [
+      "ffffffffffffffff",
+      "ffffffffffffffff",
+      "ffffffffffffffff",
+      "ffffffffffffffff",
+      "ffffffffffffffff",
+      "ffffffffffffffff",
+      "ffffffffffffffff",
+      "ffffffffffffffff"
+    ],
+    [
+      "f...............",
+      "fbbbbbbbbbbbbbb.",
+      "fpppbbbbbbbbbbb.",
+      "fpppbbbbbbbbbbb.",
+      "fpppbbbbbbbbbbb.",
+      "fpppbbbbbbbbbbb.",
+      "fbbbbbbbbbbbbbb.",
+      "f..............."
+    ],
+    [
+      "f...............",
+      "f...............",
+      "f...............",
+      "f...............",
+      "f...............",
+      "f...............",
+      "f...............",
+      "f..............."
+    ]
+  ]
+}

@@ -123,6 +123,14 @@ namespace Godless.Sim.Settlements
             _claims[pz * World.ParcelGrid.Width + px] = owner.Index;
         }
 
+        /// <summary>Gives back every parcel a record holds (S2T): a fallen building's ground.</summary>
+        public void ReleaseClaims(RecordId owner)
+        {
+            var mine = new List<int>();
+            foreach (KeyValuePair<int, int> c in _claims) if (c.Value == owner.Index) mine.Add(c.Key);
+            foreach (int parcel in mine) _claims.Remove(parcel);
+        }
+
         public bool IsClaimed(int px, int pz)
         {
             return World.ParcelGrid.InBounds(px, pz) && _claims.ContainsKey(pz * World.ParcelGrid.Width + px);
@@ -143,6 +151,16 @@ namespace Godless.Sim.Settlements
 
         /// <summary>The culture's dispositions (S17). What the grammar and the siting read.</summary>
         public Culture.Genome Genome { get; set; }
+
+        // S2T. What fell, and the heaps it left.
+        internal readonly List<Build.RubbleCell> RubbleList = new List<Build.RubbleCell>();
+        internal readonly List<Build.Project> RuinList = new List<Build.Project>();
+
+        /// <summary>Rubble lying in the settlement, waiting to be carried off or built over.</summary>
+        public IReadOnlyList<Build.RubbleCell> Rubble { get { return RubbleList; } }
+
+        /// <summary>Buildings that came down, in the order they fell.</summary>
+        public IReadOnlyList<Build.Project> Ruins { get { return RuinList; } }
 
         /// <summary>Buildings commissioned and not yet standing (S15, S1A).</summary>
         public List<Build.Project> Projects { get; } = new List<Build.Project>();

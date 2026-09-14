@@ -1,3 +1,5 @@
+using Godless.Sim.Settlements;
+using Godless.Sim.Build;
 using System.Collections.Generic;
 using Godless.Sim.Annals;
 using Godless.Sim.Core;
@@ -76,7 +78,10 @@ namespace Godless.Unity
                 Status = "viewing the past — return to the present to act";
                 return;
             }
-            Status = "brush radius " + radius + "   (click raise, shift-click lower, [ ] size)";
+            Status = "brush radius " + radius + "   (click raise, shift-click lower, [ ] size, X bring down the building under the pointer)";
+
+            // S2T: a god's hand on a building.
+            if (keys != null && keys.xKey.wasPressedThisFrame) DemolishAt(mouse.position.ReadValue());
 
             if (!mouse.leftButton.isPressed) return;
             if (Time.unscaledTime < _nextStroke) return;
@@ -84,6 +89,57 @@ namespace Godless.Unity
 
             bool lower = keys != null && (keys.leftShiftKey.isPressed || keys.rightShiftKey.isPressed);
             StrokeAt(mouse.position.ReadValue(), lower);
+        }
+
+        /// <summary>
+        /// Brings down whatever building stands under a screen point, and
+        /// everything added to it (S2T). The same collapse any cause uses; this
+        /// one's cause is the god. Returns false when nothing was hit.
+        /// </summary>
+        public bool DemolishAt(Vector2 pointer)
+        {
+            var world = _boot.World;
+            Settlement town = _boot.Town;
+            if (world == null || town == null || _solid == null) return false;
+            Camera cam = Camera.main;
+            if (cam == null) return false;
+            Ray ray = cam.ScreenPointToRay(pointer);
+
+            VoxelRaycast.Hit hit;
+            if (!VoxelRaycast.Cast(world.Voxels.Store, ray.origin.x, ray.origin.y, ray.origin.z,
+                                   ray.direction.x, ray.direction.y, ray.direction.z, 3000,
+                                   id => id != VoxelTypes.AirId && id != _water, out hit))
+                return false;
+
+            Project target = null;
+            foreach (Project p in town.Projects)
+            {
+                if (p.Host != null) continue;
+                Int3 a = Construction.World(p, 0, 0, 0);
+                Int3 b = Construction.World(p, p.Plan.Width - 1, p.Plan.Height - 1, p.Plan.Depth - 1);
+                bool inside = hit.Voxel.X >= a.X && hit.Voxel.X <= b.X && hit.Voxel.Z >= a.Z && hit.Voxel.Z <= b.Z && hit.Voxel.Y >= a.Y - 1 && hit.Voxel.Y <= b.Y;
+                foreach (Project added in p.Added)
+                {
+                    Int3 c = Construction.World(added, 0, 0, 0);
+                    Int3 d = Construction.World(added, added.Plan.Width - 1, added.Plan.Height - 1, added.Plan.Depth - 1);
+                    if (hit.Voxel.X >= c.X && hit.Voxel.X <= d.X && hit.Voxel.Z >= c.Z && hit.Voxel.Z <= d.Z && hit.Voxel.Y >= c.Y - 1 && hit.Voxel.Y <= d.Y) inside = true;
+                }
+                if (inside) { target = p; break; }
+            }
+            if (target == null) return false;
+
+            world.Clock.Advance();
+            long tick = world.Clock.Tick;
+            int before = world.Voxels.Log.Count;
+            RecordId by = world.Annals.Write(tick, Symbol.For("god.brought-down"), Symbol.None, hit.Voxel, RecordId.None);
+            BiomeTable biomes = BiomeTable.FromContent(world.Content);
+            Collapse.BringDown(world, town, target, by, _solid, MaterialTable.FromContent(world.Content, biomes),
+                               DetailModelTable.FromContent(world.Content), _boot.Parcels);
+
+            IReadOnlyList<Godless.Sim.Deltas.VoxelDelta> log = world.Voxels.Log.All();
+            for (int i = before; i < log.Count; i++) _boot.View.MarkDirty(ChunkStore.PositionOf(log[i].ChunkIndex, log[i].VoxelIndex));
+            world.Voxels.EndTick(tick);
+            return true;
         }
 
         /// <summary>

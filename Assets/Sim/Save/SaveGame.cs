@@ -40,7 +40,7 @@ namespace Godless.Sim.Save
     public static class SaveGame
     {
         const uint Magic = 0x534C4447; // "GDLS" little-endian
-        const uint Version = 4;   // 4 records planted deposits (S2F); 3 names the map (S09 presets); 2 added annal contributors (S14)
+        const uint Version = 5;   // 5 carries the detail layer (S2R); 4 records planted deposits (S2F); 3 names the map (S09 presets); 2 added annal contributors (S14)
 
         public static void Write(Stream stream, SimWorld world, bool containsCodeMod = false)
         {
@@ -99,6 +99,22 @@ namespace Godless.Sim.Save
                 w.Write(d.OldType);
                 w.Write(d.NewType);
                 w.Write(d.Cause.Index);
+            }
+
+            // S2R: every detail placed or taken away, with its cause.
+            IReadOnlyList<Voxels.DetailChange> details = world.Details.Log;
+            w.Write(details.Count);
+            foreach (Voxels.DetailChange c in details)
+            {
+                w.Write(c.Tick);
+                w.Write(c.Added);
+                w.Write(c.Instance);
+                w.Write(c.Model.Hash);
+                w.Write(c.X); w.Write(c.Y); w.Write(c.Z);
+                w.Write((byte)c.Turn);
+                w.Write((ushort)(c.Slots == null ? 0 : c.Slots.Length));
+                if (c.Slots != null) foreach (ushort slot in c.Slots) w.Write(slot);
+                w.Write(c.Cause.Index);
             }
 
             w.Flush();
@@ -218,6 +234,28 @@ namespace Godless.Sim.Save
                 world.Voxels.ReplaySaved(dTick, chunk, voxel,
                                          Remap(remap, oldType), Remap(remap, newType),
                                          new RecordId(cause));
+            }
+
+            if (version >= 5)
+            {
+                int detailCount = r.ReadInt32();
+                for (int i = 0; i < detailCount; i++)
+                {
+                    var c = new Voxels.DetailChange
+                    {
+                        Tick = r.ReadInt64(),
+                        Added = r.ReadBoolean(),
+                        Instance = r.ReadInt32(),
+                        Model = Symbol.FromHash(r.ReadUInt64()),
+                        X = r.ReadInt32(), Y = r.ReadInt32(), Z = r.ReadInt32(),
+                        Turn = r.ReadByte(),
+                    };
+                    int slots = r.ReadUInt16();
+                    c.Slots = new ushort[slots];
+                    for (int k = 0; k < slots; k++) c.Slots[k] = Remap(remap, r.ReadUInt16());
+                    c.Cause = new RecordId(r.ReadInt32());
+                    world.Details.Replay(c);
+                }
             }
 
             world.Clock.RewindTo(tick);

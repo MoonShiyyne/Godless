@@ -69,6 +69,19 @@ namespace Godless.Sim.Settlements
                         }
                     }
                 }
+                // S2S, S2T: nothing a building left behind hangs in the air.
+                long floatingRubble = 0, floatingBeds = 0;
+                foreach (Settlement s in world.Settlements)
+                {
+                    foreach (Build.RubbleCell c in s.Rubble)
+                        if (world.Voxels.Get(c.At.X, c.At.Y - 1, c.At.Z) == VoxelTypes.AirId) floatingRubble++;
+                    foreach (Build.Project p in s.Projects)
+                        foreach (Build.Furnishing.Bed bed in p.Beds)
+                            if (world.Voxels.Get(bed.Centre.X, bed.Centre.Y - 1, bed.Centre.Z) == VoxelTypes.AirId) floatingBeds++;
+                }
+                into.Record("rubble.floating", floatingRubble);
+                into.Record("beds.floating", floatingBeds);
+
                 into.Record("settlements.count", world.Settlements.Count);
                 into.Record("people.count", people);
                 into.Record("people.in-sea", inSea);
@@ -105,6 +118,12 @@ namespace Godless.Sim.Settlements
                     run => run.Metric("people.in-sea") == 0.0),
                 Invariant.PerRun("S2G", "everybody is somewhere on the island",
                     run => run.Metric("people.outside") == 0.0),
+
+                // S2T. A fallen building's rubble lies on something; S2S, a bed stands on a floor.
+                Invariant.PerRun("S2T", "every heap of rubble rests on something",
+                    run => run.Metric("rubble.floating") == 0.0),
+                Invariant.PerRun("S2S", "every bed stands on a floor",
+                    run => run.Metric("beds.floating") == 0.0),
 
                 // S2P. A wing or a storey is always part of a house that stands.
                 Invariant.PerRun("S2P", "every wing and storey belongs to a standing house",

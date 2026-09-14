@@ -74,6 +74,13 @@ namespace Godless.Sim.Build
                 foreach (Household h in s.Households)
                 {
                     if (!h.Crowded) continue;
+
+                    // Room already on the way: the family waits for it rather
+                    // than asking for the same wing twice.
+                    bool coming = false;
+                    foreach (Project added in h.Homes[0].Added) if (!added.Complete) coming = true;
+                    foreach (Project p2 in s.Projects) if (!p2.Complete && p2.ForFamilies.Contains(h.Number)) coming = true;
+                    if (coming) continue;
                     int over = h.Size - h.Beds;
                     double d = Distance(h.Homes[0].Site.ParcelX, h.Homes[0].Site.ParcelZ, intent.ParcelX, intent.ParcelZ);
                     if (over > worstOver || (over == worstOver && d < worstDistance)) { worst = h; worstOver = over; worstDistance = d; }
@@ -266,8 +273,28 @@ namespace Godless.Sim.Build
             int hostZ0 = host.Site.ParcelZ * ParcelGrid.Size + host.OffsetZ;
             var beds = new Dictionary<string, double> { { "capacity", System.Math.Min(program.Beds, 8) } };
 
-            // A wing on each side but the front.
+            // How tall the house it joins is, storeys added on top included.
+            int hostStoreys = Construction.Storeys(host.Plan);
+            foreach (Project added in host.Additions) if (added.PartKind == "storey") hostStoreys++;
+
+            // A wing on each side but the front. Against a tall house it either
+            // matches the house's height, where the culture builds tall, or is a
+            // low lean-to that keeps under the upper storey's windows.
             Grammar wing = grammars.PartFor("shelter", "wing");
+            string wingForm = "";
+            if (hostStoreys >= 2)
+            {
+                if (Gene(genome, "gene.verticality") >= 0.6)
+                {
+                    beds["storeys"] = hostStoreys;
+                    wingForm = ", as tall as the house";
+                }
+                else
+                {
+                    beds["pitch"] = 0.25;
+                    wingForm = ", a lean-to under the upper windows";
+                }
+            }
             if (wing != null)
             {
                 Blueprint basePlan = wing.Build(genome, palette, 64, 64, budget, beds);
@@ -275,6 +302,9 @@ namespace Godless.Sim.Build
                 for (int side = 0; side < 4; side++)
                 {
                     if (side == host.DoorSide) continue;
+                    bool built = false;
+                    foreach (Project added in host.Additions) if (added.PartKind == "wing" && added.DoorSide == side) built = true;
+                    if (built) continue;
                     // Its own door looks outward, away from the house.
                     int q = baseDoor < 0 ? 0 : ((side - baseDoor) % 4 + 4) % 4;
                     Blueprint plan = basePlan.Rotated(q);
@@ -307,7 +337,7 @@ namespace Godless.Sim.Build
                     };
                     a.Ground = NegotiationTable.AtFloor(grid, x0, z0, wW, wD, host.Site.Ground,
                                                        host.Ground != null && host.Ground.Strategy == GroundStrategy.Stilt);
-                    a.Reasons.Add("a wing on the " + SideName(side) + " side of the house, for a family of " + program.Crowded.Size);
+                    a.Reasons.Add("a wing on the " + SideName(side) + " side of the house" + wingForm + ", for a family of " + program.Crowded.Size);
                     if (best == null || a.Score > best.Score) best = a;
                 }
             }

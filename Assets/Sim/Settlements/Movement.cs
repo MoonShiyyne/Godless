@@ -222,10 +222,14 @@ namespace Godless.Sim.Settlements
                 Household family = s.Households.Count > 0 ? Households.Of(s, a) : null;
                 if (night && a.ShelteredLastNight && family != null && family.Housed && !a.Crowded)
                 {
+                    // Their own bed (S2S): the family's beds, house then wings and
+                    // storeys, in the order the family's members joined it.
                     Project home = family.Home[0];
                     Int3 door = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);
                     gx = door.X; gz = door.Z;
                     doing = "asleep at home";
+                    Furnishing.Bed bed;
+                    if (BedOf(family, a, out bed)) { gx = bed.Centre.X; gz = bed.Centre.Z; doing = "asleep in bed"; }
                 }
                 else if (night && a.ShelteredLastNight && house < beds.Count)
                 {
@@ -262,6 +266,26 @@ namespace Godless.Sim.Settlements
                 Movement.OnLand(world.Island, ref gx, ref gz, s.Hearth.X, s.Hearth.Z);
                 Movement.Toward(a, _grid, gx, gz, s.Traffic, world.Island);
             }
+        }
+
+        /// <summary>The bed a person sleeps in: their place in the family's roll, among the family's beds.</summary>
+        static bool BedOf(Household family, Agent a, out Furnishing.Bed bed)
+        {
+            bed = default(Furnishing.Bed);
+            int place = family.Members.IndexOf(a.Id.Hash);
+            if (place < 0) return false;
+            foreach (Project home in family.Homes)
+            {
+                if (place < home.Beds.Count) { bed = home.Beds[place]; return true; }
+                place -= home.Beds.Count;
+                foreach (Project added in home.Added)
+                {
+                    if (!added.Complete) continue;
+                    if (place < added.Beds.Count) { bed = added.Beds[place]; return true; }
+                    place -= added.Beds.Count;
+                }
+            }
+            return false;
         }
 
         /// <summary>Where a worker's task puts them, and what to call it.</summary>

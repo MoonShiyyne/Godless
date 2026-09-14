@@ -116,11 +116,15 @@ namespace Godless.Sim.Settlements
                                      tiles, materials, palette, grid, fields,
                                      NegotiationTable.FromContent(content, genes)))
                  .Add(new DepositSystem(grid))
+                 .Add(new SupportSystem(TerrainBrush.SolidTable(content, world.VoxelTypes), materials,
+                                        DetailModelTable.FromContent(content), grid))
                  .Add(new TaskSystem(new Construction(world.Voxels, materials, world.VoxelTypes, tiles, palette,
                                                       deposits: world.Island != null ? world.Island.Deposits : null,
                                                       ticksPerDay: world.Clock.TicksPerDay)
                  {
                      Island = world.Island,
+                     Details = world.Details,
+                     Models = DetailModelTable.FromContent(content),
                      GroundTable = TerrainBrush.SolidTable(content, world.VoxelTypes),
                  }, grid))
                  .Add(new MovementSystem(grid, rules));

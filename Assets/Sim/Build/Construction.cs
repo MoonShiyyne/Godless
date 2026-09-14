@@ -56,6 +56,10 @@ namespace Godless.Sim.Build
             return voxel < _ground.Length && _ground[voxel];
         }
 
+        /// <summary>Where furniture and rubble go (S2R), and what they look like. Null leaves buildings unfurnished.</summary>
+        public DetailLayer Details { get; set; }
+        public DetailModelTable Models { get; set; }
+
         /// <summary>Which voxel ids are ground (TerrainBrush.SolidTable), for backing a house into a hill. Null disables it.</summary>
         public bool[] GroundTable { get { return _ground; } set { _ground = value; } }
         bool[] _ground;
@@ -326,6 +330,57 @@ namespace Godless.Sim.Build
                     }
         }
 
+        /// <summary>
+        /// Cuts a doorway, two voxels wide and four high, through the host's
+        /// wall and the wing's own where they meet, at the wing's floor and
+        /// in the middle of the wall they share.
+        /// </summary>
+        void OpenDoorway(Project wing, long tick, RecordId cause)
+        {
+            Project host = wing.Host;
+            int side = wing.DoorSide;          // the wing's door looks away from the house
+            if (side < 0) return;
+            int dx, dz;
+            Blueprint.SideStep(side, out dx, out dz);
+
+            int hostW = host.Plan.Width - 2 * Grammar.Margin, hostD = host.Plan.Depth - 2 * Grammar.Margin;
+            Int3 h0 = World(host, Grammar.Margin, 0, Grammar.Margin);
+            int wingW = wing.Plan.Width - 2 * Grammar.Margin, wingD = wing.Plan.Depth - 2 * Grammar.Margin;
+            Int3 w0 = World(wing, Grammar.Margin, 0, Grammar.Margin);
+
+            int lo, hi;
+            wing.Plan.Span(Symbol.For("role.floor"), out lo, out hi);
+            int floorY = w0.Y + (lo < 0 ? 0 : lo) + 1;
+
+            // The two walls: the host's on this side, and the wing's back.
+            int hostWall, wingWall;
+            if (dx != 0)
+            {
+                hostWall = dx > 0 ? h0.X + hostW - 1 : h0.X;
+                wingWall = dx > 0 ? w0.X : w0.X + wingW - 1;
+            }
+            else
+            {
+                hostWall = dz > 0 ? h0.Z + hostD - 1 : h0.Z;
+                wingWall = dz > 0 ? w0.Z : w0.Z + wingD - 1;
+            }
+            int along = dx != 0 ? w0.Z + wingD / 2 - 1 : w0.X + wingW / 2 - 1;
+
+            for (int y = floorY; y < floorY + 4; y++)
+                for (int a = along; a < along + 2; a++)
+                {
+                    foreach (int wall in new[] { hostWall, wingWall })
+                    {
+                        Int3 at = dx != 0 ? new Int3(wall, y, a) : new Int3(a, y, wall);
+                        if (!ChunkStore.InBounds(at.X, at.Y, at.Z)) continue;
+                        ushort here = _voxels.Get(at);
+                        if (here == VoxelTypes.AirId) continue;
+                        if (_materials.IndexOf(_types.SymbolOf(here)) < 0) continue;   // only building material, never the hill
+                        _voxels.Set(at, VoxelTypes.AirId, tick, cause);
+                    }
+                }
+        }
+
         /// <summary>The lowest course of a blueprint's roof, or -1 when it has none.</summary>
         public static int RoofBase(Blueprint plan)
         {
@@ -356,9 +411,15 @@ namespace Godless.Sim.Build
         /// </summary>
         void ClearSite(Settlement settlement, Project project, long tick)
         {
-            if (_deposits == null) return;
             Int3 lo = World(project, 0, 0, 0);
             Int3 hi = World(project, project.Plan.Width - 1, 0, project.Plan.Depth - 1);
+
+            // Rubble on the ground goes into the yard first (S2T): the old house
+            // becomes the new one's stock.
+            if (settlement.Rubble.Count > 0)
+                Collapse.ClearRubble(_voxels, Details, settlement, lo.X - 1, lo.Z - 1, hi.X + 1, hi.Z + 1, tick);
+
+            if (_deposits == null) return;
             int[] got = _deposits.Clear(lo.X - 1, lo.Z - 1, hi.X + 1, hi.Z + 1, _voxels, tick, project.Begun, _ticksPerDay);
             for (int k = 0; k < got.Length; k++)
             {
@@ -376,6 +437,13 @@ namespace Godless.Sim.Build
             RecordId done = annals.Write(tick, CompletedKind, settlement.Id, Centre(project), project.Begun,
                                          project.Built.TotalVoxels, project.Plan.Capacity,
                                          new[] { project.Intent.Kind.Id });
+
+            // A wing is a room of the house, not a shed beside it: a doorway goes
+            // through the wall the two share (S2P).
+            if (project.PartKind == "wing" && project.Host != null) OpenDoorway(project, tick, done);
+
+            // A bed for each sleeping place (S2S).
+            Furnishing.Furnish(project, Details, Models, _types, _materials, tick, done);
 
             // A wing or a storey (S2P) is more room in a home that stands: its
             // beds are the host family's. A house of its own takes a family in

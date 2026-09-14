@@ -49,6 +49,9 @@ namespace Godless.Sim.Harness
         public Annalist Annals { get; private set; }
         public VoxelWorld Voxels { get; private set; }
         public ContentDatabase Content { get; private set; }
+
+        /// <summary>Things drawn in detail cells — furniture, rubble — and why each is there (S2R).</summary>
+        public DetailLayer Details { get; } = new DetailLayer();
         public VoxelTypes VoxelTypes { get; private set; }
 
         /// <summary>

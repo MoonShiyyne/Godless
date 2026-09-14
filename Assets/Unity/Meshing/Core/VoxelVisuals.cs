@@ -50,6 +50,10 @@ namespace Godless.Meshing
                 JsonValue doc = content.Get("voxel", name);
                 bool solid = doc["solid"].AsBool(true);
 
+                // Drawn in detail cells by the detail layer (S2R), not as a block:
+                // the terrain mesher neither draws it nor hides faces behind it.
+                if (doc["detail"].AsBool(false)) { byId[id] = default(VoxelVisual); continue; }
+
                 byte r, g, b;
                 HslToRgb(doc["hue"].AsInt32(0), doc["saturation"].AsInt32(0), doc["value"].AsInt32(50),
                          out r, out g, out b);

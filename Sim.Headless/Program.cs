@@ -876,8 +876,11 @@ namespace Godless.Sim.Headless
             var construction = new Construction(world.Voxels, materials, types, tileset, palette,
                                                 deposits: island.Deposits, ticksPerDay: world.Clock.TicksPerDay);
             construction.GroundTable = solid;
+            construction.Details = world.Details;
+            construction.Models = DetailModelTable.FromContent(db);
             construction.Island = island;
             Profiled(world, cli, new DepositSystem(grid));
+            Profiled(world, cli, new SupportSystem(solid, materials, DetailModelTable.FromContent(db), grid));
             Profiled(world, cli, new TaskSystem(construction, grid));
             Profiled(world, cli, new MovementSystem(grid, rules));
             world.BeginHistory();
@@ -897,6 +900,22 @@ namespace Godless.Sim.Headless
                 // One row is dawn to night of one day, so an intent raised at
                 // dawn lands on the row of the day it was raised.
                 do world.Tick(); while (world.Clock.TickOfDay != world.Clock.TicksPerDay - 1);
+
+                // S2T: bring the first standing house down on the day asked for, as a god would.
+                if (d == cli.Int("demolish-day", -1))
+                {
+                    Project target = null;
+                    foreach (Project candidate in s.Projects) if (candidate.Complete && candidate.Host == null) { target = candidate; break; }
+                    if (target != null)
+                    {
+                        RecordId by = world.Annals.Write(world.Clock.Tick, Symbol.For("god.brought-down"), s.Id,
+                                                         Construction.World(target, target.Plan.Width / 2, 0, target.Plan.Depth / 2), RecordId.None);
+                        int parts = target.Added.Count;
+                        int fell = Collapse.BringDown(world, s, target, by, solid, materials, DetailModelTable.FromContent(db), grid);
+                        Console.WriteLine("  -- day " + world.Clock.TotalDays.ToString(c) + ": a god brought down " + target.Site.Record + " and "
+                            + parts.ToString(c) + " addition(s); " + fell.ToString(c) + " voxels fell");
+                    }
+                }
 
                 long day = world.Clock.TotalDays;
                 Sky sky = Weather.On(world.Streams, biome, day, world.Clock.DaysPerYear);
@@ -972,7 +991,8 @@ namespace Godless.Sim.Headless
                     if (project.Built.Cost[m] > 0) of.Add(project.Built.Cost[m].ToString(c) + " " + materials[m].Name);
                 Console.WriteLine("  " + project.Site.Record + " parcel (" + project.Site.ParcelX.ToString(c) + ", "
                     + project.Site.ParcelZ.ToString(c) + ") score " + project.Site.Score.ToString("0.0", c)
-                    + ", sleeps " + project.Plan.Capacity.ToString(c) + ", " + string.Join(" + ", of)
+                    + ", sleeps " + project.Plan.Capacity.ToString(c) + (project.Complete ? " in " + project.Beds.Count.ToString(c) + " beds" : "")
+                    + ", " + string.Join(" + ", of)
                     + "   " + (project.Complete ? "standing" : project.Placed + " of " + project.Built.TotalVoxels + " laid")
                     + (project.Ground == null ? "" : ", " + project.Ground.Strategy.ToString().ToLowerInvariant()
                         + (project.Ground.Moved > 0 ? " (" + project.Ground.Moved.ToString(c) + " voxels of earth moved)" : "")));
@@ -1034,6 +1054,16 @@ namespace Godless.Sim.Headless
                         + "% of each one's gathering was their own main material");
                 Console.WriteLine("  " + s.Tasks.IdleTicks.ToString(c) + " working ticks found nothing that needed doing");
             }
+            if (s.Ruins.Count > 0 || s.Rubble.Count > 0)
+            {
+                // S2T: what fell, and what of it still lies there.
+                long beds = 0;
+                foreach (Project p in s.Projects) beds += p.Beds.Count;
+                Console.WriteLine("\nruins (S2T): " + s.Ruins.Count.ToString(c) + " building(s) came down; "
+                    + s.Rubble.Count.ToString(c) + " voxels of rubble still lie in the settlement; "
+                    + world.Details.Count.ToString(c) + " detail objects stand (" + beds.ToString(c) + " beds)");
+            }
+
             if (island.Deposits != null)
             {
                 // S2F: what is left in reach, against what was there.

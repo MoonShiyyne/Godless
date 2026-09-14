@@ -87,6 +87,7 @@ namespace Godless.Unity
             // Added in code rather than in the scene, so a scene saved before
             // S2G still shows its people.
             if (showPeople && GetComponent<PeopleView>() == null) gameObject.AddComponent<PeopleView>();
+            if (GetComponent<DetailRenderer>() == null) gameObject.AddComponent<DetailRenderer>();
         }
 
         void Start()

@@ -215,6 +215,42 @@ traffic is high, abandoned when it falls (Part 16).
 - Invariant (S2P, settled batch): every wing and storey belongs to a standing
   house. The first full run caught a wing pressed against the hearth's parcel.
 
+### What S2R, S2S and S2T shipped, and wings on tall houses
+
+Registered alongside the block above:
+
+| ID | System | Deps | Tell |
+|----|--------|------|------|
+| S2R | Detail cells | S02, S03 | Furniture and rubble are drawn at 12.5 cm, not as half-metre blocks |
+| S2S | Beds | S2R, S1A, S2N | A house has a bed for everyone it sleeps, and each person sleeps in theirs |
+| S2T | Collapse and rubble | S2R, S2F, S2N | A building brought down falls into a heap of what it was, to be built on or carried off |
+
+- **Detail cells, decided:** not a second world grid (64x the voxels, and the
+  things that want this scale move) but placed models at 4 cells a voxel edge,
+  authored in content as character layers with slots a material fills
+  (`Assets/Content/base/models`). `DetailLayer` records every placement and
+  removal with its cause (L3) and rides in saves (format 5). The Editor meshes
+  each model once per turn and material with the terrain mesher and draws one
+  combined mesh per chunk. **Known gap:** the timeline scrub does not rewind
+  details yet.
+- **Beds:** laid when a house, wing or storey is finished — one per sleeping
+  place, on its floors, clear of the hearth and the door, in its floor timber —
+  and a person sleeps in their own.
+- **Collapse:** everything of a building and its additions leaves its place
+  and falls; the high voxels scatter further and heaps slump. Each fallen
+  voxel is a `rubble` voxel (ground, drawn as a detail chunk of its material)
+  that remembers the material. The family loses its roof, the claim is
+  released, and a new house on the spot clears the heap into its yard;
+  gathering salvages rubble before cutting anything new. Brought down by: the
+  daily support check (a floor mostly over air falls, citing whatever dug the
+  ground away), the Editor's X key, and `sim settle --demolish-day D`.
+- **Wings on tall houses:** against a house of two storeys or more, a wing is
+  a low lean-to under the upper windows, or — where the culture builds tall —
+  rises the house's full height. A doorway is cut through the shared wall when
+  a wing is finished.
+- Invariants (settled batch): every heap of rubble rests on something; every
+  bed stands on a floor.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

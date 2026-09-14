@@ -1,0 +1,18 @@
+{
+  "type": "voxel",
+  "id": "rubble",
+  "solid": true,
+  "hardness": 1,
+
+  // S2T. Where a building fell. Ground — it is walked on and built on — but
+  // not drawn as a block: each rubble voxel is drawn in detail cells as a
+  // broken chunk of whatever it used to be, and what it used to be is what
+  // salvage gets back.
+  "ground": true,
+  "scenery": true,
+  "detail": true,
+  "value": 40,
+  "hue": 30,
+  "saturation": 10,
+  "class": "rubble"
+}

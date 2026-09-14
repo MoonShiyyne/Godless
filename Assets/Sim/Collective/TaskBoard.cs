@@ -38,6 +38,9 @@ namespace Godless.Sim.Collective
 
         /// <summary>The world a harvest takes voxels out of (S2F). Null where gathering is a sum.</summary>
         public Deltas.VoxelWorld Voxels;
+
+        /// <summary>Where rubble's detail lives, so salvage can take it away (S2T).</summary>
+        public Voxels.DetailLayer Details;
         public int TicksPerDay = Core.SimClock.DefaultTicksPerDay;
     }
 
@@ -301,6 +304,16 @@ namespace Godless.Sim.Collective
             }
 
             int m = _material[task];
+
+            // Rubble first (S2T): what fell is already cut, and lies closer than any wood.
+            if (m >= 0 && s.Rubble.Count > 0 && work != null && work.Voxels != null && Collapse.HasRubble(s, m))
+            {
+                int most = (int)SimMath.Round(s.Stock.Materials[m].PerLabourTick);
+                Collapse.Salvage(work.Voxels, work.Details, s, m, most < 1 ? 1 : most, work.Tick);
+                agent.WorkingAt = -1;
+                return true;
+            }
+
             if (m >= 0)
             {
                 if (s.Catchment.HasDeposits && work != null && work.Voxels != null)
@@ -406,6 +419,7 @@ namespace Godless.Sim.Collective
                 // Nothing of it left in reach: wanting it does not make it
                 // gatherable, and a call nobody can answer only takes hands
                 // away from one they can (S2F).
+                if (m >= 0 && per <= 0.0 && Collapse.HasRubble(s, m)) per = s.Stock.Materials[m].PerLabourTick;
                 if (m >= 0 && per <= 0.0 && s.Catchment.HasDeposits) { _demand[t] = 0.0; continue; }
                 if (per <= 0.0) per = 1.0;
                 _demand[t] = d > 0.0 ? d / per : 0.0;
@@ -454,7 +468,7 @@ namespace Godless.Sim.Collective
             var work = new WorkSite
             {
                 Builder = _builder, Grid = _grid, Annals = world.Annals, Tick = world.Clock.Tick,
-                Voxels = world.Voxels, TicksPerDay = world.Clock.TicksPerDay,
+                Voxels = world.Voxels, TicksPerDay = world.Clock.TicksPerDay, Details = world.Details,
             };
             foreach (Settlement s in world.Settlements)
                 if (s.Tasks != null) s.Tasks.Step(s, rng, work);
