@@ -27,6 +27,7 @@ namespace Godless.Unity
         static readonly int CutMap = Shader.PropertyToID("_GodlessCutMap");
         static readonly int CutSize = Shader.PropertyToID("_GodlessCutSize");
         static readonly int CutOn = Shader.PropertyToID("_GodlessCutOn");
+        static readonly int CullMode = Shader.PropertyToID("_Cull");
         static readonly Symbol FloorRole = Symbol.For("role.floor");
 
         /// <summary>No cut: higher than anything in the world.</summary>
@@ -37,6 +38,7 @@ namespace Godless.Unity
         float[] _heights;
         readonly List<int> _written = new List<int>();
         long _signature = -1;
+        bool _shown;
 
         public static string Keys { get { return "C cutaway"; } }
 
@@ -45,11 +47,19 @@ namespace Godless.Unity
 
         void Awake() { _boot = GetComponent<WorldBootstrap>(); }
 
-        void OnDisable() { Shader.SetGlobalFloat(CutOn, 0f); }
+        void OnDisable() { Show(false); }
+
+        /// <summary>The shader's cut, and back faces drawn as cross-sections while it is on.</summary>
+        void Show(bool cut)
+        {
+            Shader.SetGlobalFloat(CutOn, cut ? 1f : 0f);
+            UnityEngine.Material voxels = _boot != null && _boot.View != null ? _boot.View.OpaqueMaterial : null;
+            if (voxels != null) voxels.SetFloat(CullMode, cut ? (float)UnityEngine.Rendering.CullMode.Off : (float)UnityEngine.Rendering.CullMode.Back);
+        }
 
         void OnDestroy()
         {
-            Shader.SetGlobalFloat(CutOn, 0f);
+            Show(false);
             if (_map != null) Destroy(_map);
         }
 
@@ -58,12 +68,12 @@ namespace Godless.Unity
             Keyboard keys = Keyboard.current;
             if (keys != null && keys.cKey.wasPressedThisFrame) on = !on;
 
-            if (!on || _boot.World == null) { Shader.SetGlobalFloat(CutOn, 0f); return; }
+            if (!on || _boot.World == null) { if (_shown) { Show(false); _shown = false; } return; }
             if (_map == null) Create();
 
             long signature = Signature();
             if (signature != _signature) { _signature = signature; Rebuild(); }
-            Shader.SetGlobalFloat(CutOn, 1f);
+            if (!_shown) { Show(true); _shown = true; }
         }
 
         void Create()

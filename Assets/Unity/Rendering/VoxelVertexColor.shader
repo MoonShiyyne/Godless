@@ -11,17 +11,24 @@
 // each building is opened, and anything cuttable above it is not drawn — nor
 // does it cast a shadow, so a bed under a removed roof is lit. People draw
 // with this shader too, uncuttable and instanced.
+//
+// Cutting leaves holes: a face between two solid voxels was never meshed, so
+// the ground under a wall that is no longer drawn has no top to see. While the
+// cutaway is on the view draws back faces as well, and a back face is shaded
+// as a dark cross-section of whatever it belongs to — a cut solid reads solid.
 Shader "Godless/VoxelVertexColor"
 {
     Properties
     {
         _Tint ("Tint", Color) = (1, 1, 1, 1)
         _Cuttable ("Cuttable", Float) = 1
+        [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
     SubShader
     {
         Tags { "RenderType" = "Opaque" }
         LOD 200
+        Cull [_Cull]
 
         CGPROGRAM
         #pragma surface surf Lambert vertex:vert fullforwardshadows addshadow
@@ -41,6 +48,7 @@ Shader "Godless/VoxelVertexColor"
             float4 vcol;
             float3 worldPos;
             float3 worldNormal;
+            float face : VFACE;
         };
 
         void vert(inout appdata_full v, out Input o)
@@ -65,7 +73,12 @@ Shader "Godless/VoxelVertexColor"
             #ifndef UNITY_COLORSPACE_GAMMA
             c = GammaToLinearSpace(c);
             #endif
-            o.Albedo = c;
+            if (IN.face < 0)
+            {
+                o.Albedo = 0;
+                o.Emission = c * 0.22;
+            }
+            else o.Albedo = c;
             o.Alpha = 1;
         }
         ENDCG

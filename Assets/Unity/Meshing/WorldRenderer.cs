@@ -82,6 +82,9 @@ namespace Godless.Unity
         public int ChunksInFlight { get { return _inFlightCount; } }
         public int ChunksQueued { get { return _dirty.Count + _deferred.Count; } }
 
+        /// <summary>The material solid voxels draw with, once meshing has begun. Null before.</summary>
+        public Material OpaqueMaterial { get { return opaqueMaterial; } }
+
         /// <summary>True once nothing is waiting to be meshed or uploaded.</summary>
         public bool IsIdle { get { return _store != null && ChunksQueued == 0 && _inFlightCount == 0 && _done.IsEmpty; } }
 

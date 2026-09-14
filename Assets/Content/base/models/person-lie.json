@@ -18,16 +18,6 @@
     "h": {
       "slot": "hair"
     },
-    "t": {
-      "hue": 30,
-      "saturation": 22,
-      "value": 32
-    },
-    "f": {
-      "hue": 22,
-      "saturation": 30,
-      "value": 17
-    },
     "e": {
       "hue": 20,
       "saturation": 30,
@@ -36,12 +26,12 @@
   },
   "layers": [
     [
-      ".tt.tt.",
-      ".tt.tt.",
-      ".tt.tt.",
-      ".tt.tt.",
-      ".tt.tt.",
-      "stt.tts",
+      "ccccccc",
+      "ccccccc",
+      "ccccccc",
+      "ccccccc",
+      "ccccccc",
+      "ccccccc",
       "ccccccc",
       "ccccccc",
       "ccccccc",
@@ -52,12 +42,12 @@
       "..hhh.."
     ],
     [
-      ".ff.ff.",
+      ".cc.cc.",
+      ".cc.cc.",
       ".......",
       ".......",
-      ".......",
-      ".......",
-      ".......",
+      ".ccccc.",
+      ".ccccc.",
       ".ccccc.",
       ".ccccc.",
       ".ccccc.",
