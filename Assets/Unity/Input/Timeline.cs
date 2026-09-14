@@ -93,7 +93,7 @@ namespace Godless.Unity
         void OnGUI()
         {
             var world = _boot.World;
-            if (world == null) return;
+            if (world == null || _boot.Phase != WorldBootstrap.SetupPhase.Playing) return;
 
             long present = world.Clock.Tick;
             long shown = ShownTick;

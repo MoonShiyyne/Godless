@@ -250,7 +250,7 @@ namespace Godless.Unity
             _chosenMarker.transform.position = at + Vector3.up * 5f;
             _chosenMarker.GetComponent<Renderer>().sharedMaterial.color = _chosen.CanSettle ? new Color(1f, 0.55f, 0.1f) : new Color(0.8f, 0.15f, 0.1f);
             DrawReach(at);
-            GodCamera god = Camera.main != null ? Camera.main.GetComponent<GodCamera>() : null;
+            GodCamera god = FindFirstObjectByType<GodCamera>();
             if (focus && god != null) god.Focus(at, 260f);
         }
 
@@ -319,7 +319,7 @@ namespace Godless.Unity
                 var go = new GameObject("Reach of the first fire");
                 _reachRing = go.AddComponent<LineRenderer>();
                 _reachRing.loop = true;
-                _reachRing.widthMultiplier = 1.2f;
+                _reachRing.widthMultiplier = 3f;
                 _reachRing.positionCount = 96;
                 Shader sprite = Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color");
                 _reachRing.sharedMaterial = new UnityEngine.Material(sprite) { color = new Color(1f, 0.8f, 0.3f, 0.8f) };
@@ -487,7 +487,7 @@ namespace Godless.Unity
             _title = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, wordWrap = true };
             _body = new GUIStyle(GUI.skin.label) { fontSize = 15, wordWrap = true };
             _small = new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true };
-            _button = new GUIStyle(GUI.skin.button) { fontSize = 16, alignment = TextAnchor.MiddleLeft, wordWrap = true, padding = new RectOffset(12, 12, 8, 8) };
+            _button = new GUIStyle(GUI.skin.button) { fontSize = 15, alignment = TextAnchor.UpperLeft, wordWrap = true, padding = new RectOffset(12, 12, 10, 10) };
             _box = new GUIStyle(GUI.skin.box);
         }
 
@@ -514,7 +514,8 @@ namespace Godless.Unity
                     string label = (selected ? "▶ " : "   ") + preset.Title + "\n" + preset.Tell;
                     Color was = GUI.backgroundColor;
                     if (selected) GUI.backgroundColor = new Color(1f, 0.75f, 0.4f);
-                    if (GUILayout.Button(label, _button, GUILayout.MinHeight(58))) _mapIndex = i;
+                    float tall = _button.CalcHeight(new GUIContent(label), w - 80f) + 4f;
+                    if (GUILayout.Button(label, _button, GUILayout.Height(tall))) _mapIndex = i;
                     GUI.backgroundColor = was;
                 }
             GUILayout.EndScrollView();
