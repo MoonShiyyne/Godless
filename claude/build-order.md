@@ -305,6 +305,15 @@ Registered alongside the block above:
   67 of 96 people forage; by day 2300 the store is empty with 98 of 116
   foraging, 18 are lost, and growth stops, so no more houses are asked for.
   Foraging is finite by day; the answer is S2I (fields, fishing), not tuning.
+- **Needs move on the scale of a week,** so one person can be followed: each
+  eats and drinks about once a week (measured: a meal every 6.4 days, a drink
+  every 8.3) and talks about as often; a week of bad nights, not one, sends
+  someone to the fire or to doze. Every personal rate is the daily one over
+  seven and a meal is a week's food (`eat` uses 7), so a person still eats a
+  meal's worth a day and the foraging ceiling is where it was — green shore
+  grows day for day as before and levels at about 116, now without the
+  famine swing. Shelter is not personal and keeps its pace: it is the pressure
+  that raises houses. Getting past the ceiling is for new food, not tuning.
 - **The cutaway (C):** every building opens a metre above its lowest floor, in
   the voxel shader from a per-column height map; the hill a house is backed
   into is never cut, anyone upstairs is hidden with the upstairs, and back

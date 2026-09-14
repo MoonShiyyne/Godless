@@ -113,12 +113,13 @@ namespace Godless.Sim.Tests
         }
 
         /// <summary>
-        /// S12's tell, verbatim: an agent who slept in the rain behaves
-        /// differently tomorrow. Two identical people, one roof, one wet
-        /// night; the next day is fair for both.
+        /// An agent who slept out in the rain behaves differently for it. Two
+        /// identical people, one roof, a week of wet nights; the days are fair
+        /// for both. Needs move on the scale of a week (S2V), so it is the week
+        /// in the open that shows, not one night.
         /// </summary>
         [Fact]
-        public void AnAgentWhoSleptInTheRainBehavesDifferentlyTomorrow()
+        public void AnAgentWhoSleptInTheRainBehavesDifferentlyThatWeek()
         {
             ContentDatabase content = Shipped();
             DriveRules rules = DriveRules.FromContent(content);
@@ -126,21 +127,27 @@ namespace Godless.Sim.Tests
             Settlement s = Settlement.Found("test", new Int3(100, 50, 100), Temperate(content), 2, rules, 0, annals, RecordId.None);
             s.ShelterCapacity = 1;
 
-            Night(s, rules, 0, Rain, annals);
-            Agent dry = s.People[0], wet = s.People[1];
-            Assert.True(dry.ShelteredLastNight, "the tie for the one roof goes to founding order");
-            Assert.False(wet.ShelteredLastNight);
-
             int warm = rules.Activities.IndexOf("warm");
             bool wetWarmed = false, dryWarmed = false;
-            for (int t = 0; t < 3; t++)
+            Agent dry = s.People[0], wet = s.People[1];
+            int shelter = rules.Needs.IndexOf("shelter");
+            for (long day = 0; day < 10; day++)
             {
-                DriveSystem.Step(s, rules, 4 + t, false, Sky.Fair, annals);
-                wetWarmed |= wet.Activity == warm;
-                dryWarmed |= dry.Activity == warm;
+                // The roof goes to whoever wants it most; keep that the same person all week.
+                dry.SetLevel(shelter, 1.0, RecordId.None);
+                wet.SetLevel(shelter, 0.0, RecordId.None);
+                Night(s, rules, day, Rain, annals);
+                Assert.True(dry.ShelteredLastNight);
+                Assert.False(wet.ShelteredLastNight);
+                for (int t = 0; t < 3; t++)
+                {
+                    DriveSystem.Step(s, rules, (day + 1) * 4 + t, false, Sky.Fair, annals);
+                    wetWarmed |= wet.Activity == warm;
+                    dryWarmed |= dry.Activity == warm;
+                }
             }
 
-            Assert.True(wetWarmed, "whoever slept in the rain spends part of the morning at the fire");
+            Assert.True(wetWarmed, "whoever slept in the rain all week spends a morning at the fire");
             Assert.False(dryWarmed);
             Assert.True(wet.ProductiveTicks < dry.ProductiveTicks,
                         "and does less work: " + wet.ProductiveTicks + " against " + dry.ProductiveTicks);

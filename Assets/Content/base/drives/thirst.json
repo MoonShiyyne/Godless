@@ -1,9 +1,9 @@
 {
   "type": "need",
   "id": "thirst",
-  "tell": "People walk down to the river or the shore to drink a couple of times a day, and a settlement far from water spends its day walking.",
+  "tell": "About once a week each person walks down to the river or the shore to drink, and a settlement far from water spends its days walking.",
   "start": 0.1,
-  "drift": 0.12,
+  "drift": 0.0171,
   "threshold": 0.75,
   "urgencyPower": 2,
   "rises": {}

@@ -119,6 +119,43 @@ namespace Godless.Sim.Tests
             }
         }
 
+        /// <summary>
+        /// Needs come round about once a week, so what one person does can be
+        /// followed: counted over eight weeks, people eat and drink every five
+        /// to twelve days, not every day.
+        /// </summary>
+        [Fact]
+        public void PeopleEatAndDrinkAboutOnceAWeek()
+        {
+            SimWorld world = Settled(7);
+            Settlement s = world.Settlements[0];
+            for (int t = 0; t < 14 * world.Clock.TicksPerDay; t++) world.Tick();   // settle past the founding levels
+
+            var meals = new Dictionary<ulong, int>();
+            var drinks = new Dictionary<ulong, int>();
+            const int days = 56;
+            for (int t = 0; t < days * world.Clock.TicksPerDay; t++)
+            {
+                world.Tick();
+                foreach (Agent a in s.People)
+                {
+                    if (a.Errands.Contains("eating")) meals[a.Id.Hash] = (meals.TryGetValue(a.Id.Hash, out int m) ? m : 0) + 1;
+                    if (a.Errands.Contains("drinking")) drinks[a.Id.Hash] = (drinks.TryGetValue(a.Id.Hash, out int d) ? d : 0) + 1;
+                }
+            }
+
+            int people = s.People.Count;
+            int eaten = 0, drunk = 0;
+            foreach (int n in meals.Values) eaten += n;
+            foreach (int n in drinks.Values) drunk += n;
+            double daysPerMeal = (double)days * people / System.Math.Max(1, eaten);
+            double daysPerDrink = (double)days * people / System.Math.Max(1, drunk);
+            _out.WriteLine(people + " people: a meal every " + daysPerMeal.ToString("0.0") + " days, a drink every " + daysPerDrink.ToString("0.0"));
+            Assert.InRange(daysPerDrink, 5.0, 12.0);
+            // Foragers eat some of what they find, so meals from the store can come less often than drinks.
+            Assert.InRange(daysPerMeal, 5.0, 20.0);
+        }
+
         /// <summary>An errand that eats takes from the store, and an empty store feeds nobody.</summary>
         [Fact]
         public void AnEmptyStoreFeedsNobody()
@@ -129,14 +166,20 @@ namespace Godless.Sim.Tests
                 for (int t = 0; t < world.Clock.TicksPerDay; t++) world.Tick();
             while (world.Clock.TickOfDay != 0) world.Tick();
 
-            s.Food = 0.0;
-            world.Tick();
-            foreach (Agent a in s.People)
+            // Two weeks with the store kept empty: a meal is a week's worth, and
+            // nobody eats one that is not there.
+            for (int t = 0; t < 14 * world.Clock.TicksPerDay; t++)
             {
-                Assert.DoesNotContain("eating", a.Errands);
-                Assert.False(a.Doing.StartsWith("eating"), a.Doing);
+                s.Food = 0.0;
+                world.Tick();
+                foreach (Agent a in s.People)
+                {
+                    Assert.DoesNotContain("eating", a.Errands);
+                    Assert.False(a.Doing.StartsWith("eating"), a.Doing);
+                }
             }
 
+            // Hungry by now, and the store full again: they come and eat.
             s.Food = 1000.0;
             int ate = 0;
             for (int t = 0; t < 8; t++)
@@ -144,7 +187,7 @@ namespace Godless.Sim.Tests
                 world.Tick();
                 foreach (Agent a in s.People) if (a.Errands.Contains("eating")) ate++;
             }
-            Assert.True(ate > 0, "nobody ate from a full store in two days");
+            Assert.True(ate > 0, "nobody ate from a full store in two days after two hungry weeks");
             Assert.True(s.Food < 1000.0);
         }
 

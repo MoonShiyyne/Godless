@@ -9,7 +9,7 @@
   "requires": ["day"],
   "at": "wild",
   "gathers": { "food": 1 },
-  "relieves": { "hunger": 0.25 },
+  "relieves": { "hunger": 0.0357 },
   "doing": "foraging",
   "pose": "work"
 }

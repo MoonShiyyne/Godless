@@ -6,7 +6,7 @@
   // S2V. Half a morning, not the whole day: then back to work.
   "takes": 0.5,
   "at": "fire",
-  "relieves": { "warmth": 0.15 },
+  "relieves": { "warmth": 0.4 },
   "doing": "warming up at the fire",
   "pose": "sit"
 }

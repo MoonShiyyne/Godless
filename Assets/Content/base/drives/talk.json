@@ -7,7 +7,7 @@
   // whatever the rest of the tick is for.
   "takes": 0.25,
   "at": "people",
-  "relieves": { "company": 0.45 },
+  "relieves": { "company": 0.6 },
   "doing": "talking with others",
   "pose": "stand"
 }

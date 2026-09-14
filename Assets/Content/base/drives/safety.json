@@ -3,8 +3,8 @@
   "id": "safety",
   "tell": "Where people sleep in the open, someone is always sitting up by the fire.",
   "start": 0.1,
-  "drift": -0.02,
+  "drift": -0.0029,
   "threshold": 0.7,
   "urgencyPower": 2,
-  "rises": { "unsheltered": 0.15, "sheltered": -0.05 }
+  "rises": { "unsheltered": 0.0214, "sheltered": -0.0071 }
 }
