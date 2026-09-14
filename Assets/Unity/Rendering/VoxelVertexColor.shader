@@ -48,7 +48,6 @@ Shader "Godless/VoxelVertexColor"
             float4 vcol;
             float3 worldPos;
             float3 worldNormal;
-            float face : VFACE;
         };
 
         void vert(inout appdata_full v, out Input o)
@@ -73,7 +72,9 @@ Shader "Godless/VoxelVertexColor"
             #ifndef UNITY_COLORSPACE_GAMMA
             c = GammaToLinearSpace(c);
             #endif
-            if (IN.face < 0)
+            // Seen from behind: the face's own normal points away from the eye.
+            // (VFACE would say the same, and on Metal broke ordinary drawing.)
+            if (_GodlessCutOn > 0.5 && dot(IN.worldNormal, _WorldSpaceCameraPos - IN.worldPos) < 0)
             {
                 o.Albedo = 0;
                 o.Emission = c * 0.22;
