@@ -887,7 +887,8 @@ namespace Godless.Sim.Headless
             Profiled(world, cli, new TaskSystem(construction, grid, HaulRules.FromContent(db)));
             Profiled(world, cli, new HaulingSystem(HaulRules.FromContent(db), FoodRules.FromContent(db), DetailModelTable.FromContent(db), grid));
             Profiled(world, cli, new FarmSystem(FarmRules.FromContent(db), CropTable.FromContent(db, genes), grid, constraints, DetailModelTable.FromContent(db)));
-            Profiled(world, cli, new MovementSystem(grid, rules, PastimeTable.FromContent(db)));
+            Profiled(world, cli, new CommonsSystem(CommonsRules.FromContent(db, rules.Needs), grid, DetailModelTable.FromContent(db)));
+            Profiled(world, cli, new MovementSystem(grid, rules, PastimeTable.FromContent(db)).WithCommons(CommonsRules.FromContent(db, rules.Needs)));
             world.BeginHistory();
 
             var header = new StringBuilder("  day  weather     in open ");
@@ -1157,6 +1158,29 @@ namespace Godless.Sim.Headless
                             Console.WriteLine("    a new town from here: " + (found ? "at parcel (" + fx + ", " + fz + ")" : "nowhere (" + Towns.WhyNowhere(world, db, grid, biomes, t.Borders, t, tr) + ")"));
                         }
                     }
+                    // S2Z: what each town's fire has become, and what gathered there.
+                    CommonsRules cr = CommonsRules.FromContent(db, rules.Needs);
+                    if (cr != null)
+                        foreach (Settlement t in world.Settlements)
+                        {
+                            Commons cm = t.Commons;
+                            if (cm == null) continue;
+                            Console.WriteLine("  " + t.Id + " commons (S2Z): " + cm.PlaceName(cr) + ", holds " + cr.Stages[cm.Stage].Holds
+                                + ", " + cm.Seats.Count + " seats, " + cm.Paved + " columns paved, " + cm.GatheringsHeld + " gatherings"
+                                + (cm.Underway >= 0 ? ", making " + cr.Stages[cm.Underway].Name : "")
+                                + (cm.Building != null ? ", " + cm.Building.Intent.Kind.Name + (cm.Building.Complete ? " standing" : " going up") : "")
+                                + (cm.Last != null ? "; last: " + cm.Last.Kind.Doing + " at " + cm.Last.Place + ", day " + cm.Last.Day + ", " + cm.Last.Attending + " came" : ""));
+                        }
+                    var gatheredKinds = new SortedDictionary<string, int>();
+                    foreach (AnnalRecord r in world.Annals.OfKind(Commons.GatheredKind))
+                    {
+                        string k = r.Participants.Count > 0 ? r.Participants[0].ToString() : "?";
+                        int n; gatheredKinds.TryGetValue(k, out n); gatheredKinds[k] = n + 1;
+                    }
+                    foreach (KeyValuePair<string, int> kv in gatheredKinds) Console.WriteLine("    " + kv.Key + ": " + kv.Value);
+                    foreach (AnnalRecord r in world.Annals.OfKind(Commons.RaisedKind))
+                        Console.WriteLine("    day " + r.Tick / world.Clock.TicksPerDay + ": " + r.Subject + " raised its commons to stage " + r.ValueA);
+
                     foreach (AnnalRecord r in world.Annals.OfKind(Towns.OutgrownKind))
                         Console.WriteLine("  day " + r.Tick / world.Clock.TicksPerDay + ": " + r.Subject + " outgrown, " + r.ValueA + " of " + r.ValueB + " left");
                 }

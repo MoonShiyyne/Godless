@@ -1,0 +1,12 @@
+{
+  "type": "gathering",
+  "id": "mourning",
+  "tell": "The evening after someone dies the whole village stands round the fire instead of going home.",
+  // S2Z. The evening after a death.
+  "trigger": "death",
+  "share": 0.9,
+  "doing": "mourning the dead",
+  "pose": "stand",
+  "takes": 0.3,
+  "relieves": { "company": 0.4 }
+}

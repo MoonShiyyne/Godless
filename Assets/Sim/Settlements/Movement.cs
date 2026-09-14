@@ -259,6 +259,7 @@ namespace Godless.Sim.Settlements
 
         readonly NeedTable _needs;
         readonly PastimeTable _pastimes;
+        CommonsRules _commons;
 
         /// <summary>Voxels from the hearth that count as being at the fire, for the record of where the day goes.</summary>
         public const int NearFire = 12;
@@ -270,6 +271,9 @@ namespace Godless.Sim.Settlements
             _needs = rules.Needs;
             _pastimes = pastimes ?? PastimeTable.None;
         }
+
+        /// <summary>The commons rules (S2Z), so gatherings and work parties are drawn where they are held.</summary>
+        public MovementSystem WithCommons(CommonsRules commons) { _commons = commons; return this; }
 
         public Symbol Id { get { return SystemId; } }
 
@@ -433,7 +437,9 @@ namespace Godless.Sim.Settlements
 
             WalkTo(a, world, a.X, a.Z, "walk", "on the way: " + doing);
             day.Fill(pose, doing);
-            if (Errands(s, world, a, i)) WalkTo(a, world, a.X, a.Z, "walk", "back to " + doing);
+            bool away = Errands(s, world, a, i);
+            away |= AtCommons(s, world, a, i, false);
+            if (away) WalkTo(a, world, a.X, a.Z, "walk", "back to " + doing);
 
             ulong who = a.Id.Hash;
             int hour = world.Clock.TickOfDay;
@@ -496,7 +502,7 @@ namespace Godless.Sim.Settlements
         {
             Itinerary day = a.Day;
             day.Begin(a.StartX, a.StartZ);
-            if (!night) { Morning(s, world, a, i); Errands(s, world, a, i); }
+            if (!night) { Morning(s, world, a, i); Errands(s, world, a, i); AtCommons(s, world, a, i, false); }
             if (!a.Arrived)
             {
                 WalkTo(a, world, a.X, a.Z, "walk", "on the way: " + doing, true);
@@ -504,7 +510,11 @@ namespace Godless.Sim.Settlements
                 return;
             }
 
-            if (night) DoPastime(s, world, a, i, PastimeWhen.Evening, 5);
+            if (night)
+            {
+                // The evening at the fire (S2Z) when there is a gathering and they go; else at home.
+                if (!AtCommons(s, world, a, i, true)) DoPastime(s, world, a, i, PastimeWhen.Evening, 5);
+            }
             else if (idle)
             {
                 DoPastime(s, world, a, i, PastimeWhen.Idle, 6);
@@ -513,6 +523,34 @@ namespace Godless.Sim.Settlements
             WalkTo(a, world, a.X, a.Z, "walk", "on the way: " + doing);
             day.Fill(pose, doing);
             day.Finish();
+        }
+
+        /// <summary>
+        /// Time at the commons (S2Z): the evening's gathering for whoever goes,
+        /// or an afternoon on the works for whoever is in today's party. True
+        /// when they went.
+        /// </summary>
+        bool AtCommons(Settlement s, SimWorld world, Agent a, int i, bool evening)
+        {
+            Commons c = s.Commons;
+            if (c == null || _commons == null || _commons.Stages.Count == 0) return false;
+            int x, z;
+            if (evening)
+            {
+                if (c.Tonight == null || c.Tonight.Day != world.Clock.TotalDays || !c.Attends(a)) return false;
+                c.Spot(s, world.Island, _commons, i, true, out x, out z);
+                string at = c.Tonight.Place;
+                WalkTo(a, world, x, z, "walk", "on the way to " + at);
+                a.Day.Stay(c.Tonight.Kind.Takes, c.Tonight.Kind.Pose, c.Tonight.Kind.Doing + " at " + at);
+                return true;
+            }
+            if (world.Clock.TickOfDay != 2 || !c.InParty(a, world.Clock.TotalDays)) return false;
+            int stage = System.Math.Min(c.Underway, _commons.Stages.Count - 1);
+            if (stage < 0) return false;
+            c.Spot(s, world.Island, _commons, i, false, out x, out z);
+            WalkTo(a, world, x, z, "walk", "on the way to the fire");
+            a.Day.Stay(0.35, "work", "making " + _commons.Stages[stage].Name);
+            return true;
         }
 
         /// <summary>The first tick of a day starts where they slept, with whatever they do first thing.</summary>

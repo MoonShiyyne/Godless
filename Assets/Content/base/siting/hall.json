@@ -1,0 +1,16 @@
+{
+  "type": "siting",
+  "id": "hall",
+  "for": "hall",
+  "tell": "The hall goes up on the old meeting ground, its door on the fire the founders lit.",
+
+  // S2Z. Over the kept ground round the fire, as near its middle as it will go.
+  "searchRadiusParcels": 8,
+  "allow": "parcel.land * (parcel.wet < 3) * (parcel.slope < 8) * (parcel.hearth < 9)",
+  "score": "4.0 - 0.45 * parcel.hearth + 1.0 * (1 - clamp(parcel.slope, 0, 8) / 8) + 1.0 * (1 - field.flood)",
+
+  "prefer": {
+    "doorToFire": "3.0",
+    "doorDownhill": "0.2"
+  }
+}

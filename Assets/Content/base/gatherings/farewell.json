@@ -1,0 +1,11 @@
+{
+  "type": "gathering",
+  "id": "farewell",
+  "tell": "The night families leave to found a town of their own, the ones who stay gather at the fire.",
+  "trigger": "emigration",
+  "share": 0.8,
+  "doing": "remembering those who left",
+  "pose": "sit",
+  "takes": 0.3,
+  "relieves": { "company": 0.4 }
+}

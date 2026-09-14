@@ -141,6 +141,19 @@ namespace Godless.Sim.Settlements
                     }
                 into.Record("days.broken", brokenDays);
 
+                // S2Z: the fire and its seats are drawn by details that exist, its stage is
+                // one content has, and the ground kept round it is claimed by nothing else.
+                long brokenCommons = 0;
+                foreach (Settlement s in world.Settlements)
+                {
+                    Commons c = s.Commons;
+                    if (c == null) continue;
+                    if (c.Stage < 0 || c.FireDetail >= 0 && world.Details.Get(c.FireDetail) == null) brokenCommons++;
+                    foreach (int seat in c.Seats) if (world.Details.Get(seat) == null) { brokenCommons++; break; }
+                    if (!c.Kept.Exists) brokenCommons++;
+                }
+                into.Record("commons.broken", brokenCommons);
+
                 // S2Y: no town has claimed ground inside another's border, and no two fires stand too close.
                 long trespass = 0, crowdedFires = 0;
                 foreach (Settlement s in world.Settlements)
@@ -213,6 +226,10 @@ namespace Godless.Sim.Settlements
                 // S2W. The tick drawn is the tick spent, from where they stood to where they stand.
                 Invariant.PerRun("S2W", "every person's drawn tick is whole and ends where they stand",
                     run => run.Metric("days.broken") == 0.0),
+
+                // S2Z. The first fire is kept, and what it has become is drawn.
+                Invariant.PerRun("S2Z", "every town's commons is kept, and its fire and seats are drawn by details that exist",
+                    run => run.Metric("commons.broken") == 0.0),
 
                 // S2Y. Towns keep to their own ground and their own distance.
                 Invariant.PerRun("S2Y", "no two towns claim the same parcel",

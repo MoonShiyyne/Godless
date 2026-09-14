@@ -1,0 +1,48 @@
+{
+  // S2Z. A long flat stone to sit on.
+  "type": "model",
+  "id": "seat-stone",
+  "tell": "Flat stones set in a ring round the fire to sit on, where the town has stone to spare and no timber.",
+  "size": {
+    "x": 10,
+    "y": 3,
+    "z": 4
+  },
+  "paint": {
+    "s": {
+      "hue": 30,
+      "saturation": 5,
+      "value": 45
+    },
+    "S": {
+      "hue": 30,
+      "saturation": 5,
+      "value": 52
+    },
+    "t": {
+      "hue": 30,
+      "saturation": 4,
+      "value": 62
+    }
+  },
+  "layers": [
+    [
+      ".ssssssss.",
+      "ssssssssss",
+      "ssssssssss",
+      ".ssssssss."
+    ],
+    [
+      ".ssssssss.",
+      "sSSSSSSSSs",
+      "sSSSSSSSSs",
+      ".ssssssss."
+    ],
+    [
+      "..........",
+      ".tttttttt.",
+      ".tttttttt.",
+      ".........."
+    ]
+  ]
+}

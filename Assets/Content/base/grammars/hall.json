@@ -1,0 +1,59 @@
+{
+  "type": "grammar",
+  "id": "hall",
+  "builds": "hall",
+  "tell": "A hall is a house for the whole town: one long room on a low plinth with a hearth down its middle and a door onto the fire, its roof and its windows still the culture's own.",
+
+  // S2Z. One storey, long, a shared hearth inside; the genome still decides
+  // its pitch, its length and how open it is.
+  "axiom": "Lot",
+  "let": {
+    "width": "max(12, round(lerp(13, 20, gene.footprint_area) * lerp(0.9, 1.2, gene.communal_ratio)))",
+    "depth": "max(7, round(lerp(7, 10, gene.footprint_area)))",
+    "raise": "1",
+    "pitch": "lerp(0.4, 1.5, gene.roof_pitch)",
+    "overhang": "1",
+    "roofRise": "floor((floor((depth - 1) / 2) + overhang) * pitch) + 1",
+    "windowWidth": "round(lerp(1, 4, gene.aperture_ratio))",
+    "windowHeight": "round(lerp(1, 2, gene.aperture_ratio))",
+    "sill": "2",
+    "bodyHeight": "palette.floor + 2",
+    "height": "raise + bodyHeight + roofRise"
+  },
+  "rules": {
+    "Lot": { "op": "split", "axis": "v", "parts": [
+      { "size": "raise", "rule": { "op": "fill", "role": "plinth" } },
+      { "size": "bodyHeight", "rule": "Body" },
+      { "size": "roofRise", "rule": "Roof" }
+    ] },
+    "Body": { "op": "split", "axis": "v", "parts": [
+      { "size": 1, "rule": { "op": "fill", "role": "floor" } },
+      { "size": "~1", "rule": [
+        { "op": "comp", "front": "DoorFacade", "back": "Facade", "ends": "Facade" },
+        { "op": "centre", "u": 4, "w": 2, "v": 1, "rule": { "op": "fill", "role": "hearth" } }
+      ] }
+    ] },
+    "DoorFacade": { "op": "split", "axis": "u", "parts": [
+      { "size": "~1", "rule": "Facade" },
+      { "size": "palette.door.w", "rule": "DoorBay" },
+      { "size": "~1", "rule": "Facade" }
+    ] },
+    "DoorBay": { "op": "split", "axis": "v", "parts": [
+      { "size": "palette.door.h", "rule": { "op": "fill", "role": "door" } },
+      { "size": "~1", "rule": "Wall" }
+    ] },
+    "Facade": { "op": "repeat", "axis": "u", "size": "palette.bay", "rule": "Bay" },
+    "Bay": { "op": "split", "axis": "v", "parts": [
+      { "size": "sill", "rule": "Wall" },
+      { "size": "windowHeight", "rule": "WindowBand" },
+      { "size": "~1", "rule": "Wall" }
+    ] },
+    "WindowBand": { "op": "split", "axis": "u", "parts": [
+      { "size": "~1", "rule": "Wall" },
+      { "size": "min(windowWidth, max(1, scope.u - 2))", "rule": { "op": "fill", "role": "window" } },
+      { "size": "~1", "rule": "Wall" }
+    ] },
+    "Wall": { "op": "fill", "role": "wall" },
+    "Roof": { "op": "roof", "pitch": "pitch", "overhang": "overhang", "role": "roof", "gable": "wall" }
+  }
+}

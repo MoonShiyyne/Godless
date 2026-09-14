@@ -1,0 +1,44 @@
+{
+  "type": "grammar",
+  "id": "stoa",
+  "builds": "stoa",
+  "tell": "A colonnade is a roof on posts along the edge of the square, one wall at its back and the rest open, so a town that lives outside can gather out of the sun and the rain.",
+
+  // S2Z. Posts round the edge, a back wall, an opening framed on the front
+  // where it faces the fire; a shallow roof over all of it.
+  "axiom": "Lot",
+  "let": {
+    "width": "max(12, round(lerp(13, 22, gene.footprint_area)))",
+    "depth": "max(5, round(lerp(5, 7, gene.footprint_area)))",
+    "raise": "1",
+    "pitch": "lerp(0.2, 0.7, gene.roof_pitch)",
+    "overhang": "1",
+    "roofRise": "floor((floor((depth - 1) / 2) + overhang) * pitch) + 1",
+    "bodyHeight": "palette.floor + 2",
+    "height": "raise + bodyHeight + roofRise"
+  },
+  "rules": {
+    "Lot": { "op": "split", "axis": "v", "parts": [
+      { "size": "raise", "rule": { "op": "fill", "role": "plinth" } },
+      { "size": "bodyHeight", "rule": "Body" },
+      { "size": "roofRise", "rule": "Roof" }
+    ] },
+    "Body": { "op": "split", "axis": "v", "parts": [
+      { "size": 1, "rule": { "op": "fill", "role": "floor" } },
+      { "size": "~1", "rule": [
+        { "op": "posts", "spacing": "palette.bay", "role": "post" },
+        { "op": "comp", "front": "Opening", "back": "Wall" }
+      ] }
+    ] },
+    "Opening": { "op": "split", "axis": "u", "parts": [
+      { "size": "~1", "rule": null },
+      { "size": "palette.door.w", "rule": { "op": "split", "axis": "v", "parts": [
+        { "size": "palette.door.h", "rule": { "op": "fill", "role": "door" } },
+        { "size": "~1", "rule": "Wall" }
+      ] } },
+      { "size": "~1", "rule": null }
+    ] },
+    "Wall": { "op": "fill", "role": "wall" },
+    "Roof": { "op": "roof", "pitch": "pitch", "overhang": "overhang", "role": "roof", "gable": "post" }
+  }
+}

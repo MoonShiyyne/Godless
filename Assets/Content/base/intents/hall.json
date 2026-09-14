@@ -1,0 +1,13 @@
+{
+  "type": "intent",
+  "id": "hall",
+  "tell": "A town that shares its hearth and keeps its roofs closed builds a long hall beside the old fire once its gatherings no longer fit round it, and the chronicle can say which gathering was too big.",
+
+  // S2Z. No need raises a hall: gatherings too big for the meeting ground do.
+  "purpose": "commons",
+  "pressedBy": "crowded-gathering-indoors",
+  "threshold": 100,
+  "maxOpen": 1,
+  "halfLifeDays": 120,
+  "budgetVoxels": 2600
+}

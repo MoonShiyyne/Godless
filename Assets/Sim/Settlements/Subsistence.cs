@@ -102,7 +102,8 @@ namespace Godless.Sim.Settlements
                 if (_hungerNeed >= 0 && s.People[i].Level(_hungerNeed) > s.People[worst].Level(_hungerNeed)) worst = i;
 
             Agent lost = s.People[worst];
-            world.Annals.Write(world.Clock.Tick, DiedKind, lost.Id, s.Hearth, s.Founded, s.HungryDays);
+            s.LastDeath = world.Annals.Write(world.Clock.Tick, DiedKind, lost.Id, s.Hearth, s.Founded, s.HungryDays);
+            s.LastDeathTick = world.Clock.Tick;
             s.Remove(worst, world.Streams);
             s.HungryDays = 0;   // one at a time, and the rest eat a little longer
         }
@@ -164,7 +165,8 @@ namespace Godless.Sim.Settlements
             for (int d = 0; d < deaths && s.People.Count > 0; d++)
             {
                 int who = rng.NextInt(s.People.Count);
-                world.Annals.Write(world.Clock.Tick, DiedKind, s.People[who].Id, s.Hearth, s.Founded, 0);
+                s.LastDeath = world.Annals.Write(world.Clock.Tick, DiedKind, s.People[who].Id, s.Hearth, s.Founded, 0);
+                s.LastDeathTick = world.Clock.Tick;
                 s.Remove(who, world.Streams);
             }
         }
@@ -208,7 +210,8 @@ namespace Godless.Sim.Settlements
             if (worst >= 0 && worstDays >= StarvesAfter)
             {
                 Agent lost = s.People[worst];
-                world.Annals.Write(world.Clock.Tick, DiedKind, lost.Id, s.Hearth, s.Founded, worstDays);
+                s.LastDeath = world.Annals.Write(world.Clock.Tick, DiedKind, lost.Id, s.Hearth, s.Founded, worstDays);
+                s.LastDeathTick = world.Clock.Tick;
                 s.Remove(worst, world.Streams);
             }
         }

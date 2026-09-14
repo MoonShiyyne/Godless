@@ -311,6 +311,8 @@ namespace Godless.Sim.Settlements
                 if (intent.Kind.Purpose == IntentPurpose.Home && (intent.Status == IntentStatus.Abandoned || intent.Status == IntentStatus.Open))
                     why = intent.Record;
             RecordId outgrown = world.Annals.Write(tick, OutgrownKind, from.Id, from.Hearth, why, movers, from.People.Count);
+            from.LastOutgrown = outgrown;
+            from.LastOutgrownTick = tick;
 
             string name = "town-" + (world.Settlements.Count + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
             Settlement town = Founding.Begin(world, content, grid, biomes, name, 0, siteX, siteZ, from.Genome != null ? from.Genome.Clone() : null,

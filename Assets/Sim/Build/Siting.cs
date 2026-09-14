@@ -256,6 +256,9 @@ namespace Godless.Sim.Build
             // the yard its wings will go into. A culture that builds up packs tight.
             int gap = rule.Weight("wing", genome) > rule.Weight("storey", genome) + 0.1 ? 2 : 1;
 
+            // S2Z: a hall or a colonnade goes up on the ground kept round the fire.
+            bool overCommons = intent.Kind.Purpose == IntentPurpose.Commons;
+
             // Near first; a settlement that has filled the ground round its fire
             // looks further out rather than giving up on the house (S2V). The
             // score still prefers the nearer of two equal sites.
@@ -265,30 +268,30 @@ namespace Godless.Sim.Build
             {
                 if (best.Count > 0) break;
                 int inner = radius == rule.SearchRadius ? -1 : radius - rule.SearchRadius;
-                ScanRing(settlement, rule, grid, reachable, scope, best, keep, hx, hz, radius, inner, wide, deep, gap, false);
+                ScanRing(settlement, rule, grid, reachable, scope, best, keep, hx, hz, radius, inner, wide, deep, gap, false, overCommons);
             }
 
             // Nowhere at all but the fields (S2I): a house goes up on a plot or
             // two, as a town grows over the land that fed it.
             if (best.Count == 0)
-                ScanRing(settlement, rule, grid, reachable, scope, best, keep, hx, hz, rule.SearchRadius * 3, -1, wide, deep, gap, true);
+                ScanRing(settlement, rule, grid, reachable, scope, best, keep, hx, hz, rule.SearchRadius * 3, -1, wide, deep, gap, true, overCommons);
 
             // And a village out of room packs tighter: the yard a wing would
             // have gone into becomes somebody's house.
             if (best.Count == 0 && gap > 1)
-                ScanRing(settlement, rule, grid, reachable, scope, best, keep, hx, hz, rule.SearchRadius * 3, -1, wide, deep, 1, true);
+                ScanRing(settlement, rule, grid, reachable, scope, best, keep, hx, hz, rule.SearchRadius * 3, -1, wide, deep, 1, true, overCommons);
             return best;
         }
 
         static void ScanRing(Settlement settlement, SitingRule rule, ParcelGrid grid, bool[] reachable, ParcelScope scope,
                              List<Site> best, int keep, int hx, int hz, int radius, int inner, int wide, int deep, int gap,
-                             bool overFields)
+                             bool overFields, bool overCommons = false)
         {
             for (int pz = hz - radius; pz <= hz + radius; pz++)
                 for (int px = hx - radius; px <= hx + radius; px++)
                 {
                     if (inner >= 0 && System.Math.Abs(px - hx) <= inner && System.Math.Abs(pz - hz) <= inner) continue;   // looked at already
-                    if (!Fits(settlement, grid, px, pz, wide, deep, reachable, gap, overFields)) continue;
+                    if (!Fits(settlement, grid, px, pz, wide, deep, reachable, gap, overFields, overCommons)) continue;
 
                     scope.X = px; scope.Z = pz;
                     if (rule.Allow.Eval(scope) <= 0.0) continue;
@@ -400,7 +403,7 @@ namespace Godless.Sim.Build
         /// go through somebody else's house.
         /// </summary>
         static bool Fits(Settlement settlement, ParcelGrid grid, int px, int pz, int wide, int deep, bool[] reachable, int gap = 1,
-                         bool overFields = false)
+                         bool overFields = false, bool overCommons = false)
         {
             for (int dz = 0; dz < deep; dz++)
                 for (int dx = 0; dx < wide; dx++)
@@ -421,6 +424,9 @@ namespace Godless.Sim.Build
                     bool inside = dx >= 0 && dz >= 0 && dx < wide && dz < deep;
                     // A field may come right up to a house (S2I): that is a farmhouse.
                     // And where nothing else is left, a house may stand on one.
+                    // S2Z: a hall may take the kept ground round the fire, never the fire itself.
+                    bool fire = px + dx == settlement.HearthParcelX && pz + dz == settlement.HearthParcelZ;
+                    if (overCommons && settlement.IsCommons(px + dx, pz + dz) && !(fire && inside)) continue;
                     if (settlement.IsClaimed(px + dx, pz + dz)
                         && (!settlement.IsField(px + dx, pz + dz) || (inside && !overFields))) return false;
                 }
@@ -459,9 +465,9 @@ namespace Godless.Sim.Build
                         int nx = ax + dx, nz = az + dz;
                         if (!ParcelGrid.InBounds(nx, nz)) continue;
                         int next = nz * ParcelGrid.Width + nx;
-                        // A field is walked across (S2I); a house, a store and the fire are not.
+                        // A field is walked across (S2I), and so is the ground round the fire (S2Z); a house and a store are not.
                         if (seen[next] || !grid.IsLand(nx, nz)) continue;
-                        if (settlement.IsClaimed(nx, nz) && !settlement.IsField(nx, nz)) continue;
+                        if (settlement.IsClaimed(nx, nz) && !settlement.IsField(nx, nz) && !settlement.IsCommons(nx, nz)) continue;
 
                         double climb = grid.Height[nx, nz] - grid.Height[ax, az];
                         if (climb < 0.0) climb = -climb;

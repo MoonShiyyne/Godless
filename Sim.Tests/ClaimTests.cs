@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Godless.Sim.Annals;
 using Godless.Sim.Build;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
@@ -102,9 +103,10 @@ namespace Godless.Sim.Tests
                     for (int dx = -1; dx <= project.Site.ParcelsWide && !found; dx++)
                     {
                         int px = project.Site.ParcelX + dx, pz = project.Site.ParcelZ + dz;
-                        if (Built.Town.IsClaimed(px, pz) || !ParcelGrid.InBounds(px, pz)) continue;
+                        // The ground kept round the fire is walked across (S2Z).
+                        if ((Built.Town.IsClaimed(px, pz) && !Built.Town.IsCommons(px, pz)) || !ParcelGrid.InBounds(px, pz)) continue;
                         List<int> path = ParcelPath.Find(Built.Grid, Built.Town.HearthParcelX, Built.Town.HearthParcelZ, px, pz,
-                                                         (x, z) => Built.Town.IsClaimed(x, z));
+                                                         (x, z) => Built.Town.IsClaimed(x, z) && !Built.Town.IsCommons(x, z));
                         if (path.Count > 0) found = true;
                     }
                 Assert.True(found, "no way from the fire to the house at (" + project.Site.ParcelX + ", " + project.Site.ParcelZ + ")");
@@ -114,7 +116,9 @@ namespace Godless.Sim.Tests
         [Fact]
         public void NobodyBuildsOnTheFire()
         {
-            Assert.Equal(Built.Town.Founded, Built.Town.ClaimOn(Built.Town.HearthParcelX, Built.Town.HearthParcelZ));
+            // Held by the founding, or since S2Z by the commons kept round the fire the founders lit.
+            RecordId owner = Built.Town.ClaimOn(Built.Town.HearthParcelX, Built.Town.HearthParcelZ);
+            Assert.True(owner == Built.Town.Founded || Built.Town.IsCommons(Built.Town.HearthParcelX, Built.Town.HearthParcelZ));
             foreach (Project project in Built.Town.Projects)
             {
                 bool covers = Built.Town.HearthParcelX >= project.Site.ParcelX

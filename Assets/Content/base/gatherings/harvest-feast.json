@@ -1,0 +1,12 @@
+{
+  "type": "gathering",
+  "id": "harvest-feast",
+  "tell": "After a field is cut the village eats together at the fire, and the gatherings get bigger as the farms do.",
+  "trigger": "harvest",
+  "share": 0.85,
+  "everyDays": 20,
+  "doing": "feasting",
+  "pose": "sit",
+  "takes": 0.35,
+  "relieves": { "company": 0.5 }
+}

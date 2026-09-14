@@ -5,6 +5,7 @@ using Godless.Sim.Build;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
 using Godless.Sim.Deltas;
+using Godless.Sim.Drives;
 using Godless.Sim.Harness;
 using Godless.Sim.Settlements;
 using Godless.Sim.Voxels;
@@ -78,6 +79,8 @@ namespace Godless.Unity
 
         /// <summary>How fast the world runs while somebody is watching. Never seen by the simulation.</summary>
         public TickPacer Pacer { get; private set; }
+
+        CommonsRules _commonsRules;
 
         /// <summary>What the ground is made of, by place and height — the god's brush builds from this.</summary>
         public GroundPalette Ground { get; private set; }
@@ -480,6 +483,20 @@ namespace Godless.Unity
                 }
                 text += "\nfood " + Town.Food.ToString("0") + "   farms " + Town.Farms.Count + " (" + plots + " plots)   stores keep "
                       + Stores.Capacity(Town).ToString("0") + "   heaps " + Town.Piles.Count + "   rotted " + Town.FoodSpoiled.ToString("0");
+
+                // S2Z: what the first fire has become, and the last time the town gathered there.
+                Commons commons = Town.Commons;
+                if (commons != null)
+                {
+                    if (_commonsRules == null) _commonsRules = CommonsRules.FromContent(_content, DriveRules.FromContent(_content).Needs);
+                    if (_commonsRules != null && _commonsRules.Stages.Count > 0)
+                    {
+                        text += "\ncommons: " + commons.PlaceName(_commonsRules) + ", " + commons.Seats.Count + " seats"
+                              + (commons.Underway >= 0 ? ", making " + _commonsRules.Stages[commons.Underway].Name : "")
+                              + (commons.Last != null ? "   last gathering: " + commons.Last.Kind.Doing + ", day " + (commons.Last.Day % World.Clock.DaysPerYear)
+                                 + ", " + commons.Last.Attending + " came" : "");
+                    }
+                }
             }
 
             if (GetComponent<SimSpeed>() != null) text += "\n" + SimSpeed.Keys + (GetComponent<CutawayView>() != null ? "   " + CutawayView.Keys : "") + (GetComponent<BorderView>() != null ? "   " + BorderView.Keys : "");
@@ -487,7 +504,7 @@ namespace Godless.Unity
             TerrainEditor editor = GetComponent<TerrainEditor>();
             if (editor != null) text += "\n" + editor.Status + "\nstrokes " + editor.Strokes;
 
-            GUI.Label(new Rect(12, 10, 900, 190), text);
+            GUI.Label(new Rect(12, 10, 900, 210), text);
         }
 
         // ── the screens before the world runs ───────────────────────────────

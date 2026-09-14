@@ -1,0 +1,11 @@
+{
+  "type": "gathering",
+  "id": "founding-day",
+  "tell": "Once a year, on the day the first fire was lit, everyone sits round it together.",
+  "trigger": "founding-day",
+  "share": 1.0,
+  "doing": "keeping the founding day",
+  "pose": "sit",
+  "takes": 0.4,
+  "relieves": { "company": 0.6 }
+}

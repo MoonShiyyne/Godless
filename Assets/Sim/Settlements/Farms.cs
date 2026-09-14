@@ -727,6 +727,8 @@ namespace Godless.Sim.Settlements
                 {
                     double meals = crop.MealsPerPlot * at.Fertility * at.Standing;
                     at.Last = annals.Write(tick, HarvestedKind, s.Id, place, atFarm.Record, (long)meals, (long)(at.Fertility * 1000.0), new[] { crop.Id });
+                    s.LastHarvest = at.Last;
+                    s.LastHarvestTick = tick;
                     Hauling.Drop(s, at.CentreX, at.CentreZ, -1, meals, at.Last);
                     at.Fertility = System.Math.Max(0.1, at.Fertility - crop.SoilUse);
                     at.State = PlotState.Stubble; at.Days = 0; at.Labour = 0.0; at.Standing = 1.0;

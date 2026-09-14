@@ -1,0 +1,48 @@
+{
+  // S2Z. A split log to sit on, bark down, the cut face up.
+  "type": "model",
+  "id": "seat-log",
+  "tell": "Logs laid in a ring round the fire to sit on: the gatherings have outgrown standing.",
+  "size": {
+    "x": 10,
+    "y": 3,
+    "z": 4
+  },
+  "paint": {
+    "b": {
+      "hue": 26,
+      "saturation": 45,
+      "value": 34
+    },
+    "B": {
+      "hue": 28,
+      "saturation": 40,
+      "value": 40
+    },
+    "c": {
+      "hue": 34,
+      "saturation": 35,
+      "value": 55
+    }
+  },
+  "layers": [
+    [
+      ".bbbbbbbb.",
+      "bbbbbbbbbb",
+      "bbbbbbbbbb",
+      ".bbbbbbbb."
+    ],
+    [
+      ".bbbbbbbb.",
+      "bBBBBBBBBb",
+      "bBBBBBBBBb",
+      ".bbbbbbbb."
+    ],
+    [
+      "..........",
+      ".cccccccc.",
+      ".cccccccc.",
+      ".........."
+    ]
+  ]
+}

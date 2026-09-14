@@ -80,6 +80,26 @@ namespace Godless.Sim.Settlements
         }
         public IReadOnlyList<Farm> Farms { get { return FarmList; } }
 
+        // S2Z. The ground kept round the first fire: claimed, so nothing is built on
+        // it, and walked across like a field.
+        internal readonly HashSet<int> CommonsRecords = new HashSet<int>();
+
+        /// <summary>Ground kept clear round the fire (S2Z).</summary>
+        public bool IsCommons(int px, int pz)
+        {
+            int owner;
+            return CommonsRecords.Count > 0 && World.ParcelGrid.InBounds(px, pz)
+                && _claims.TryGetValue(pz * World.ParcelGrid.Width + px, out owner) && CommonsRecords.Contains(owner);
+        }
+
+        /// <summary>The fire, the ground round it and what the town has made of them (S2Z), or null before the commons system has seen it.</summary>
+        public Commons Commons { get; internal set; }
+
+        // S2Z. The latest of what a town gathers for, kept as it happens so the
+        // commons need not search the annals.
+        internal RecordId LastDeath = RecordId.None, LastHarvest = RecordId.None, LastOutgrown = RecordId.None;
+        internal long LastDeathTick = -1, LastHarvestTick = -1, LastOutgrownTick = -1;
+
         // Heaps waiting to be carried in (S2X), in the order they were started.
         internal readonly List<Pile> PileList = new List<Pile>();
         public IReadOnlyList<Pile> Piles { get { return PileList; } }

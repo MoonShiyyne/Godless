@@ -234,7 +234,8 @@ namespace Godless.Sim.Settlements
                                         DetailModelTable.FromContent(content), grid))
                  .Add(new FarmSystem(FarmRules.FromContent(content), CropTable.FromContent(content, genes), grid, fields,
                                      DetailModelTable.FromContent(content)))
-                 .Add(new MovementSystem(grid, rules, PastimeTable.FromContent(content)));
+                 .Add(new CommonsSystem(CommonsRules.FromContent(content, rules.Needs), grid, DetailModelTable.FromContent(content)))
+                 .Add(new MovementSystem(grid, rules, PastimeTable.FromContent(content)).WithCommons(CommonsRules.FromContent(content, rules.Needs)));
         }
 
         /// <summary>The parcel grid and the fields an island needs before anybody can settle it.</summary>

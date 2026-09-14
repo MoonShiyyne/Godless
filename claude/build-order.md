@@ -446,6 +446,41 @@ Registered alongside the block above:
   about the old 1x. Keys 1-8.
 - **Cost:** movement 1.74 s to 2.32 s over 2,000 days of green shore.
 
+### What S2Z shipped: the first fire, kept, and what it becomes
+
+| ID | System | Depends on | What a stranger sees |
+|---|---|---|---|
+| S2Z | The commons | S2W, S2V, S14, S1A, S2R | The same spot in the middle of the village at every age of it — a ring of stones, a ring of logs, a paved square, then a hall or a colonnade — and the whole village standing there the evening after a death |
+
+- **The fire is kept** (`Settlements/Commons.cs`): the day it is lit it is drawn
+  (`models/fire-ring`, it was never drawn before) and two parcels round it are
+  claimed as the commons: nothing is built or farmed on them, and they are
+  walked across like fields. It is no longer where anyone goes by default (S2W).
+- **Gatherings** (`Assets/Content/base/gatherings`): the evening after a death,
+  the night families leave for a new town, the founding day each year, after a
+  harvest (at most every twenty days), and some evenings a few people telling
+  stories. Whoever goes (a share, by person and day) walks there in their
+  evening itinerary and sits or stands in rings round the fire; it eases
+  company, on record as `commons.gathered` caused by the death, the harvest,
+  the leaving.
+- **Outgrown, it grows** (`commons/base.json`): three gatherings bigger than
+  the place holds and the next stage is begun, on record as caused by the
+  gathering that was too big. The fire circle (10 seats) and the meeting ground
+  (18 more, paved nine voxels out) are laid by a work party of whoever has
+  nothing asked of them or is foraging, an afternoon at a time, seats from the
+  yard's timber or stone and paving from its stone or earth, else beaten bare.
+- **The last stage is commissioned** through the intent bus (`IntentPurpose.Commons`):
+  a hall (`grammars/hall`) where the culture's `communal_ratio` is above half,
+  a colonnade (`grammars/stoa`) where it is not, sited on the commons ground by
+  the fire. Evening gatherings move inside a hall; a colonnade's stay on the square.
+- **Green shore, seed 7, twenty years:** fire circle day 496, meeting ground
+  day 1067, a hall by day 2630 at communal 0.85 and a colonnade by day 2754 at
+  0.3; about 1,250 gatherings (900 story evenings, 240 feasts, 80-150 mournings,
+  19 founding days).
+- **Not yet:** the fire does not flicker or light the night; gatherings do not
+  yet carry myth or salience (S23, S24 will read them); the work party's
+  afternoon is drawn but not taken off their own work.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

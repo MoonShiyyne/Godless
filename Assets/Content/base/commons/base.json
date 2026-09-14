@@ -1,0 +1,48 @@
+{
+  "type": "commons",
+  "id": "base",
+  "tell": "The fire the founders lit stays in the middle of the village with open ground kept round it: logs to sit on once the gatherings outgrow standing, a paved meeting ground once they outgrow the logs, and at last a hall or a colonnade, built because the whole town no longer fits.",
+
+  // S2Z. Parcels round the first fire kept clear from the day it is lit: no
+  // house or field goes on them, and people walk across them. Two parcels is
+  // about ten metres either way of the fire: the meeting ground, and room for
+  // the hall that one day goes up at its edge.
+  "reserveParcels": 2,
+
+  // A stage is outgrown when this many gatherings in a row, or near enough,
+  // bring more people than it holds.
+  "crowdedGatherings": 3,
+
+  // Who builds the next stage: a few people a day who have nothing else
+  // asked of them or are foraging, each laying this many seats or paving
+  // this many columns in an afternoon.
+  "workParty": 6,
+  "seatsPerWorker": 1,
+  "pavingPerWorker": 8,
+
+  // What a seat costs, and which model it is drawn as, by the class of
+  // material the settlement has to spare.
+  "seatVoxels": 4,
+  "seatModels": { "timber": "seat-log", "stone": "seat-stone" },
+
+  // What the meeting ground is paved with: stone if the town holds any, then
+  // fired earth, else the ground is beaten bare where it stands.
+  "paving": ["stone", "earth"],
+  "bareGround": "soil",
+
+  // The last stage is not laid by hand but commissioned: a hall where the
+  // culture keeps its hearth shared and its roofs closed, a colonnade on the
+  // open square where it does not.
+  "indoorsGene": "communal_ratio",
+  "indoorsAbove": 0.5,
+
+  "stages": [
+    { "id": "campfire", "name": "the campfire", "holds": 16, "fire": "fire-ring", "ring": 3 },
+    { "id": "fire-circle", "name": "the fire circle", "holds": 40, "seats": 10, "ring": 5 },
+    { "id": "meeting-ground", "name": "the meeting ground", "holds": 120, "seats": 18, "ring": 8, "pave": 9 },
+    { "id": "hall", "name": "the hall", "holds": 1000, "commissions": true, "ring": 10,
+      "buildings": { "hall": "the hall", "stoa": "the colonnade" },
+      // Evenings are spent inside these; a colonnade's gatherings stay on the square.
+      "inside": ["hall"] }
+  ]
+}

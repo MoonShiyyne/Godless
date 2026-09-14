@@ -14,6 +14,8 @@ namespace Godless.Sim.Build
         Store,
         /// <summary>Fields rather than a building, laid out by the farm system (S2I).</summary>
         Farm,
+        /// <summary>A place the whole town gathers, beside its first fire (S2Z): a hall or a colonnade.</summary>
+        Commons,
     }
 
     /// <summary>One kind of thing a settlement can commission, as content declares it.</summary>
@@ -96,8 +98,8 @@ namespace Godless.Sim.Build
                 string fault = null;
                 if (string.IsNullOrEmpty(tell) || tell.Trim().Length == 0) fault = "declares no tell";
                 else if (need < 0 && (answers.Length > 0 || pressedBy.Length == 0)) fault = "answers need '" + answers + "', which is not loaded";
-                else if (purposeName != "home" && purposeName != "store" && purposeName != "farm")
-                    fault = "has purpose '" + purposeName + "'; a purpose is home, store or farm";
+                else if (purposeName != "home" && purposeName != "store" && purposeName != "farm" && purposeName != "commons")
+                    fault = "has purpose '" + purposeName + "'; a purpose is home, store, farm or commons";
                 else if (!(threshold > 0.0)) fault = "has a threshold that is not above zero";
                 else if (maxOpen < 1) fault = "has maxOpen below one";
                 else if (!(halfLife > 0.0)) fault = "has a half-life that is not above zero";
@@ -118,7 +120,8 @@ namespace Godless.Sim.Build
                     HalfLifeDays = halfLife,
                     BudgetVoxels = doc["budgetVoxels"].AsInt32(0),
                     PressedBy = pressedBy,
-                    Purpose = purposeName == "store" ? IntentPurpose.Store : purposeName == "farm" ? IntentPurpose.Farm : IntentPurpose.Home,
+                    Purpose = purposeName == "store" ? IntentPurpose.Store : purposeName == "farm" ? IntentPurpose.Farm
+                            : purposeName == "commons" ? IntentPurpose.Commons : IntentPurpose.Home,
                     StoresMeals = doc["storesMeals"].AsInt32(0),
                 });
             }

@@ -35,6 +35,9 @@ namespace Godless.Sim.Build
 
         /// <summary>A store for food (S2H), standing or going up.</summary>
         public bool IsStore { get { return Intent != null && Intent.Kind.Purpose == IntentPurpose.Store; } }
+
+        /// <summary>A hall or a colonnade on the town's commons (S2Z), standing or going up.</summary>
+        public bool IsCommons { get { return Intent != null && Intent.Kind.Purpose == IntentPurpose.Commons; } }
         public Blueprint Plan { get; internal set; }
         public Site Site { get; internal set; }
         public Structure Built { get; internal set; }
