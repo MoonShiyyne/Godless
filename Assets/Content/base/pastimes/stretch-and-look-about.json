@@ -1,0 +1,10 @@
+{
+  "type": "pastime",
+  "id": "stretch-and-look-about",
+  "tell": "Someone standing in their doorway in the morning, looking at the sky before they go.",
+  "when": ["morning"],
+  "at": "here",
+  "takes": 0.03,
+  "doing": "looking at the sky",
+  "pose": "stand"
+}

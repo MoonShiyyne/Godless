@@ -24,7 +24,7 @@ namespace Godless.Sim.Harness
     public sealed class TickPacer
     {
         /// <summary>Speeds, as multiples of the base rate. The first is paused.</summary>
-        public static readonly int[] Multipliers = { 0, 1, 2, 4, 8, 16 };
+        public static readonly int[] Multipliers = { 0, 1, 2, 4, 8, 16, 32, 64, 128 };
 
         /// <summary>
         /// Ticks of debt that may be carried. A frame that took a second —

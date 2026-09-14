@@ -194,6 +194,49 @@ namespace Godless.Sim.Settlements
             z = Clamp(fallbackZ, Voxels.ChunkStore.SizeZ);
         }
 
+        /// <summary>
+        /// The way between two columns as the columns to pass through (S2W):
+        /// nothing between on open ground, the parcels of the found path where
+        /// a straight line would cross water or a cliff. For drawing a walk;
+        /// nobody is moved by it.
+        /// </summary>
+        public static void Route(ParcelGrid grid, IslandMap island, int x0, int z0, int x1, int z1, List<Int3> via)
+        {
+            via.Clear();
+            if (grid == null) return;
+            int p0x = x0 / ParcelGrid.Size, p0z = z0 / ParcelGrid.Size, p1x = x1 / ParcelGrid.Size, p1z = z1 / ParcelGrid.Size;
+            if (!ParcelGrid.InBounds(p0x, p0z) || !ParcelGrid.InBounds(p1x, p1z)) return;
+            if ((p0x == p1x && p0z == p1z) || Clear(grid, p0x, p0z, p1x, p1z)) return;
+            List<int> path = CachedPath(grid, p0z * ParcelGrid.Width + p0x, p1z * ParcelGrid.Width + p1x);
+            for (int k = 1; k < path.Count - 1; k++)
+            {
+                int cx, cz;
+                if (DryIn(island, path[k] % ParcelGrid.Width, path[k] / ParcelGrid.Width, out cx, out cz)) via.Add(new Int3(cx, 0, cz));
+            }
+        }
+
+        /// <summary>Voxels from the fire the roofless camp: near enough for its light, clear of the fire itself (S2W).</summary>
+        public const int CampNearest = 8, CampFarthest = 18;
+
+        /// <summary>
+        /// Where the i-th person without a roof keeps their place (S2W): round
+        /// the fire at a distance, spread out, on dry land. The fire itself is
+        /// kept for what is done at a fire.
+        /// </summary>
+        public static void Camp(Settlement s, IslandMap island, int i, out int x, out int z)
+        {
+            double angle = i * 2.399963229728653;
+            int r = CampNearest + (i * 7) % (CampFarthest - CampNearest + 1);
+            for (int attempt = 0; attempt < 8; attempt++)
+            {
+                x = s.Hearth.X + (int)SimMath.Round(SimMath.Cos(angle) * r);
+                z = s.Hearth.Z + (int)SimMath.Round(SimMath.Sin(angle) * r);
+                if (x >= 0 && z >= 0 && x < Voxels.ChunkStore.SizeX && z < Voxels.ChunkStore.SizeZ && (island == null || island.IsLand(x, z))) return;
+                angle += 0.9;
+            }
+            AtFire(s, i, out x, out z);
+        }
+
         /// <summary>A place round the fire for the i-th person: rings of eight, three voxels apart.</summary>
         public static void AtFire(Settlement s, int i, out int x, out int z)
         {
@@ -215,15 +258,17 @@ namespace Godless.Sim.Settlements
         readonly ActivityTable _activities;
 
         readonly NeedTable _needs;
+        readonly PastimeTable _pastimes;
 
         /// <summary>Voxels from the hearth that count as being at the fire, for the record of where the day goes.</summary>
         public const int NearFire = 12;
 
-        public MovementSystem(ParcelGrid grid, DriveRules rules)
+        public MovementSystem(ParcelGrid grid, DriveRules rules, PastimeTable pastimes = null)
         {
             _grid = grid;
             _activities = rules.Activities;
             _needs = rules.Needs;
+            _pastimes = pastimes ?? PastimeTable.None;
         }
 
         public Symbol Id { get { return SystemId; } }
@@ -246,6 +291,8 @@ namespace Godless.Sim.Settlements
             for (int i = 0; i < people.Count; i++)
             {
                 Agent a = people[i];
+                // Arrived since the tick began (born, or come from another town): their tick starts where they are.
+                if (a.StartTick != world.Clock.Tick) { a.StartX = a.X; a.StartZ = a.Z; a.StartTick = world.Clock.Tick; }
                 if (!night)
                 {
                     s.DaylightTicks++;
@@ -273,54 +320,40 @@ namespace Godless.Sim.Settlements
                     }
                 }
 
-                // An errand with somewhere to go is where they are seen this tick —
-                // kneeling at the water, sitting by the store — unless they are
-                // building, which needs them on the site.
-                bool building = s.Tasks != null && s.Tasks.CurrentTask(i) >= 0 && s.Tasks.KindOf(s.Tasks.CurrentTask(i)).Verb == "build";
-                // Someone at work is mostly seen at work: their errands show a tick
-                // in four, staggered person by person, and the rest of the time
-                // they are only the "(after ...)" on what they are doing.
-                bool working = act != null && act.Productive;
-                bool seenOnErrand = !working || (world.Clock.Tick + i) % 4 == 0;
-                if (a.ErrandActivity >= 0 && !building && !night && seenOnErrand)
-                {
-                    Activity errand = _activities[a.ErrandActivity];
-                    string at;
-                    if (Places.Target(s, world.Island, a, i, errand.At, night, out gx, out gz, out at))
-                    {
-                        Go(s, world, a, gx, gz);
-                        string then = act != null && act.Productive ? ", then back to work" : "";
-                        a.Doing = (a.Arrived ? errand.Doing : "on the way: " + errand.Doing) + at + then;
-                        a.Pose = a.Arrived ? errand.Pose : "walk";
-                        a.Talking = a.Arrived && errand.At == ActionPlace.People;
-                        continue;
-                    }
-                }
+                // Errands move nobody any more (S2W): they are done on the way, and
+                // drawn as the detour they are, from wherever the tick takes them.
+                foreach (int e in a.ErrandPlaces)
+                    if (_activities[e].At == ActionPlace.People) a.Talking = true;
 
                 string workPose;
                 if (act != null && act.Productive && s.Tasks != null
                     && Working(s, i, a, deposits, world.Island, world.Clock.TotalDays, world.Clock.Tick, out gx, out gz, out doing, out workPose))
                 {
+                    string verb = s.Tasks.KindOf(s.Tasks.CurrentTask(i)).Verb;
                     // A builder has already walked this tick (S1A does its own).
-                    if (s.Tasks.CurrentTask(i) >= 0 && s.Tasks.KindOf(s.Tasks.CurrentTask(i)).Verb == "build")
+                    if (verb == "build")
                     {
                         a.Doing = doing;
                         a.Pose = "work";
                         a.Arrived = true;
+                        bool there = System.Math.Abs(a.X - a.GoalX) <= Places.Reach && System.Math.Abs(a.Z - a.GoalZ) <= Places.Reach;
+                        DrawWork(s, world, a, i, "work", doing, there, verb);
                         continue;
                     }
                     Go(s, world, a, gx, gz);
                     a.Doing = (a.Arrived || workPose == "carry" ? doing : "going to work") + After(a);
                     a.Pose = a.Arrived ? workPose : (workPose == "carry" ? "carry" : "walk");
                     if (a.Arrived) { a.LastWorkX = a.X; a.LastWorkZ = a.Z; }
+                    if (verb == "haul") DrawHaul(s, world, a, i);
+                    else DrawWork(s, world, a, i, workPose == "carry" ? "work" : workPose, doing, a.Arrived, verb);
                     continue;
                 }
 
                 if (act == null || act.Productive)
                 {
                     // Nothing wanted of them this tick (S2V): at home if they have
-                    // one, else where they last worked, and the fire only for the
-                    // newly founded and the roofless who have never worked.
+                    // one, else where they last worked, and the camp only for the
+                    // newly founded and the roofless who have never worked (S2W).
                     string idle;
                     Household family = Households.Of(s, a);
                     if (family != null && family.Housed)
@@ -330,10 +363,11 @@ namespace Godless.Sim.Settlements
                         gx = c.X + (i % 3) - 1; gz = c.Z + (i / 3 % 3) - 1; idle = "idle at home";
                     }
                     else if (a.LastWorkX >= 0) { gx = a.LastWorkX; gz = a.LastWorkZ; idle = "idle where they work"; }
-                    else { Movement.AtFire(s, i, out gx, out gz); idle = "idle at the fire"; }
+                    else { Movement.Camp(s, world.Island, i, out gx, out gz); idle = "idle at the camp"; }
                     Go(s, world, a, gx, gz);
                     a.Doing = idle;
                     a.Pose = a.Arrived ? "stand" : "walk";
+                    DrawOwn(s, world, a, i, "stand", idle, night, true);
                     continue;
                 }
 
@@ -342,7 +376,7 @@ namespace Godless.Sim.Settlements
                 string where;
                 if (!Places.Target(s, world.Island, a, i, act.At, night, out gx, out gz, out where))
                 {
-                    Movement.AtFire(s, i, out gx, out gz);
+                    Movement.Camp(s, world.Island, i, out gx, out gz);
                     where = "";
                 }
                 Go(s, world, a, gx, gz);
@@ -351,16 +385,218 @@ namespace Godless.Sim.Settlements
                 {
                     a.Doing = act.Doing + where + After(a);
                     a.Pose = act.Pose;
-                    a.Talking = act.At == ActionPlace.People;
+                    a.Talking = a.Talking || act.At == ActionPlace.People;
                 }
                 else
                 {
                     a.Doing = "on the way: " + act.Doing + where;
-                    a.Pose = night ? "walk" : "walk";
+                    a.Pose = "walk";
                 }
+                DrawOwn(s, world, a, i, act.Pose, act.Doing + where, night, false);
             }
             Company(s, needs, night);
         }
+
+        // ── S2W: the tick drawn as it was spent ──────────────────────────────
+
+        /// <summary>Voxels either way a worker moves about their work between spells of it.</summary>
+        const int AboutTheWork = 2;
+
+        /// <summary>Most loads drawn in one tick of hauling; a short haul makes more trips than anyone could follow.</summary>
+        const int MostTripsShown = 6;
+
+        /// <summary>Share of a tick spent taking up or putting down a load.</summary>
+        const double Handling = 0.02;
+
+        readonly List<Int3> _via = new List<Int3>();
+
+        /// <summary>A walk along the ground from wherever the day has got to, round what cannot be crossed.</summary>
+        void WalkTo(Agent a, SimWorld world, int x, int z, string pose, string doing, bool fills = false)
+        {
+            Itinerary day = a.Day;
+            Movement.Route(_grid, world.Island, day.X, day.Z, x, z, _via);
+            day.Walk(_via, x, z, pose, doing, fills);
+        }
+
+        /// <summary>Someone at work: out to it, the errands on the side, a pause, and back to it until the tick ends.</summary>
+        void DrawWork(Settlement s, SimWorld world, Agent a, int i, string pose, string doing, bool arrived, string verb)
+        {
+            Itinerary day = a.Day;
+            day.Begin(a.StartX, a.StartZ);
+            Morning(s, world, a, i);
+            if (!arrived)
+            {
+                WalkTo(a, world, a.X, a.Z, "walk", "on the way: " + doing, true);
+                day.Finish();
+                return;
+            }
+
+            WalkTo(a, world, a.X, a.Z, "walk", "on the way: " + doing);
+            day.Fill(pose, doing);
+            if (Errands(s, world, a, i)) WalkTo(a, world, a.X, a.Z, "walk", "back to " + doing);
+
+            ulong who = a.Id.Hash;
+            int hour = world.Clock.TickOfDay;
+            bool pause = (hour == 1 || hour == 2) && StableHash.Combine(who, (ulong)world.Clock.Tick) % 3 == 0;
+            // Moved about the work: a stand of reeds, a furrow, the other side of a wall.
+            int spells = verb == "farm" || verb == "forage" || verb == "build" ? 3 : 2;
+            for (int k = 1; k < spells; k++)
+            {
+                if (pause && k == 1) DoPastime(s, world, a, i, PastimeWhen.Midday, 3);
+                ulong h = StableHash.Combine(who, (ulong)(world.Clock.Tick * 8 + k));
+                int wx = a.X + ((int)(h % (2 * AboutTheWork + 1)) - AboutTheWork);
+                int wz = a.Z + ((int)((h >> 8) % (2 * AboutTheWork + 1)) - AboutTheWork);
+                if (world.Island != null && !world.Island.IsLand(Clamp(wx, Voxels.ChunkStore.SizeX), Clamp(wz, Voxels.ChunkStore.SizeZ)))
+                { wx = a.X; wz = a.Z; }
+                day.Walk(null, wx, wz, "walk", doing);
+                day.Fill(pose, doing);
+            }
+            if (pause && spells < 2) DoPastime(s, world, a, i, PastimeWhen.Midday, 3);
+            day.Walk(null, a.X, a.Z, "walk", doing);
+            day.Fill(pose, doing);
+            day.Finish();
+        }
+
+        /// <summary>A hauler's tick: loads taken up at the heap, carried, put down, and back for the next.</summary>
+        void DrawHaul(Settlement s, SimWorld world, Agent a, int i)
+        {
+            Itinerary day = a.Day;
+            day.Begin(a.StartX, a.StartZ);
+            Morning(s, world, a, i);
+            int fx = a.HaulFromX, fz = a.HaulFromZ, tx = a.HaulToX, tz = a.HaulToZ;
+            string what = a.HaulWhat;
+            if (Errands(s, world, a, i)) { }
+
+            double dx = tx - fx, dz = tz - fz;
+            double trip = 2.0 * SimMath.Sqrt(dx * dx + dz * dz) / DriveSystem.VoxelsWalkedPerTick + 2.0 * Handling;
+            int trips = trip > 0.0 ? (int)(a.LabourShare * 0.9 / trip) : MostTripsShown;
+            if (trips < 1) trips = 1;
+            if (trips > MostTripsShown) trips = MostTripsShown;
+
+            WalkTo(a, world, fx, fz, "walk", "on the way to the " + what);
+            for (int k = 0; k < trips; k++)
+            {
+                day.Stay(Handling, "work", "loading " + what);
+                WalkTo(a, world, tx, tz, "carry", "carrying " + what + " to " + a.HaulTo);
+                day.Stay(Handling, "work", "putting down " + what);
+                if (k < trips - 1) WalkTo(a, world, fx, fz, "walk", "back for more " + what);
+            }
+            bool atHeap = a.X == fx && a.Z == fz;
+            WalkTo(a, world, a.X, a.Z, atHeap ? "walk" : "carry", atHeap ? "back for more " + what : "carrying " + what + " to " + a.HaulTo);
+            day.Fill("work", atHeap ? "loading " + what : "putting down " + what);
+            day.Finish();
+        }
+
+        /// <summary>
+        /// A tick spent for themselves: the errands, the walk to where it is
+        /// done and the time there — at night, the evening at home or by the
+        /// camp and then bed; with nothing to do, a pastime or two.
+        /// </summary>
+        void DrawOwn(Settlement s, SimWorld world, Agent a, int i, string pose, string doing, bool night, bool idle)
+        {
+            Itinerary day = a.Day;
+            day.Begin(a.StartX, a.StartZ);
+            if (!night) { Morning(s, world, a, i); Errands(s, world, a, i); }
+            if (!a.Arrived)
+            {
+                WalkTo(a, world, a.X, a.Z, "walk", "on the way: " + doing, true);
+                day.Finish();
+                return;
+            }
+
+            if (night) DoPastime(s, world, a, i, PastimeWhen.Evening, 5);
+            else if (idle)
+            {
+                DoPastime(s, world, a, i, PastimeWhen.Idle, 6);
+                DoPastime(s, world, a, i, PastimeWhen.Idle, 7);
+            }
+            WalkTo(a, world, a.X, a.Z, "walk", "on the way: " + doing);
+            day.Fill(pose, doing);
+            day.Finish();
+        }
+
+        /// <summary>The first tick of a day starts where they slept, with whatever they do first thing.</summary>
+        void Morning(Settlement s, SimWorld world, Agent a, int i)
+        {
+            if (world.Clock.TickOfDay != 0) return;
+            DoPastime(s, world, a, i, PastimeWhen.Morning, 1);
+        }
+
+        /// <summary>Every errand of the tick that had somewhere to go, walked to and done. True when there were any.</summary>
+        bool Errands(Settlement s, SimWorld world, Agent a, int i)
+        {
+            bool any = false;
+            foreach (int e in a.ErrandPlaces)
+            {
+                Activity errand = _activities[e];
+                int ex, ez;
+                string at;
+                if (!Places.Target(s, world.Island, a, i, errand.At, false, out ex, out ez, out at)) continue;
+                Movement.OnLand(world.Island, ref ex, ref ez, a.X, a.Z);
+                WalkTo(a, world, ex, ez, "walk", "on the way: " + errand.Doing + at);
+                a.Day.Stay(errand.Takes * 0.5, errand.Pose, errand.Doing + at);
+                any = true;
+            }
+            return any;
+        }
+
+        /// <summary>One pastime for a time of day, if content has one that fits them, done where it is done.</summary>
+        void DoPastime(Settlement s, SimWorld world, Agent a, int i, PastimeWhen when, ulong salt)
+        {
+            Household family = Households.Of(s, a);
+            bool housed = family != null && family.Housed;
+            bool water = world.Island != null && Places.WaterPoints(s, world.Island).Count > 0;
+            Pastime p = _pastimes.Pick(when, a.Id.Hash, world.Clock.TotalDays + world.Clock.TickOfDay * 7, salt, housed, water);
+            if (p == null) return;
+            Itinerary day = a.Day;
+            int px = day.X, pz = day.Z;
+            switch (p.At)
+            {
+                case PastimeAt.Here:
+                    day.Stay(p.Takes, p.Pose, p.Doing);
+                    return;
+                case PastimeAt.Nearby:
+                {
+                    ulong h = StableHash.Combine(a.Id.Hash, (ulong)world.Clock.Tick + salt);
+                    int nx = Clamp(px + (int)(h % 13) - 6, Voxels.ChunkStore.SizeX);
+                    int nz = Clamp(pz + (int)((h >> 8) % 13) - 6, Voxels.ChunkStore.SizeZ);
+                    if (world.Island != null && !world.Island.IsLand(nx, nz)) { day.Stay(p.Takes, "stand", p.Doing); return; }
+                    day.Walk(null, nx, nz, p.Pose, p.Doing);
+                    day.Stay(p.Takes * 0.5, p.Pose == "walk" ? "stand" : p.Pose, p.Doing);
+                    day.Walk(null, px, pz, p.Pose, p.Doing);
+                    return;
+                }
+                case PastimeAt.Home:
+                {
+                    Project home = family.Home[0];
+                    Int3 c = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);
+                    // In front of it rather than in its middle: by the door, or at the hearth inside.
+                    int hx = c.X + (i % 3) - 1, hz = c.Z + (i / 3 % 3) - 1;
+                    WalkTo(a, world, hx, hz, "walk", "going home");
+                    day.Stay(p.Takes, p.Pose, p.Doing);
+                    return;
+                }
+                case PastimeAt.Water:
+                {
+                    int wx, wz;
+                    string ignored;
+                    if (!Places.Target(s, world.Island, a, i, ActionPlace.Water, false, out wx, out wz, out ignored)) return;
+                    WalkTo(a, world, wx, wz, "walk", "on the way: " + p.Doing);
+                    day.Stay(p.Takes, p.Pose, p.Doing);
+                    return;
+                }
+                case PastimeAt.Camp:
+                {
+                    int cx, cz;
+                    Movement.Camp(s, world.Island, i, out cx, out cz);
+                    WalkTo(a, world, cx, cz, "walk", "back to the camp");
+                    day.Stay(p.Takes, p.Pose, p.Doing);
+                    return;
+                }
+            }
+        }
+
+        static int Clamp(int v, int n) { return v < 0 ? 0 : (v >= n ? n - 1 : v); }
 
         /// <summary>
         /// Company out and about (S2V): everyone awake is placed, so whoever is
@@ -510,7 +746,7 @@ namespace Godless.Sim.Settlements
             }
             else
             {
-                Movement.AtFire(s, i + 16, out gx, out gz);
+                Places.WildGround(s, island, a.Id.Hash, day, i, out gx, out gz);
                 doing = "gathering " + material;
             }
             return true;

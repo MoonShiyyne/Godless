@@ -887,7 +887,7 @@ namespace Godless.Sim.Headless
             Profiled(world, cli, new TaskSystem(construction, grid, HaulRules.FromContent(db)));
             Profiled(world, cli, new HaulingSystem(HaulRules.FromContent(db), FoodRules.FromContent(db), DetailModelTable.FromContent(db), grid));
             Profiled(world, cli, new FarmSystem(FarmRules.FromContent(db), CropTable.FromContent(db, genes), grid, constraints, DetailModelTable.FromContent(db)));
-            Profiled(world, cli, new MovementSystem(grid, rules));
+            Profiled(world, cli, new MovementSystem(grid, rules, PastimeTable.FromContent(db)));
             world.BeginHistory();
 
             var header = new StringBuilder("  day  weather     in open ");

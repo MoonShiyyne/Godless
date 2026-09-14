@@ -56,8 +56,11 @@ namespace Godless.Unity
 
         [SerializeField] int people = 20;
 
-        [Tooltip("Simulated days a real second at 1x. Speed never reaches the simulation; it only decides how many whole ticks run this frame.")]
-        [SerializeField] float daysPerSecondAt1x = 2f;
+        // S2W: a day used to pass in half a second at 1x, which made every walk a
+        // blink. A new field rather than a new value, so the old one saved in
+        // the scene is not read back over it.
+        [Tooltip("Real seconds a simulated day takes at 1x: long enough to watch people walk out to their work and home again. Speed never reaches the simulation; it only decides how many whole ticks run this frame.")]
+        [SerializeField] float secondsPerDayAt1x = 120f;
 
         [Tooltip("Speed to start at, as an index into TickPacer.Multipliers (0 paused, 1 is 1x).")]
         [SerializeField] int startSpeed = 1;
@@ -185,7 +188,7 @@ namespace Godless.Unity
             }
 
             World = new SimWorld((ulong)worldSeed, _content, _types);
-            Pacer = new TickPacer(daysPerSecondAt1x, World.Clock.TicksPerDay, startSpeed);
+            Pacer = new TickPacer(1.0 / Mathf.Max(1f, secondsPerDayAt1x), World.Clock.TicksPerDay, startSpeed);
             World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, _biomes, _types, choice.Preset,
                                                     plantDeposits ? choice.Features : null);
             foreach (string problem in choice.Features.Problems) Debug.LogWarning("content: " + problem);

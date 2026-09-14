@@ -1,0 +1,10 @@
+{
+  "type": "pastime",
+  "id": "sharpen-a-blade",
+  "tell": "Someone sitting by the felled trunk working an edge back onto their tool.",
+  "when": ["midday", "idle"],
+  "at": "here",
+  "takes": 0.06,
+  "doing": "sharpening a blade",
+  "pose": "sit"
+}

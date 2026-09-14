@@ -1,0 +1,11 @@
+{
+  "type": "pastime",
+  "id": "stoke-the-hearth",
+  "tell": "Smoke rising from one house after another as the morning comes up.",
+  // S2W. First thing, at home: the fire banked overnight brought back.
+  "when": ["morning"],
+  "at": "home",
+  "takes": 0.06,
+  "doing": "stoking the hearth",
+  "pose": "kneel"
+}

@@ -1,0 +1,12 @@
+{
+  "type": "pastime",
+  "id": "wash-at-the-water",
+  "tell": "A few people kneeling along the bank at dawn, then walking up from it to their work.",
+  // S2W. Only where the water is in reach.
+  "when": ["morning", "idle"],
+  "at": "water",
+  "takes": 0.08,
+  "doing": "washing at the water",
+  "pose": "kneel",
+  "weight": 0.6
+}

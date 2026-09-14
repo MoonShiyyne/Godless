@@ -1,0 +1,10 @@
+{
+  "type": "pastime",
+  "id": "sweep-the-yard",
+  "tell": "Someone bent over in front of a house, clearing the ground by the door.",
+  "when": ["idle"],
+  "at": "home",
+  "takes": 0.08,
+  "doing": "sweeping the yard",
+  "pose": "work"
+}

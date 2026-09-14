@@ -62,6 +62,20 @@ namespace Godless.Sim.Drives
         /// <summary>The last errand this tick that had somewhere to go, by activity index, or -1 (S2V).</summary>
         public int ErrandActivity { get; internal set; } = -1;
 
+        /// <summary>Every errand this tick that had somewhere to go, by activity index, in the order done (S2W).</summary>
+        internal readonly System.Collections.Generic.List<int> ErrandPlaces = new System.Collections.Generic.List<int>();
+
+        /// <summary>Where they stood when the tick began, and which tick that was (S2W).</summary>
+        internal int StartX, StartZ;
+        internal long StartTick = -1;
+
+        /// <summary>
+        /// Their tick as the ground they covered and what they did on it, in
+        /// order (S2W). Written by the movement system, read by whoever draws
+        /// them; nothing in the simulation reads it back.
+        /// </summary>
+        public Settlements.Itinerary Day { get; } = new Settlements.Itinerary();
+
         /// <summary>Errands done on the side this tick, in words ("eating", "drinking"), for anyone reading them.</summary>
         public string Errands { get; internal set; } = "";
 

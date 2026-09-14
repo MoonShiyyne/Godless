@@ -1,0 +1,12 @@
+{
+  "type": "pastime",
+  "id": "roll-up-bedding",
+  "tell": "People bent over their bedding in the open at first light, before the camp walks out.",
+  // S2W. The roofless sleep on the ground; the morning starts by packing it away.
+  "when": ["morning"],
+  "at": "camp",
+  "takes": 0.05,
+  "doing": "rolling up their bedding",
+  "pose": "kneel",
+  "weight": 2
+}

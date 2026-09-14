@@ -37,7 +37,7 @@ namespace Godless.Sim.Settlements
                 if (x < 0 || z < 0 || x >= ChunkStore.SizeX || z >= ChunkStore.SizeZ) continue;
                 if (island == null || island.IsLand(x, z)) return;
             }
-            Movement.AtFire(s, index + 16, out x, out z);
+            Movement.Camp(s, island, index, out x, out z);
         }
 
         /// <summary>Voxels from the target at which a person counts as arrived.</summary>
@@ -100,8 +100,8 @@ namespace Godless.Sim.Settlements
                         gx = c.X; gz = c.Z; where = " at home";
                         return true;
                     }
-                    Movement.AtFire(s, index + 8, out gx, out gz);
-                    where = " by the fire";
+                    Movement.Camp(s, island, index, out gx, out gz);
+                    where = " at the camp";
                     return true;
                 }
 
@@ -115,8 +115,8 @@ namespace Godless.Sim.Settlements
                         gx = c.X; gz = c.Z; where = " at home";
                         return true;
                     }
-                    Movement.AtFire(s, index, out gx, out gz);
-                    where = " by the fire";
+                    Movement.Camp(s, island, index, out gx, out gz);
+                    where = " at the camp";
                     return true;
                 }
 
@@ -147,7 +147,7 @@ namespace Godless.Sim.Settlements
                                 return true;
                             }
                     }
-                    Movement.AtFire(s, index, out gx, out gz);
+                    Movement.Camp(s, island, index, out gx, out gz);
                     where = " in the open";
                     return true;
                 }
@@ -182,7 +182,7 @@ namespace Godless.Sim.Settlements
                         if (d < bestAny && d > 0) { bestAny = d; anyX = other.X + 1; anyZ = other.Z; }
                     }
                     if (!found && bestAny < long.MaxValue) { gx = anyX; gz = anyZ; found = true; }
-                    if (!found) Movement.AtFire(s, index + 4, out gx, out gz);
+                    if (!found) Movement.Camp(s, island, index + 4, out gx, out gz);
                     return true;
                 }
             }

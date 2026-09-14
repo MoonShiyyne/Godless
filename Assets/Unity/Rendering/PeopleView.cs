@@ -20,9 +20,11 @@ namespace Godless.Unity
     /// foraging, orange building, blue drinking. The figures are content
     /// (`models/person-*.json`); skin and hair are the person's own.
     ///
-    /// Positions come from the sim once a tick and are eased between ticks by
-    /// how far the pacer is toward the next one, so a walk reads as a walk at
-    /// any speed without the sim ever knowing a frame exists.
+    /// Since S2W the sim writes each person's tick down as stretches — the walk
+    /// out, the work, the errand, the walk home — and they are played back
+    /// across the tick by how far the pacer is toward the next one, so the
+    /// six hours a tick stands for are seen being spent, at any speed, without
+    /// the sim ever knowing a frame exists.
     ///
     /// Hover over someone to read them: what they are doing, and the needs
     /// that have them doing it.
@@ -60,10 +62,21 @@ namespace Godless.Unity
         DetailModelTable _models;
         DetailModel[] _poses;
 
-        readonly Dictionary<ulong, Vector3> _from = new Dictionary<ulong, Vector3>();
-        readonly Dictionary<ulong, Vector3> _to = new Dictionary<ulong, Vector3>();
+        // S2W: each person's tick as it was spent, copied from the sim when it
+        // ticks (the sim reuses its lists), and which way they last faced.
+        struct Stretch
+        {
+            public float Start, End;
+            public Vector3 From, To;
+            public string Pose, Doing;
+            public bool InBed;
+            public float BedYaw;
+        }
+
+        readonly Dictionary<ulong, List<Stretch>> _days = new Dictionary<ulong, List<Stretch>>();
+        readonly Stack<List<Stretch>> _spare = new Stack<List<Stretch>>();
         readonly Dictionary<ulong, float> _yaw = new Dictionary<ulong, float>();
-        readonly Dictionary<ulong, float> _bedYaw = new Dictionary<ulong, float>();
+        readonly Dictionary<int, float> _heights = new Dictionary<int, float>();
         long _tick = -1;
 
         readonly Dictionary<int, Mesh> _meshes = new Dictionary<int, Mesh>();
@@ -96,10 +109,9 @@ namespace Godless.Unity
 
             if (_boot.World.Clock.Tick != _tick) Advance();
 
-            // How far the world is toward its next tick. The pacer carries the
-            // fraction as debt; eased so a stride starts and ends gently.
+            // How far the world is toward its next tick: the share of the tick being shown.
             float t = Mathf.Clamp01((float)(_boot.Pacer.Behind));
-            float eased = t * t * (3f - 2f * t);
+            ChunkStore store = _boot.World.Voxels.Store;
 
             float pixelScale = 2f * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) / Screen.height;
 
@@ -115,19 +127,29 @@ namespace Godless.Unity
                     Agent a = s.People[i];
                     ulong id = a.Id.Hash;
 
-                    Vector3 from, to;
-                    if (!_to.TryGetValue(id, out to)) continue;
-                    if (!_from.TryGetValue(id, out from)) from = to;
-                    Vector3 at = Vector3.Lerp(from, to, eased);
-                    bool moving = !_boot.Pacer.IsPaused && t < 0.999f && (to - from).sqrMagnitude > 0.09f;
+                    List<Stretch> day;
+                    if (!_days.TryGetValue(id, out day) || day.Count == 0) continue;
+                    Stretch now = day[day.Count - 1];
+                    for (int k = 0; k < day.Count; k++)
+                        if (t < day[k].End) { now = day[k]; break; }
 
+                    float span = now.End - now.Start;
+                    float along = span > 1e-5f ? Mathf.Clamp01((t - now.Start) / span) : 1f;
+                    Vector3 flat = now.To - now.From;
+                    flat.y = 0f;
+                    bool moving = flat.sqrMagnitude > 0.01f;
+
+                    Vector3 at;
                     float yaw;
-                    Pose pose = PoseOf(a, moving, i);
-                    float bedYaw;
-                    // Only a walk is drawn between two places; anyone else is where they are.
-                    if (!moving) at = to;
-                    if (pose == Pose.Lie && _bedYaw.TryGetValue(id, out bedYaw)) yaw = bedYaw;
-                    else if (!_yaw.TryGetValue(id, out yaw)) yaw = (id % 360);
+                    if (now.InBed) { at = now.To; yaw = now.BedYaw; }
+                    else
+                    {
+                        at = Vector3.Lerp(now.From, now.To, along);
+                        at.y = moving ? StandingHeight(store, Mathf.FloorToInt(at.x), Mathf.FloorToInt(at.z)) : now.To.y;
+                        if (moving) _yaw[id] = Mathf.Atan2(flat.x, flat.z) * Mathf.Rad2Deg;
+                        if (!_yaw.TryGetValue(id, out yaw)) yaw = (id % 360);
+                    }
+                    Pose pose = PoseOf(now, moving && !_boot.Pacer.IsPaused, moving, i);
 
                     // Upstairs, while the cutaway has taken the upstairs away.
                     if (cutaway != null && cutaway.Hides(at)) continue;
@@ -136,6 +158,7 @@ namespace Godless.Unity
                     float enlarge = Mathf.Clamp(distance * pixelScale * minPixelHeight / HeightVoxels, 1f, maxEnlarge);
                     float cells = enlarge / DetailModelTable.CellsPerVoxel;
 
+                    // Dressed for what the tick is for, not for the drink on the way.
                     int colour = ColourIndex(a.Doing);
                     int look = (int)(id % (ulong)(Skins.Length * Hairs.Length));
                     int key = ((int)pose * 32 + colour) * 16 + look;
@@ -147,7 +170,7 @@ namespace Godless.Unity
                     if (screen.z > 0f)
                     {
                         float d = Vector2.Distance(mouse, new Vector2(screen.x, screen.y));
-                        if (d < closest) { closest = d; _hovered = Describe(s, a); _hoverAt = new Vector2(screen.x, Screen.height - screen.y); }
+                        if (d < closest) { closest = d; _hovered = Describe(s, a, now.Doing); _hoverAt = new Vector2(screen.x, Screen.height - screen.y); }
                     }
                 }
 
@@ -168,14 +191,15 @@ namespace Godless.Unity
             }
         }
 
-        /// <summary>The figure for what someone is doing; between ticks, a walk in two steps.</summary>
-        static Pose PoseOf(Agent a, bool moving, int index)
+        /// <summary>The figure for a stretch of someone's tick; a walk in two steps while they are moving.</summary>
+        static Pose PoseOf(Stretch now, bool stepping, bool moving, int index)
         {
             // Someone carrying keeps their arms full on the way (S2X).
-            if (a.Pose == "carry") return Pose.Carry;
-            if (moving) return ((int)(Time.time * 4f) + index) % 2 == 0 ? Pose.WalkA : Pose.WalkB;
-            if (a.Doing != null && a.Doing.StartsWith("asleep")) return Pose.Lie;
-            switch (a.Pose)
+            if (now.Pose == "carry") return Pose.Carry;
+            if (moving)
+                return !stepping ? Pose.WalkA : (((int)(Time.time * 6f) + index) % 2 == 0 ? Pose.WalkA : Pose.WalkB);
+            if (now.Doing != null && now.Doing.StartsWith("asleep")) return Pose.Lie;
+            switch (now.Pose)
             {
                 case "work": return Pose.Work;
                 case "sit": return Pose.Sit;
@@ -185,41 +209,72 @@ namespace Godless.Unity
             }
         }
 
-        /// <summary>A new tick: where they were becomes where they are coming from.</summary>
+        /// <summary>A new tick: everyone's tick, copied as it was spent, standing heights and all.</summary>
         void Advance()
         {
             _tick = _boot.World.Clock.Tick;
             ChunkStore store = _boot.World.Voxels.Store;
-            _bedYaw.Clear();
+            _heights.Clear();
+            foreach (List<Stretch> old in _days.Values) { old.Clear(); _spare.Push(old); }
+            _days.Clear();
+
             foreach (Settlement s in _boot.World.Settlements)
                 foreach (Agent a in s.People)
                 {
-                    ulong id = a.Id.Hash;
-                    int x = Mathf.Clamp(a.X, 0, ChunkStore.SizeX - 1), z = Mathf.Clamp(a.Z, 0, ChunkStore.SizeZ - 1);
-                    var now = new Vector3(x + 0.5f, StandingHeight(store, x, z), z + 0.5f);
-
-                    // Asleep in their own bed: on it, the way it lies.
-                    float bedYaw;
-                    Vector3 onBed;
-                    if (a.Doing != null && (a.Doing.StartsWith("asleep in bed") || a.Doing.StartsWith("asleep in a spare bed"))
-                        && OnBed(s, a, out onBed, out bedYaw))
+                    List<Stretch> day = _spare.Count > 0 ? _spare.Pop() : new List<Stretch>();
+                    _days[a.Id.Hash] = day;
+                    IReadOnlyList<Leg> legs = a.Day.Legs;
+                    if (legs.Count == 0)
                     {
-                        now = onBed;
-                        _bedYaw[id] = bedYaw;
+                        Vector3 here = Column(store, a.X, a.Z);
+                        day.Add(new Stretch { Start = 0f, End = 1f, From = here, To = here, Pose = a.Pose, Doing = a.Doing });
+                        continue;
                     }
 
-                    Vector3 was;
-                    bool had = _to.TryGetValue(id, out was);
-                    _from[id] = had ? was : now;
-                    _to[id] = now;
-
-                    Vector3 step = now - (had ? was : now);
-                    if (step.x * step.x + step.z * step.z > 0.09f) _yaw[id] = Mathf.Atan2(step.x, step.z) * Mathf.Rad2Deg;
+                    Vector3 onBed = Vector3.zero;
+                    float bedYaw = 0f;
+                    bool hasBed = false, looked = false;
+                    foreach (Leg leg in legs)
+                    {
+                        var stretch = new Stretch
+                        {
+                            Start = (float)leg.Start, End = (float)leg.End,
+                            From = Column(store, leg.FromX, leg.FromZ), To = Column(store, leg.ToX, leg.ToZ),
+                            Pose = leg.Pose, Doing = leg.Doing,
+                        };
+                        // Asleep in their own bed: on it, the way it lies.
+                        if (!leg.Moves && leg.Doing != null && (leg.Doing.StartsWith("asleep in bed") || leg.Doing.StartsWith("asleep in a spare bed")))
+                        {
+                            if (!looked) { hasBed = OnBed(s, a, out onBed, out bedYaw); looked = true; }
+                            if (hasBed) { stretch.InBed = true; stretch.To = onBed; stretch.From = onBed; stretch.BedYaw = bedYaw; }
+                        }
+                        day.Add(stretch);
+                    }
                 }
+        }
+
+        /// <summary>Where someone stands in a column, as a point for drawing them.</summary>
+        Vector3 Column(ChunkStore store, int x, int z)
+        {
+            x = Mathf.Clamp(x, 0, ChunkStore.SizeX - 1);
+            z = Mathf.Clamp(z, 0, ChunkStore.SizeZ - 1);
+            return new Vector3(x + 0.5f, StandingHeight(store, x, z), z + 0.5f);
         }
 
         /// <summary>The lowest place in a column someone could stand: ground with two voxels of room over it, so indoors is the floor, not the roof.</summary>
         float StandingHeight(ChunkStore store, int x, int z)
+        {
+            x = Mathf.Clamp(x, 0, ChunkStore.SizeX - 1);
+            z = Mathf.Clamp(z, 0, ChunkStore.SizeZ - 1);
+            int key = z * ChunkStore.SizeX + x;
+            float known;
+            if (_heights.TryGetValue(key, out known)) return known;
+            float found = Standing(store, x, z);
+            _heights[key] = found;
+            return found;
+        }
+
+        float Standing(ChunkStore store, int x, int z)
         {
             for (int y = 1; y < ChunkStore.SizeY - 2; y++)
                 if (_ground[store.Get(x, y - 1, z)] && !_ground[store.Get(x, y, z)] && !_ground[store.Get(x, y + 1, z)])
@@ -352,10 +407,11 @@ namespace Godless.Unity
             return 0;
         }
 
-        string Describe(Settlement s, Agent a)
+        string Describe(Settlement s, Agent a, string now)
         {
             var text = new System.Text.StringBuilder();
-            text.Append("person ").Append(a.Index).Append(": ").Append(string.IsNullOrEmpty(a.Doing) ? "—" : a.Doing);
+            text.Append("person ").Append(a.Index).Append(": ").Append(string.IsNullOrEmpty(now) ? (string.IsNullOrEmpty(a.Doing) ? "—" : a.Doing) : now);
+            if (!string.IsNullOrEmpty(now) && now != a.Doing && !string.IsNullOrEmpty(a.Doing)) text.Append("\n  this quarter of the day: ").Append(a.Doing);
             for (int n = 0; n < _needs.Count; n++)
             {
                 double level = a.Level(n);

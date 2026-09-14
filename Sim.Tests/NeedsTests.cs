@@ -89,19 +89,21 @@ namespace Godless.Sim.Tests
                 for (int t = 0; t < world.Clock.TicksPerDay; t++)
                 {
                     world.Tick();
+                    // Errands are walked to and done on the way (S2W): seen in the tick as it was spent.
                     foreach (Agent a in s.People)
-                    {
-                        if (!a.Arrived) continue;
-                        if (a.Doing.StartsWith("drinking"))
+                        foreach (Leg leg in a.Day.Legs)
                         {
-                            int near = int.MaxValue;
-                            foreach (Int3 w in water)
-                                near = System.Math.Min(near, System.Math.Max(System.Math.Abs(w.X - a.X), System.Math.Abs(w.Z - a.Z)));
-                            Assert.True(near <= Places.Reach + 1, a.Doing + " " + near + " voxels from any water");
-                            drinking++;
+                            if (leg.Moves) continue;
+                            if (leg.Doing.StartsWith("drinking"))
+                            {
+                                int near = int.MaxValue;
+                                foreach (Int3 w in water)
+                                    near = System.Math.Min(near, System.Math.Max(System.Math.Abs(w.X - leg.ToX), System.Math.Abs(w.Z - leg.ToZ)));
+                                Assert.True(near <= Places.Reach + 1, leg.Doing + " " + near + " voxels from any water");
+                                drinking++;
+                            }
+                            if (leg.Doing.StartsWith("eating")) eating++;
                         }
-                        if (a.Doing.StartsWith("eating")) eating++;
-                    }
                 }
             _out.WriteLine(drinking + " seen drinking, " + eating + " seen eating");
             Assert.True(drinking > 0, "nobody was seen drinking in sixty days");

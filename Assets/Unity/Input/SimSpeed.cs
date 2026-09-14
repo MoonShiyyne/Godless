@@ -26,7 +26,7 @@ namespace Godless.Unity
         void Awake() { _boot = GetComponent<WorldBootstrap>(); }
 
         /// <summary>What the keys are, for the HUD to say out loud.</summary>
-        public static string Keys { get { return "space pause   1-5 speed   [ ] slower faster   . step a day"; } }
+        public static string Keys { get { return "space pause   1-8 speed   [ ] slower faster   . step a day"; } }
 
         void Update()
         {
@@ -43,6 +43,9 @@ namespace Godless.Unity
             if (keys.digit3Key.wasPressedThisFrame) pacer.Level = 3;
             if (keys.digit4Key.wasPressedThisFrame) pacer.Level = 4;
             if (keys.digit5Key.wasPressedThisFrame) pacer.Level = 5;
+            if (keys.digit6Key.wasPressedThisFrame) pacer.Level = 6;
+            if (keys.digit7Key.wasPressedThisFrame) pacer.Level = 7;
+            if (keys.digit8Key.wasPressedThisFrame) pacer.Level = 8;
 
             // A step is the same ticks by another road: it goes through the
             // pacer's debt, so the frame budget and the mesher still get their

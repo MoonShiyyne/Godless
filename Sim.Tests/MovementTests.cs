@@ -76,7 +76,7 @@ namespace Godless.Sim.Tests
         }
 
         [Fact]
-        public void AtNightThoseWithoutARoofLieDownRoundTheFire()
+        public void AtNightThoseWithoutARoofLieDownInACampRoundTheFire()
         {
             SimWorld world = Settled(7);
             Settlement s = world.Settlements[0];
@@ -90,7 +90,9 @@ namespace Godless.Sim.Tests
                 if (a.ShelteredLastNight) continue;
                 open++;
                 Assert.StartsWith("asleep", a.Doing);
-                Assert.True(Distance(a.GoalX, a.GoalZ, s.Hearth.X, s.Hearth.Z) <= 12.0);
+                // Round the fire at a distance (S2W): the fire itself is kept for what is done at a fire.
+                double d = Distance(a.GoalX, a.GoalZ, s.Hearth.X, s.Hearth.Z);
+                Assert.True(d <= Movement.CampFarthest + 2.0, "slept " + d.ToString("0") + " voxels from the fire");
             }
             Assert.True(open > 0, "the first night everyone is in the open");
         }

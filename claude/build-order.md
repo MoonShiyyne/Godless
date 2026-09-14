@@ -413,6 +413,39 @@ Registered alongside the block above:
 - **Not yet:** towns do not trade, share stores or fight over borders, and a
   roofless family that cannot leave simply waits.
 
+### What S2W shipped: the tick drawn as it was spent
+
+| ID | System | Depends on | What a stranger sees |
+|---|---|---|---|
+| S2W | Walking the day | S2G, S2V, S2X | A line of people walking out to their work in the morning, one stopping at the river on the way, and home again at dusk to sit at their doors |
+
+- **Itineraries** (`Settlements/Itinerary.cs`): a tick is six hours and a
+  person used to be seen once in it, so at 1x (half a second a day) everyone
+  blinked between the tree, the fire and bed. The movement system now writes
+  each person's tick down as timed stretches — the walk out along the path,
+  spells of work moved about the stand or the furrow, each errand walked to
+  and done, a pause, the walk home — and `PeopleView` plays them back across
+  the tick. Walks go at `VoxelsWalkedPerTick`, the pace the drives already
+  charge for them. Nothing in the sim reads an itinerary back; it always
+  starts where the person stood and ends where they stand (invariant).
+- **Errands no longer move anyone.** They were drawn by putting the person at
+  the water for the whole tick, one tick in four for workers; now they are the
+  detour they are, and a worker's tick ends at their work.
+- **Haulers** make their trips in the tick: take up, carry, put down, back.
+- **Pastimes** (`Assets/Content/base/pastimes`, 13 of them): what the time
+  between is spent on — stoking the hearth and washing at the water in the
+  morning, catching a breath or sharpening a blade at midday, cooking supper and
+  sitting at the door in the evening, sweeping the yard or mending things when
+  idle. They meet no need and the drives never choose one; they are picked by
+  who the person is and the hour, so the same person keeps the same habits.
+- **The fire is no longer the default place.** The roofless camp 8-18 voxels
+  out round it; a store-less, home-less meal and a missing workplace fall back
+  to the camp or the wild ground. The fire is left for warming and keeping watch.
+- **Speed:** 1x is now two minutes a day (`secondsPerDayAt1x`, a new field so
+  the scene's old value is not read back), and the speeds run to 128x, which is
+  about the old 1x. Keys 1-8.
+- **Cost:** movement 1.74 s to 2.32 s over 2,000 days of green shore.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

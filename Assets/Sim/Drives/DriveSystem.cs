@@ -92,6 +92,10 @@ namespace Godless.Sim.Drives
             for (int i = 0; i < people.Count; i++)
             {
                 Agent a = people[i];
+                // Where their tick begins (S2W): whatever moves them later in it, the walk is drawn from here.
+                a.StartX = a.X;
+                a.StartZ = a.Z;
+                a.StartTick = tick;
                 ulong conditions;
                 RecordId cause;
                 if (!night) { conditions = day; cause = RecordId.None; }
@@ -110,6 +114,7 @@ namespace Godless.Sim.Drives
                 a.LabourShare = 1.0;
                 a.Errands = "";
                 a.ErrandActivity = -1;
+                a.ErrandPlaces.Clear();
                 if (families && !night) Errands(s, island, a, i, needs, activities, conditions);
 
                 int chosen = families ? ChooseOwn(s, island, a, i, needs, activities, conditions, night)
@@ -269,7 +274,7 @@ namespace Godless.Sim.Drives
                 if (act.UsesFood > 0.0) s.Food = System.Math.Max(0.0, s.Food - act.UsesFood);
                 left -= cost;
                 done.Add(act.Doing);
-                if (act.At != ActionPlace.Anywhere) a.ErrandActivity = i;
+                if (act.At != ActionPlace.Anywhere) { a.ErrandActivity = i; a.ErrandPlaces.Add(i); }
             }
             a.LabourShare = left;
             a.Errands = string.Join(", ", done.ToArray());

@@ -124,6 +124,23 @@ namespace Godless.Sim.Settlements
                 }
                 into.Record("plots.broken", badPlots);
 
+                // S2W: every drawn tick is whole — it runs from the start of the tick to its
+                // end, each stretch picks up where the last left off, and it ends where they stand.
+                long brokenDays = 0;
+                foreach (Settlement s in world.Settlements)
+                    foreach (Agent a in s.People)
+                    {
+                        IReadOnlyList<Leg> legs = a.Day.Legs;
+                        if (legs.Count == 0) continue;
+                        bool broken = legs[0].Start != 0.0 || legs[legs.Count - 1].End != 1.0
+                                      || legs[legs.Count - 1].ToX != a.X || legs[legs.Count - 1].ToZ != a.Z;
+                        for (int k = 1; k < legs.Count && !broken; k++)
+                            if (legs[k].Start != legs[k - 1].End || legs[k].FromX != legs[k - 1].ToX || legs[k].FromZ != legs[k - 1].ToZ
+                                || legs[k].End < legs[k].Start) broken = true;
+                        if (broken) brokenDays++;
+                    }
+                into.Record("days.broken", brokenDays);
+
                 // S2Y: no town has claimed ground inside another's border, and no two fires stand too close.
                 long trespass = 0, crowdedFires = 0;
                 foreach (Settlement s in world.Settlements)
@@ -192,6 +209,10 @@ namespace Godless.Sim.Settlements
                     run => run.Metric("needs.out-of-range") == 0.0),
                 Invariant.PerRun("S2V", "no need is at its worst for most of a settlement",
                     run => run.Metric("needs.worst-pinned-percent") <= 50.0),
+
+                // S2W. The tick drawn is the tick spent, from where they stood to where they stand.
+                Invariant.PerRun("S2W", "every person's drawn tick is whole and ends where they stand",
+                    run => run.Metric("days.broken") == 0.0),
 
                 // S2Y. Towns keep to their own ground and their own distance.
                 Invariant.PerRun("S2Y", "no two towns claim the same parcel",

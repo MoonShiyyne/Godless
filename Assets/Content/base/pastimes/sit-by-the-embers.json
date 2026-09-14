@@ -1,0 +1,11 @@
+{
+  "type": "pastime",
+  "id": "sit-by-the-embers",
+  "tell": "The roofless sitting up together round the camp before they lie down.",
+  "when": ["evening", "idle"],
+  "at": "camp",
+  "takes": 0.1,
+  "doing": "sitting by the embers",
+  "pose": "sit",
+  "weight": 2
+}
