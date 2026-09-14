@@ -120,6 +120,55 @@ namespace Godless.Sim.Tests
         }
 
         /// <summary>
+        /// Houses are for families: none goes up for nobody, no family gets two
+        /// going up at once, and a crowded family moves into an empty house that
+        /// sleeps it before it builds on beside one.
+        /// </summary>
+        [Fact]
+        public void HousesAreBuiltForFamiliesAndEmptyOnesAreMovedInto()
+        {
+            WorldChoice choice = WorldChoice.Pick(Content, "green-shore");
+            SimWorld world = SettlementInvariants.Settled(Content, choice, 20, TestIslands.Generate)(7);
+            Settlement s = world.Settlements[0];
+            int nights = 0;
+
+            for (int day = 0; day < 1500; day++)
+                for (int t = 0; t < world.Clock.TicksPerDay; t++)
+                {
+                    world.Tick();
+                    if (world.Clock.TickOfDay != world.Clock.TicksPerDay - 1) continue;
+                    nights++;
+
+                    var going = new System.Collections.Generic.HashSet<int>();
+                    foreach (Project p in s.Projects)
+                    {
+                        if (p.Host != null) continue;
+                        bool forSomeone = false;
+                        foreach (string why in p.Reasons)
+                            if (why.StartsWith("a home for") || why.StartsWith("room for") || why.StartsWith("a long house")) forSomeone = true;
+                        Assert.True(forSomeone, "house " + p.Site.Record + " was built for nobody: " + string.Join("; ", p.Reasons));
+                    }
+
+                    foreach (Household h in s.Households)
+                    {
+                        if (!h.Crowded) continue;
+                        bool adding = false;
+                        foreach (Project home in h.Home) foreach (Project added in home.Added) if (!added.Complete) adding = true;
+                        if (adding) continue;
+                        foreach (Project p in s.Projects)
+                        {
+                            if (!p.Complete || p.Host != null || Households.CapacityOf(p) < h.Size) continue;
+                            bool held = false;
+                            foreach (Household other in s.Households) foreach (Project home in other.Home) if (home == p) held = true;
+                            Assert.True(held, "a crowded family of " + h.Size + " sleeps beside empty house " + p.Site.Record
+                                        + " with " + Households.CapacityOf(p) + " beds on day " + day);
+                        }
+                    }
+                }
+            Assert.True(nights > 0);
+        }
+
+        /// <summary>
         /// A family crowded past its beds adds to its own home rather than
         /// splitting — and the new room's beds are the family's once it stands.
         /// </summary>

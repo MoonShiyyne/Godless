@@ -40,8 +40,9 @@ namespace Godless.Sim.Build
         /// The brief for the next home. For the roofless first — as many
         /// families under one roof as the culture would share — and otherwise
         /// for the most crowded family nearest where the pressure was felt.
-        /// Null when no family is waiting, which is a settlement without
-        /// families: the genome alone then sizes the house, as before.
+        /// Null when no family is waiting: in a settlement with families the
+        /// house is then not built at all; in one without, the genome alone
+        /// sizes it, as before.
         /// </summary>
         public static DwellingProgram For(Settlement s, BuildIntent intent)
         {
@@ -50,8 +51,15 @@ namespace Godless.Sim.Build
             var p = new DwellingProgram();
             double communal = Gene(s.Genome, "gene.communal_ratio");
 
+            // A family with a house already going up for it waits for that one.
             var roofless = new List<Household>();
-            foreach (Household h in s.Households) if (!h.Housed) roofless.Add(h);
+            foreach (Household h in s.Households)
+            {
+                if (h.Housed) continue;
+                bool coming = false;
+                foreach (Project p2 in s.Projects) if (!p2.Complete && p2.ForFamilies.Contains(h.Number)) coming = true;
+                if (!coming) roofless.Add(h);
+            }
             roofless.Sort((a, b) => b.Size != a.Size ? b.Size.CompareTo(a.Size) : a.Number.CompareTo(b.Number));
 
             int beds = 0;

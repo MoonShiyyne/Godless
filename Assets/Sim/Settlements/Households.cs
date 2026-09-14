@@ -223,13 +223,22 @@ namespace Godless.Sim.Settlements
         /// all of them, fullest-fitting first — before they lodge, and before
         /// anyone asks for another house. Without this a family formed after
         /// the last house went up slept beside empty ones and asked for more.
+        ///
+        /// Then a crowded family with no room already being added moves, all
+        /// of it, into a standing home nobody holds that sleeps them all,
+        /// rather than building on beside an empty house.
         /// </summary>
         public static void Rehouse(Settlement s, long tick, Annalist annals)
         {
             if (s.HouseholdList.Count == 0) return;
-            bool anyHomeless = false;
-            foreach (Household h in s.HouseholdList) if (!h.Housed) { anyHomeless = true; break; }
-            if (!anyHomeless) return;
+            bool anyHomeless = false, anyCrowded = false;
+            Settle(s);
+            foreach (Household h in s.HouseholdList)
+            {
+                if (!h.Housed) anyHomeless = true;
+                else if (h.Crowded) anyCrowded = true;
+            }
+            if (!anyHomeless && !anyCrowded) return;
 
             var homes = new List<Project>();
             foreach (Project p in s.Projects) if (p.Complete && p.Host == null) homes.Add(p);
@@ -259,6 +268,36 @@ namespace Godless.Sim.Settlements
                 h.Homes.Add(homes[best]);
                 occupied[best] += h.Size;
                 annals.Write(tick, MovedInKind, h.Id, s.Hearth, homes[best].Site.Record, h.Size, CapacityOf(homes[best]));
+            }
+
+            Settle(s);
+            foreach (Household h in s.HouseholdList)
+            {
+                if (!h.Housed || !h.Crowded) continue;
+                bool adding = false;
+                foreach (Project home in h.Homes)
+                    foreach (Project added in home.Added) if (!added.Complete) adding = true;
+                if (adding) continue;
+
+                int best = -1, bestLeft = int.MaxValue;
+                for (int i = 0; i < homes.Count; i++)
+                {
+                    if (occupied[i] > 0) continue;
+                    int left = CapacityOf(homes[i]) - h.Size;
+                    if (left >= 0 && left < bestLeft) { bestLeft = left; best = i; }
+                }
+                if (best < 0) continue;
+
+                foreach (Project home in h.Homes)
+                {
+                    int was = homes.IndexOf(home);
+                    if (was >= 0) occupied[was] -= h.Size;
+                }
+                h.Homes.Clear();
+                h.Homes.Add(homes[best]);
+                occupied[best] += h.Size;
+                annals.Write(tick, MovedInKind, h.Id, s.Hearth, homes[best].Site.Record, h.Size, CapacityOf(homes[best]));
+                Settle(s);
             }
         }
 

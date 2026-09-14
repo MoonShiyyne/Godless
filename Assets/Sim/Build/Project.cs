@@ -209,6 +209,10 @@ namespace Godless.Sim.Build
             // S2O: who it is for decides how big it is; the search decides which
             // way round it goes and where, and says why.
             DwellingProgram program = DwellingProgram.For(s, intent);
+            // Nobody to build it for: the request stays open until a family
+            // needs it, or lapses. A shelter intent outlives the nights that
+            // raised it, and building it anyway put up houses nobody moved into.
+            if (program == null && s.Households.Count > 0) return null;
             Blueprint plan = program != null
                 ? grammar.Build(s.Genome, _palette, ParcelGrid.Size * rule.SearchRadius, ParcelGrid.Size * rule.SearchRadius,
                                 intent.BudgetVoxels, program.Overrides)
