@@ -65,6 +65,15 @@ namespace Godless.Sim.Settlements
             _voxels[material] += voxels;
         }
 
+        /// <summary>Takes up to this many out of the yard with no record of any shortage (S2Y: a town's share carried off). Returns what was taken.</summary>
+        internal long Remove(int material, long voxels)
+        {
+            long take = voxels < _voxels[material] ? voxels : _voxels[material];
+            if (take < 0) take = 0;
+            _voxels[material] -= take;
+            return take;
+        }
+
         /// <summary>
         /// Takes all of it or none of it. A take that finds too little records
         /// the shortage, once per run of shortages, caused by whatever wanted

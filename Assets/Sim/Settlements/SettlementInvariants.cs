@@ -123,6 +123,27 @@ namespace Godless.Sim.Settlements
                         }
                 }
                 into.Record("plots.broken", badPlots);
+
+                // S2Y: no town has claimed ground inside another's border, and no two fires stand too close.
+                long trespass = 0, crowdedFires = 0;
+                foreach (Settlement s in world.Settlements)
+                {
+                    if (s.Borders == null) continue;
+                    foreach (int parcel in s.Claims)
+                        if (s.Borders.BelongsToAnother(s, parcel % World.ParcelGrid.Width, parcel / World.ParcelGrid.Width)
+                            && s.Borders.Owner(parcel % World.ParcelGrid.Width, parcel / World.ParcelGrid.Width).ClaimOn(parcel % World.ParcelGrid.Width, parcel / World.ParcelGrid.Width).Exists)
+                            trespass++;
+                }
+                TownRules towns = TownRules.FromContent(world.Content);
+                for (int i = 0; i < world.Settlements.Count; i++)
+                    for (int j = i + 1; j < world.Settlements.Count; j++)
+                    {
+                        Settlement a = world.Settlements[i], b = world.Settlements[j];
+                        double dx = a.HearthParcelX - b.HearthParcelX, dz = a.HearthParcelZ - b.HearthParcelZ;
+                        if (towns != null && dx * dx + dz * dz < (double)towns.NearestTownParcels * towns.NearestTownParcels) crowdedFires++;
+                    }
+                into.Record("towns.trespass", trespass);
+                into.Record("towns.fires-too-close", crowdedFires);
                 into.Record("food.negative", negativeFood);
 
                 into.Record("rubble.floating", floatingRubble);
@@ -171,6 +192,12 @@ namespace Godless.Sim.Settlements
                     run => run.Metric("needs.out-of-range") == 0.0),
                 Invariant.PerRun("S2V", "no need is at its worst for most of a settlement",
                     run => run.Metric("needs.worst-pinned-percent") <= 50.0),
+
+                // S2Y. Towns keep to their own ground and their own distance.
+                Invariant.PerRun("S2Y", "no two towns claim the same parcel",
+                    run => run.Metric("towns.trespass") == 0.0),
+                Invariant.PerRun("S2Y", "no new town's fire stands nearer another than content allows",
+                    run => run.Metric("towns.fires-too-close") == 0.0),
 
                 // S2I. A field is its farm's ground, and what grows on it is drawn.
                 Invariant.PerRun("S2I", "every plot lies on its own farm's claim, with soil between none and full, drawn by details that exist",

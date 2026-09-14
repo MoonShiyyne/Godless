@@ -110,6 +110,9 @@ namespace Godless.Sim.Settlements
             }
         }
 
+        /// <summary>A new family of a town, on record, caused by something (S2Y: arriving from a town outgrown).</summary>
+        public static Household FormIn(Settlement s, long tick, Annalist annals, RecordId cause) { return Form(s, tick, annals, cause); }
+
         static Household Form(Settlement s, long tick, Annalist annals, RecordId cause)
         {
             int number = s.NextHousehold++;

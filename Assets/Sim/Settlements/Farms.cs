@@ -382,6 +382,7 @@ namespace Godless.Sim.Settlements
             if (!ParcelGrid.InBounds(px, pz) || !grid.IsLand(px, pz)) return false;
             if (grid.Slope[px, pz] >= rules.MaxSlope || grid.WetColumns(px, pz) > rules.MaxWetColumns) return false;
             if (s.IsClaimed(px, pz)) return false;
+            if (s.Borders != null && s.Borders.BelongsToAnother(s, px, pz)) return false;   // another town's ground (S2Y)
             if (reachable != null && !reachable[pz * ParcelGrid.Width + px]) return false;
 
             int r = rules.AwayFromHouses;

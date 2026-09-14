@@ -409,6 +409,8 @@ namespace Godless.Sim.Build
                     // A parcel with a puddle in it is still ground you can
                     // build on; a parcel that is a quarter water is not.
                     if (!ParcelGrid.InBounds(x, z) || !grid.IsLand(x, z) || grid.WetColumns(x, z) > 4) return false;
+                    // Nor is ground inside another town's border (S2Y).
+                    if (settlement.Borders != null && settlement.Borders.BelongsToAnother(settlement, x, z)) return false;
                 }
 
             // The footprint and the ring round it: unclaimed, so houses do not

@@ -156,6 +156,13 @@ namespace Godless.Sim.Settlements
         public static Settlement Begin(SimWorld world, ContentDatabase content, ParcelGrid grid, BiomeTable biomes,
                                        string name, int people, int parcelX, int parcelZ, Genome genome, int roofs = 0)
         {
+            return Begin(world, content, grid, biomes, name, people, parcelX, parcelZ, genome, roofs, RecordId.None);
+        }
+
+        /// <summary>A settlement founded because of something on record (S2Y: a town it came from, outgrown).</summary>
+        public static Settlement Begin(SimWorld world, ContentDatabase content, ParcelGrid grid, BiomeTable biomes,
+                                       string name, int people, int parcelX, int parcelZ, Genome genome, int roofs, RecordId cause)
+        {
             DriveRules rules = DriveRules.FromContent(content);
             MaterialTable materials = MaterialTable.FromContent(content, biomes);
 
@@ -165,7 +172,7 @@ namespace Godless.Sim.Settlements
             int b = world.Island != null ? world.Island.BiomeAt(hx, hz) : -1;
 
             Settlement settlement = Settlement.Found(name, hearth, b >= 0 ? biomes.At(b) : null, people, rules,
-                                                     world.Clock.Tick, world.Annals, RecordId.None);
+                                                     world.Clock.Tick, world.Annals, cause);
             settlement.ShelterCapacity = roofs;
             settlement.Stock = new MaterialStock(materials);
             settlement.Catchment = world.Island != null && world.Island.Deposits != null
@@ -206,6 +213,7 @@ namespace Godless.Sim.Settlements
                  .Add(new Subsistence(rules))
                  .Add(new StoreSystem(FoodRules.FromContent(content)))
                  .Add(new IntentSystem())
+                 .Add(new TownSystem(TownRules.FromContent(content), content, grid, biomes))
                  .Add(new SiteSystem(GrammarTable.FromContent(content, genes),
                                      SitingTable.FromContent(content, genes, IntentKindTable.FromContent(content, rules.Needs)),
                                      tiles, materials, palette, grid, fields,

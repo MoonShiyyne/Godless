@@ -386,6 +386,33 @@ Registered alongside the block above:
   one reachability flood a day. A twenty-year green shore of 350 people runs in
   under a minute.
 
+### What S2Y shipped: town borders, and new towns from outgrown ones
+
+- **Borders** (`Settlements/Towns.cs`, `Territory`): once a day every town's
+  ground is redrawn as a flood over land from its fire and claims, eight
+  parcels out (`towns/base.json`), nearest town first, so two towns that meet
+  split the ground between them. No town sites a house or lays a field inside
+  another's border. B in the Editor shows each town's line in its own colour;
+  the HUD lists people and roofless per town once there is more than one.
+- **An outgrown town sends its roofless away:** a town that has had at least
+  12% of its people (and ten or more) roofless for thirty days running, and
+  has failed to find a house site in the last thirty, looks for somewhere
+  else. The site is on land outside every border, 32 or more parcels from any
+  fire, with room and water, scored on forage, materials and distance. The
+  roofless families, largest first and never more than half the town, leave
+  with a share of the food and the yard by head and the old town's culture.
+  On record as `town.outgrown`, which causes the new town's founding. One
+  founding a year from each town, at most twelve towns.
+- **Invariants:** no two towns claim the same parcel; no founded fire stands
+  nearer another than content allows.
+- **What it did:** broad delta, seed 7: first outgrown on day 4178, 55 of 339
+  leave; the new town reaches 115 in thirty years. By then the delta has no
+  free land left (`sim settle` prints why a new town can go nowhere: each
+  lattice point is water, near a fire or a border). Green shore, cold massif
+  and the isles still find house sites at thirty years and never split.
+- **Not yet:** towns do not trade, share stores or fight over borders, and a
+  roofless family that cannot leave simply waits.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

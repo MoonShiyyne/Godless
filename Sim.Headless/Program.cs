@@ -823,6 +823,7 @@ namespace Godless.Sim.Headless
             PressureTally tally = bus.Tally;
             world.Settlements.Add(s);
             Profiled(world, cli, new DriveSystem(rules)); Profiled(world, cli, new Subsistence(rules)); Profiled(world, cli, new StoreSystem(FoodRules.FromContent(db))); Profiled(world, cli, new IntentSystem());
+            Profiled(world, cli, new TownSystem(TownRules.FromContent(db), db, grid, biomes));
 
             Console.WriteLine("seed " + seed.ToString(c) + ": " + people.ToString(c) + " people found a settlement at parcel ("
                 + px.ToString(c) + ", " + pz.ToString(c) + ") in " + (biome == null ? "no biome" : biome.Id.ToString())
@@ -1136,6 +1137,28 @@ namespace Godless.Sim.Headless
                     Console.WriteLine("unfinished " + p.Site.Record + " " + p.Intent.Kind.Name + (p.Host != null ? " " + p.PartKind : "")
                         + ": " + p.Placed.ToString(c) + " laid, begun " + p.Begun.Exists + ", ready " + Construction.Ready(s, p)
                         + ", obtainable " + Construction.Obtainable(s, p) + "; owes " + string.Join(", ", bill));
+                }
+                if (s == world.Settlements[0])
+                {
+                    Console.WriteLine("towns (S2Y): " + world.Settlements.Count);
+                    foreach (Settlement t in world.Settlements)
+                    {
+                        int housedT = 0, homelessT = Towns.Homeless(t);
+                        Console.WriteLine("  " + t.Id + " at parcel (" + t.HearthParcelX + ", " + t.HearthParcelZ + "), founded day "
+                            + world.Annals.Get(t.Founded).Tick / world.Clock.TicksPerDay + ": " + t.People.Count + " people, "
+                            + t.ShelterCapacity + " sleeping places, " + homelessT + " homeless, " + t.Farms.Count + " farms, holds "
+                            + (t.Borders != null ? t.Borders.Area(t) : 0) + " parcels; homeless for " + t.HomelessDays + " days, "
+                            + (t.NoSiteTick < 0 ? "never short of ground" : "last short of ground on day " + t.NoSiteTick / world.Clock.TicksPerDay));
+                        if (t.Borders != null)
+                        {
+                            int fx, fz;
+                            TownRules tr = TownRules.FromContent(db);
+                            bool found = Towns.FindSite(world, db, grid, biomes, t.Borders, t, tr, out fx, out fz);
+                            Console.WriteLine("    a new town from here: " + (found ? "at parcel (" + fx + ", " + fz + ")" : "nowhere (" + Towns.WhyNowhere(world, db, grid, biomes, t.Borders, t, tr) + ")"));
+                        }
+                    }
+                    foreach (AnnalRecord r in world.Annals.OfKind(Towns.OutgrownKind))
+                        Console.WriteLine("  day " + r.Tick / world.Clock.TicksPerDay + ": " + r.Subject + " outgrown, " + r.ValueA + " of " + r.ValueB + " left");
                 }
                 Console.WriteLine("daylight at the fire: " + (s.DaylightTicks > 0 ? 100.0 * s.DaylightAtFire / s.DaylightTicks : 0.0).ToString("0.0", c)
                     + "% of " + s.DaylightTicks.ToString(c) + " agent-ticks");

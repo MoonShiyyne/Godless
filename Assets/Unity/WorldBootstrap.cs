@@ -120,6 +120,7 @@ namespace Godless.Unity
             if (showPeople && GetComponent<PeopleView>() == null) gameObject.AddComponent<PeopleView>();
             if (GetComponent<DetailRenderer>() == null) gameObject.AddComponent<DetailRenderer>();
             if (GetComponent<CutawayView>() == null) gameObject.AddComponent<CutawayView>();
+            if (GetComponent<BorderView>() == null) gameObject.AddComponent<BorderView>();
         }
 
         void Start()
@@ -464,16 +465,26 @@ namespace Godless.Unity
                       + "   intents " + Town.Intents.Intents.Count;
                 int plots = 0;
                 foreach (Farm farm in Town.Farms) plots += farm.Plots.Count;
+                if (World.Settlements.Count > 1)
+                {
+                    text += "\ntowns " + World.Settlements.Count + ":";
+                    for (int i = 0; i < World.Settlements.Count; i++)
+                    {
+                        Settlement t = World.Settlements[i];
+                        text += "  " + (i == 0 ? "first" : t.Id.ToString().Replace("settlement.", "")) + " " + t.People.Count
+                              + " (" + Towns.Homeless(t) + " roofless)";
+                    }
+                }
                 text += "\nfood " + Town.Food.ToString("0") + "   farms " + Town.Farms.Count + " (" + plots + " plots)   stores keep "
                       + Stores.Capacity(Town).ToString("0") + "   heaps " + Town.Piles.Count + "   rotted " + Town.FoodSpoiled.ToString("0");
             }
 
-            if (GetComponent<SimSpeed>() != null) text += "\n" + SimSpeed.Keys + (GetComponent<CutawayView>() != null ? "   " + CutawayView.Keys : "");
+            if (GetComponent<SimSpeed>() != null) text += "\n" + SimSpeed.Keys + (GetComponent<CutawayView>() != null ? "   " + CutawayView.Keys : "") + (GetComponent<BorderView>() != null ? "   " + BorderView.Keys : "");
 
             TerrainEditor editor = GetComponent<TerrainEditor>();
             if (editor != null) text += "\n" + editor.Status + "\nstrokes " + editor.Strokes;
 
-            GUI.Label(new Rect(12, 10, 620, 150), text);
+            GUI.Label(new Rect(12, 10, 900, 190), text);
         }
 
         // ── the screens before the world runs ───────────────────────────────

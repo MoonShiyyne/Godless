@@ -128,6 +128,38 @@ namespace Godless.Sim.Settlements
             return person;
         }
 
+        /// <summary>Lets one go elsewhere, alive (S2Y): out of their family and off the roll, not a death.</summary>
+        internal Agent Release(int index)
+        {
+            Agent a = _people[index];
+            Settlements.Households.Leave(this, a);
+            _people.RemoveAt(index);
+            return a;
+        }
+
+        /// <summary>Takes in someone arriving from elsewhere (S2Y), with the life they had: their id, needs and temperament.</summary>
+        internal void Welcome(Agent a)
+        {
+            a.LastWorkX = a.LastWorkZ = -1;
+            a.FieldX = a.FieldZ = a.FieldFarm = -1;
+            a.WorkingAt = -1;
+            a.Path = null;
+            _people.Add(a);
+        }
+
+        /// <summary>The borders this town and its neighbours build within (S2Y), or null before any are drawn.</summary>
+        public Territory Borders { get; internal set; }
+
+        /// <summary>Days in a row a substantial share of the town has had no roof (S2Y).</summary>
+        public int HomelessDays { get; internal set; }
+
+        // The tick a house could last not be sited anywhere, and the day people last left to found a town (S2Y).
+        internal long LastNoSiteTick = -1;
+        internal long LastEmigrationDay = -1;
+
+        /// <summary>The tick a house last found nowhere to go, or -1 (S2Y).</summary>
+        public long NoSiteTick { get { return LastNoSiteTick; } }
+
         /// <summary>Loses one. The board forgets them and keeps everyone else's thresholds.</summary>
         public void Remove(int index, StreamRegistry streams)
         {

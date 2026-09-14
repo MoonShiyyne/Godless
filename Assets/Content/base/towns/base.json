@@ -1,0 +1,31 @@
+{
+  "type": "towns",
+  "id": "base",
+  "tell": "A line round each town swells as it builds and farms outward and stops where a neighbour's begins; a town with nowhere left to build and too many sleeping rough sends its roofless families off to light a fire of their own.",
+
+  // S2Y. A town holds the land this many parcels beyond its fire and
+  // everything it has claimed: houses, stores, fields. Where two towns' reach
+  // meets, the nearer keeps it.
+  "borderParcels": 8,
+
+  // A substantial homeless population: at least this share of the town, and
+  // at least this many people, with no roof of their own for this many days,
+  // in a town that has lately found no ground for a house at all.
+  "homelessShare": 0.12,
+  "homelessAtLeast": 10,
+  "homelessDays": 30,
+  "noSiteWithinDays": 30,
+
+  // Where they go: land no town holds, at least this far from every fire and
+  // no further than this from the town they leave, looked for this many
+  // parcels apart.
+  "nearestTownParcels": 32,
+  "farthestParcels": 256,
+  "searchStepParcels": 3,
+
+  // A town sends people away at most once in this many days; there are at
+  // most this many towns; it takes at least this many to found one.
+  "betweenFoundingsDays": 365,
+  "mostTowns": 12,
+  "fewestFounders": 8
+}

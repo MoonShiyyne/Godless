@@ -250,7 +250,11 @@ namespace Godless.Sim.Build
             if (addition != null && addition.Score >= apart) return Add(s, intent, addition, world, rng);
 
             if (waitsForRoom) return null;
-            if (chosen == null) return null;
+            if (chosen == null)
+            {
+                if (home) s.LastNoSiteTick = world.Clock.Tick;   // nowhere at all for a house (S2Y)
+                return null;
+            }
             plan = chosen.Plan;
             Site site = chosen.Site;
             SiteScorer.Commit(s, intent, site, _grid, world.Clock.Tick, world.Annals);
