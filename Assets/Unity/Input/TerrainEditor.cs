@@ -53,7 +53,7 @@ namespace Godless.Unity
         void Update()
         {
             var world = _boot.World;
-            if (world == null) return;
+            if (world == null || _boot.Phase != WorldBootstrap.SetupPhase.Playing) return;   // no god before there is anyone
 
             if (_solid == null)
             {

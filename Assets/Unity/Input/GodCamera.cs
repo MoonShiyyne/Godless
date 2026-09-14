@@ -75,6 +75,13 @@ namespace Godless.Unity
             transform.SetPositionAndRotation(pivot - rotation * Vector3.forward * distance, rotation);
         }
 
+        /// <summary>Swings the camera round to look at a point from a distance, keeping its bearing.</summary>
+        public void Focus(Vector3 target, float fromDistance)
+        {
+            pivot = target;
+            distance = Mathf.Clamp(fromDistance, minDistance, maxDistance);
+        }
+
         void Pan(float right, float forward)
         {
             Quaternion flat = Quaternion.Euler(0f, yaw, 0f);

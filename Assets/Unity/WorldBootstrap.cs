@@ -10,6 +10,8 @@ using Godless.Sim.Settlements;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 namespace Godless.Unity
 {
@@ -41,6 +43,9 @@ namespace Godless.Unity
         [SerializeField] bool frameCamera = true;
 
         [SerializeField] bool showStats = true;
+
+        [Tooltip("Show the map chooser and let the player pick where the first fire is lit before anything runs. Off starts on the map and seed above, at the suggested site, as tools and captures expect.")]
+        [SerializeField] bool chooseBeforePlay = true;
 
         [Tooltip("Frames a second the Editor and player may render. 0 leaves it to the platform. Vsync is turned off so this is the cap that holds.")]
         [SerializeField] int maxFramesPerSecond = 100;
@@ -77,6 +82,32 @@ namespace Godless.Unity
         /// <summary>The map this world was generated on. Never null once the world exists.</summary>
         public WorldPreset Map { get; private set; }
 
+        /// <summary>Where the game is before it runs: choosing a world, choosing a site, or under way.</summary>
+        public enum SetupPhase { ChoosingMap, ChoosingSite, Playing }
+
+        public SetupPhase Phase { get; private set; }
+
+        /// <summary>The suggested site, in parcels, once a world is made; -1 when the island has none.</summary>
+        public int SuggestedX { get; private set; } = -1;
+        public int SuggestedZ { get; private set; } = -1;
+
+        // Kept across a return to the map chooser, which reloads the scene.
+        static string _lastMap;
+        static long _lastSeed = long.MinValue;
+
+        ContentDatabase _content;
+        VoxelTypes _types;
+        WorldTable _maps;
+        BiomeTable _biomes;
+        ConstraintFields _fields;
+        int _mapIndex;
+        string _seedText = "7";
+
+        SiteReport _hover, _chosen;
+        GameObject _hoverMarker, _chosenMarker;
+        LineRenderer _reachRing;
+        Rect _panel;
+
         float _smoothedFrame = 1f / 60f;
         float _worstFrame;
         float _loadSeconds;
@@ -98,39 +129,66 @@ namespace Godless.Unity
             // from real seconds, so a capped frame simply takes more of them.
             ApplyFrameCap();
 
-            var watch = System.Diagnostics.Stopwatch.StartNew();
-
             string root = Path.Combine(Application.dataPath, "Content");
             LoadResult content = ContentLoader.Load(new DirectoryContentSource(root));
             foreach (string warning in content.Warnings) Debug.LogWarning("content: " + warning);
+            _content = content.Database;
+            _types = VoxelTypes.FromContent(_content);
+            _maps = WorldTable.FromContent(_content, BiomeTable.FromContent(_content));
+            foreach (string problem in _maps.Problems) Debug.LogWarning("content: " + problem);
 
-            VoxelTypes types = VoxelTypes.FromContent(content.Database);
+            string wantMap = _lastMap ?? (map == null ? "" : map.Trim());
+            long wantSeed = _lastSeed != long.MinValue ? _lastSeed : seed;
+            _seedText = wantSeed.ToString();
+            for (int i = 0; i < _maps.Count; i++) if (_maps[i].Name == wantMap) _mapIndex = i;
+
+            if (!chooseBeforePlay)
+            {
+                if (!Generate(wantMap, wantSeed)) return;
+                if (settle && SuggestedX >= 0) FoundAt(SuggestedX, SuggestedZ);
+                else Phase = SetupPhase.Playing;
+                return;
+            }
+            Phase = SetupPhase.ChoosingMap;
+        }
+
+        /// <summary>
+        /// Makes the island for a map and seed and puts it on screen, with
+        /// nobody on it yet. True when there is a world to settle.
+        /// </summary>
+        public bool Generate(string mapName, long worldSeed)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            seed = worldSeed;
+            map = mapName;
+            _lastMap = mapName;
+            _lastSeed = worldSeed;
 
             WorldChoice choice;
-            try { choice = WorldChoice.Pick(content.Database, map == null ? "" : map.Trim()); }
+            try { choice = WorldChoice.Pick(_content, mapName ?? ""); }
             catch (ContentException e)
             {
                 // A misspelled map in the inspector is a content problem, not
                 // a crash: say what there is and fall back to the plain island.
                 Debug.LogWarning("Godless: " + e.Message);
-                choice = WorldChoice.Pick(content.Database, "");
+                choice = WorldChoice.Pick(_content, "");
             }
 
-            BiomeTable biomes = choice.Biomes;
-            if (biomes.Count == 0)
+            _biomes = choice.Biomes;
+            if (_biomes.Count == 0)
             {
                 // L5's tell, seen from the Unity side: no content is not a crash.
-                Debug.Log("No biomes declared in " + root + " — booting with nothing to build.");
-                return;
+                Debug.Log("No biomes declared — booting with nothing to build.");
+                Phase = SetupPhase.Playing;
+                return false;
             }
-            foreach (string problem in choice.Maps.Problems) Debug.LogWarning("content: " + problem);
 
-            World = new SimWorld((ulong)seed, content.Database, types);
+            World = new SimWorld((ulong)worldSeed, _content, _types);
             Pacer = new TickPacer(daysPerSecondAt1x, World.Clock.TicksPerDay, startSpeed);
-            World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, biomes, types, choice.Preset,
+            World.Island = IslandGenerator.Generate(World.Voxels.Store, World.Streams, _biomes, _types, choice.Preset,
                                                     plantDeposits ? choice.Features : null);
             foreach (string problem in choice.Features.Problems) Debug.LogWarning("content: " + problem);
-            Ground = GroundPalette.From(World.Island, biomes, types);
+            Ground = GroundPalette.From(World.Island, _biomes, _types);
             Map = choice.Preset;
 
             // The untouched island is history's baseline (S04): everything the
@@ -138,39 +196,163 @@ namespace Godless.Unity
             World.BeginHistory();
 
             View = GetComponent<WorldRenderer>();
-            View.Bind(World.Voxels.Store, VoxelVisuals.FromContent(content.Database, types));
+            View.Bind(World.Voxels.Store, VoxelVisuals.FromContent(_content, _types));
 
-            if (settle) Settle(content.Database, biomes);
+            Parcels = Founding.Survey(World, _content, _biomes, out _fields);
+            int px, pz;
+            if (Founding.StandInSite(Parcels, World.Island, _biomes, Symbol.For("biome.temperate"), out px, out pz)
+                || Founding.StandInSite(Parcels, World.Island, _biomes, Symbol.None, out px, out pz))
+            { SuggestedX = px; SuggestedZ = pz; }
 
+            _deltaCursor = World.Voxels.Log.Count;
             _loadSeconds = (float)watch.Elapsed.TotalSeconds;
-            Debug.Log("Godless: " + Map.Title + " (" + Map.Name + "), seed " + seed
-                      + ", island generated in " + _loadSeconds.ToString("0.00") + "s"
-                      + "\n" + Map.Tell);
+            Debug.Log("Godless: " + Map.Title + " (" + Map.Name + "), seed " + worldSeed
+                      + ", island generated in " + _loadSeconds.ToString("0.00") + "s" + "\n" + Map.Tell);
 
             if (frameCamera) FrameCamera();
+            Phase = settle ? SetupPhase.ChoosingSite : SetupPhase.Playing;
+            if (Phase == SetupPhase.ChoosingSite && SuggestedX >= 0) Choose(SuggestedX, SuggestedZ, true);
+            return true;
         }
 
         /// <summary>
-        /// One settlement, with everything stratum 1 gives it. The site is a
-        /// stand-in until S30 founds settlements by quorum.
+        /// Lights the first fire at a parcel and starts the world: twenty people,
+        /// everything stratum 1 and 2 gives them, and the clock running. False,
+        /// and nothing happens, when people could not live there.
         /// </summary>
-        void Settle(ContentDatabase content, BiomeTable biomes)
+        public bool FoundAt(int px, int pz)
         {
-            ConstraintFields fields;
-            Parcels = Founding.Survey(World, content, biomes, out fields);
-
-            int px, pz;
-            if (!Founding.StandInSite(Parcels, World.Island, biomes, Symbol.For("biome.temperate"), out px, out pz)
-                && !Founding.StandInSite(Parcels, World.Island, biomes, Symbol.None, out px, out pz))
+            if (World == null || Town != null) return false;
+            SiteReport report = Founding.Appraise(World, _content, Parcels, _biomes, px, pz);
+            if (!report.CanSettle)
             {
-                Debug.Log("Godless: nowhere flat and dry to settle on seed " + seed);
-                return;
+                Debug.Log("Godless: cannot settle at parcel (" + px + ", " + pz + "): " + report.Why);
+                return false;
             }
 
-            Town = Founding.Begin(World, content, Parcels, biomes, "first", people, px, pz, null);
-            Founding.AddSystems(World, content, Parcels, fields, biomes);
+            Town = Founding.Begin(World, _content, Parcels, _biomes, "first", people, px, pz, null);
+            Founding.AddSystems(World, _content, Parcels, _fields, _biomes);
             _deltaCursor = World.Voxels.Log.Count;
+            Phase = SetupPhase.Playing;
+            ClearMarkers();
             Debug.Log("Godless: " + people + " people settled at parcel (" + px + ", " + pz + ")");
+            return true;
+        }
+
+        // ── choosing the site ───────────────────────────────────────────────
+
+        /// <summary>Makes a parcel the chosen site: appraised, marked, and the camera turned to it.</summary>
+        void Choose(int px, int pz, bool focus)
+        {
+            _chosen = Founding.Appraise(World, _content, Parcels, _biomes, px, pz);
+            Vector3 at = ParcelTop(px, pz);
+            if (_chosenMarker == null) _chosenMarker = Marker("Chosen fire", new Color(1f, 0.55f, 0.1f), 1.6f, 10f);
+            _chosenMarker.transform.position = at + Vector3.up * 5f;
+            _chosenMarker.GetComponent<Renderer>().sharedMaterial.color = _chosen.CanSettle ? new Color(1f, 0.55f, 0.1f) : new Color(0.8f, 0.15f, 0.1f);
+            DrawReach(at);
+            GodCamera god = Camera.main != null ? Camera.main.GetComponent<GodCamera>() : null;
+            if (focus && god != null) god.Focus(at, 260f);
+        }
+
+        void UpdateSitePicking()
+        {
+            Mouse mouse = Mouse.current;
+            Camera cam = Camera.main;
+            if (mouse == null || cam == null || World == null) return;
+
+            Vector2 pointer = mouse.position.ReadValue();
+            bool overPanel = _panel.Contains(new Vector2(pointer.x, Screen.height - pointer.y));
+
+            int px = -1, pz = -1;
+            if (!overPanel)
+            {
+                Ray ray = cam.ScreenPointToRay(pointer);
+                VoxelRaycast.Hit hit;
+                if (VoxelRaycast.Cast(World.Voxels.Store, ray.origin.x, ray.origin.y, ray.origin.z,
+                                      ray.direction.x, ray.direction.y, ray.direction.z, 3000,
+                                      id => id != VoxelTypes.AirId, out hit))
+                { px = hit.Voxel.X / ParcelGrid.Size; pz = hit.Voxel.Z / ParcelGrid.Size; }
+            }
+
+            if (px < 0) { _hover = null; if (_hoverMarker != null) _hoverMarker.SetActive(false); }
+            else
+            {
+                if (_hover == null || _hover.ParcelX != px || _hover.ParcelZ != pz)
+                    _hover = Founding.Appraise(World, _content, Parcels, _biomes, px, pz);
+                if (_hoverMarker == null) _hoverMarker = Marker("Site under the pointer", Color.white, 0.8f, 6f);
+                _hoverMarker.SetActive(true);
+                _hoverMarker.transform.position = ParcelTop(px, pz) + Vector3.up * 3f;
+                _hoverMarker.GetComponent<Renderer>().sharedMaterial.color = _hover.CanSettle ? new Color(0.35f, 0.9f, 0.4f) : new Color(0.9f, 0.25f, 0.2f);
+                if (mouse.leftButton.wasPressedThisFrame) Choose(px, pz, false);
+            }
+
+            Keyboard keys = Keyboard.current;
+            if (keys != null && (keys.enterKey.wasPressedThisFrame || keys.numpadEnterKey.wasPressedThisFrame) && _chosen != null && _chosen.CanSettle)
+                FoundAt(_chosen.ParcelX, _chosen.ParcelZ);
+        }
+
+        Vector3 ParcelTop(int px, int pz)
+        {
+            int x = px * ParcelGrid.Size + ParcelGrid.Size / 2, z = pz * ParcelGrid.Size + ParcelGrid.Size / 2;
+            float y = Parcels != null ? Parcels.GroundAt(x, z) + 1 : World.Island.SeaLevel;
+            if (World.Island != null && y < World.Island.SeaLevel) y = World.Island.SeaLevel;
+            return new Vector3(x, y, z);
+        }
+
+        static GameObject Marker(string name, Color colour, float width, float height)
+        {
+            // The built-in cylinder mesh, without the collider a primitive would bring.
+            var go = new GameObject(name);
+            go.AddComponent<MeshFilter>().sharedMesh = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
+            go.AddComponent<MeshRenderer>();
+            go.transform.localScale = new Vector3(width, height * 0.5f, width);
+            Shader unlit = Shader.Find("Unlit/Color") ?? Shader.Find("Standard");
+            go.GetComponent<Renderer>().sharedMaterial = new UnityEngine.Material(unlit) { color = colour };
+            return go;
+        }
+
+        /// <summary>A ring round the chosen site at the distance people will go for materials at first.</summary>
+        void DrawReach(Vector3 centre)
+        {
+            if (_reachRing == null)
+            {
+                var go = new GameObject("Reach of the first fire");
+                _reachRing = go.AddComponent<LineRenderer>();
+                _reachRing.loop = true;
+                _reachRing.widthMultiplier = 1.2f;
+                _reachRing.positionCount = 96;
+                Shader sprite = Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color");
+                _reachRing.sharedMaterial = new UnityEngine.Material(sprite) { color = new Color(1f, 0.8f, 0.3f, 0.8f) };
+                _reachRing.startColor = _reachRing.endColor = new Color(1f, 0.8f, 0.3f, 0.8f);
+            }
+            float radius = MaterialTable.FromContent(_content, _biomes).DepositRangeVoxels;
+            for (int i = 0; i < _reachRing.positionCount; i++)
+            {
+                float a = i / (float)_reachRing.positionCount * Mathf.PI * 2f;
+                int x = Mathf.Clamp(Mathf.RoundToInt(centre.x + Mathf.Cos(a) * radius), 0, ChunkStore.SizeX - 1);
+                int z = Mathf.Clamp(Mathf.RoundToInt(centre.z + Mathf.Sin(a) * radius), 0, ChunkStore.SizeZ - 1);
+                float y = Mathf.Max(Parcels.GroundAt(x, z) + 1.5f, World.Island.SeaLevel + 0.5f);
+                _reachRing.SetPosition(i, new Vector3(x, y, z));
+            }
+        }
+
+        void ClearMarkers()
+        {
+            if (_hoverMarker != null) Destroy(_hoverMarker);
+            if (_chosenMarker != null) Destroy(_chosenMarker);
+            if (_reachRing != null) Destroy(_reachRing.gameObject);
+            _hover = _chosen = null;
+        }
+
+        /// <summary>Back to the map chooser: the scene again from the top, with the last map and seed remembered.</summary>
+        void ChooseAnotherWorld()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+#if UNITY_EDITOR
+            UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(scene.path, new LoadSceneParameters(LoadSceneMode.Single));
+#else
+            SceneManager.LoadScene(scene.buildIndex);
+#endif
         }
 
         void ApplyFrameCap()
@@ -207,6 +389,7 @@ namespace Godless.Unity
             _smoothedFrame = Mathf.Lerp(_smoothedFrame, dt, 0.05f);
             if (Time.frameCount > 10 && dt > _worstFrame) _worstFrame = dt;
 
+            if (Phase == SetupPhase.ChoosingSite) UpdateSitePicking();
             RunSim(dt);
         }
 
@@ -258,6 +441,8 @@ namespace Godless.Unity
 
         void OnGUI()
         {
+            if (Phase == SetupPhase.ChoosingMap) { MapChooser(); return; }
+            if (Phase == SetupPhase.ChoosingSite) { SiteChooser(); return; }
             if (!showStats || View == null) return;
 
             string text =
@@ -289,6 +474,130 @@ namespace Godless.Unity
             if (editor != null) text += "\n" + editor.Status + "\nstrokes " + editor.Strokes;
 
             GUI.Label(new Rect(12, 10, 620, 150), text);
+        }
+
+        // ── the screens before the world runs ───────────────────────────────
+
+        GUIStyle _title, _body, _small, _button, _box;
+        Vector2 _mapScroll;
+
+        void Styles()
+        {
+            if (_title != null) return;
+            _title = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, wordWrap = true };
+            _body = new GUIStyle(GUI.skin.label) { fontSize = 15, wordWrap = true };
+            _small = new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true };
+            _button = new GUIStyle(GUI.skin.button) { fontSize = 16, alignment = TextAnchor.MiddleLeft, wordWrap = true, padding = new RectOffset(12, 12, 8, 8) };
+            _box = new GUIStyle(GUI.skin.box);
+        }
+
+        /// <summary>Which world: the maps content declares, what each is, and the seed.</summary>
+        void MapChooser()
+        {
+            Styles();
+            float w = Mathf.Min(760f, Screen.width - 40f), h = Mathf.Min(640f, Screen.height - 40f);
+            _panel = new Rect((Screen.width - w) * 0.5f, (Screen.height - h) * 0.5f, w, h);
+            GUI.Box(_panel, GUIContent.none, _box);
+            GUILayout.BeginArea(new Rect(_panel.x + 20, _panel.y + 16, w - 40, h - 32));
+
+            GUILayout.Label("Godless", _title);
+            GUILayout.Label("Choose a world. Next you choose where its first fire is lit; after that you may act on the world, never on its people.", _body);
+            GUILayout.Space(10);
+
+            _mapScroll = GUILayout.BeginScrollView(_mapScroll, GUILayout.ExpandHeight(true));
+            if (_maps == null || _maps.Count == 0) GUILayout.Label("No maps in content: the built-in island will be made.", _body);
+            else
+                for (int i = 0; i < _maps.Count; i++)
+                {
+                    WorldPreset preset = _maps[i];
+                    bool selected = i == _mapIndex;
+                    string label = (selected ? "▶ " : "   ") + preset.Title + "\n" + preset.Tell;
+                    Color was = GUI.backgroundColor;
+                    if (selected) GUI.backgroundColor = new Color(1f, 0.75f, 0.4f);
+                    if (GUILayout.Button(label, _button, GUILayout.MinHeight(58))) _mapIndex = i;
+                    GUI.backgroundColor = was;
+                }
+            GUILayout.EndScrollView();
+
+            GUILayout.Space(8);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Seed", _body, GUILayout.Width(50));
+            _seedText = GUILayout.TextField(_seedText, 18, GUILayout.Width(200), GUILayout.Height(26));
+            if (GUILayout.Button("Another", GUILayout.Width(90), GUILayout.Height(26)))
+                _seedText = (System.DateTime.Now.Ticks % 1000000L).ToString();   // presentation only: the sim sees the number, never the clock
+            GUILayout.FlexibleSpace();
+            plantDeposits = GUILayout.Toggle(plantDeposits, " woods, reeds and rock to use up", GUILayout.Height(26));
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(8);
+            long parsed;
+            bool seedOk = long.TryParse(_seedText, out parsed);
+            GUI.enabled = seedOk;
+            if (GUILayout.Button(seedOk ? "Make this world" : "The seed must be a whole number", GUILayout.Height(44)))
+            {
+                string name = _maps != null && _maps.Count > 0 ? _maps[_mapIndex].Name : "";
+                Generate(name, parsed);
+            }
+            GUI.enabled = true;
+            GUILayout.EndArea();
+        }
+
+        /// <summary>Where the first fire goes: what the ground under the pointer and the chosen site offer.</summary>
+        void SiteChooser()
+        {
+            Styles();
+            float w = 360f, h = Mathf.Min(560f, Screen.height - 40f);
+            _panel = new Rect(Screen.width - w - 20f, 20f, w, h);
+            GUI.Box(_panel, GUIContent.none, _box);
+            GUILayout.BeginArea(new Rect(_panel.x + 14, _panel.y + 12, w - 28, h - 24));
+
+            GUILayout.Label("Where is the first fire lit?", new GUIStyle(_title) { fontSize = 22 });
+            GUILayout.Label((Map != null ? Map.Title + ", seed " + seed : "") + "\nClick the ground to choose. Right-drag to turn, WASD or middle-drag to move, scroll to zoom. Twenty people will begin there, and the land within the ring is what they have to build with and eat.", _small);
+            GUILayout.Space(6);
+
+            if (_hover != null && (_chosen == null || _hover.ParcelX != _chosen.ParcelX || _hover.ParcelZ != _chosen.ParcelZ))
+            {
+                GUILayout.Label("Under the pointer", new GUIStyle(_body) { fontStyle = FontStyle.Bold });
+                Report(_hover, false);
+                GUILayout.Space(6);
+            }
+            if (_chosen != null)
+            {
+                GUILayout.Label("Chosen", new GUIStyle(_body) { fontStyle = FontStyle.Bold });
+                Report(_chosen, true);
+            }
+
+            GUILayout.FlexibleSpace();
+            GUI.enabled = _chosen != null && _chosen.CanSettle;
+            if (GUILayout.Button("Light the fire here  (Enter)", GUILayout.Height(40))) FoundAt(_chosen.ParcelX, _chosen.ParcelZ);
+            GUI.enabled = SuggestedX >= 0;
+            if (GUILayout.Button("Go to the suggested site", GUILayout.Height(28))) Choose(SuggestedX, SuggestedZ, true);
+            GUI.enabled = true;
+            if (GUILayout.Button("Choose another world", GUILayout.Height(28))) ChooseAnotherWorld();
+            GUILayout.EndArea();
+        }
+
+        void Report(SiteReport r, bool full)
+        {
+            if (!r.CanSettle) { GUILayout.Label("Cannot settle here: " + r.Why + ".", _small); return; }
+            var text = new System.Text.StringBuilder();
+            text.Append(r.Biome.Length > 0 ? char.ToUpperInvariant(r.Biome[0]) + r.Biome.Substring(1) : "Land")
+                .Append(", ").Append(r.Elevation).Append(" voxels above the sea")
+                .Append("\nWater ").Append(r.WaterParcels < 1.0 ? "right here" : (r.WaterParcels * ParcelGrid.Size * 0.5).ToString("0") + " m away")
+                .Append(", ground ").Append(r.Slope < 1.0 ? "flat" : r.Slope < 3.0 ? "gently sloping" : "steep")
+                .Append("\nThe wild land feeds about ").Append(r.ForagePerDay.ToString("0")).Append(" people before they must farm")
+                .Append("\nRoom nearby: ").Append(r.RoomNearby).Append(" flat dry parcels");
+            if (full || r.Materials.Count > 0)
+            {
+                text.Append("\nTo build with: ");
+                if (r.Materials.Count == 0) text.Append("nothing in reach");
+                for (int i = 0; i < r.Materials.Count; i++)
+                {
+                    if (i > 0) text.Append(", ");
+                    text.Append(r.Materials[i].Key).Append(' ').Append((r.Materials[i].Value * 100).ToString("0")).Append('%');
+                }
+            }
+            GUILayout.Label(text.ToString(), _small);
         }
     }
 }

@@ -41,7 +41,7 @@ namespace Godless.Unity
 
         void Update()
         {
-            if (_boot.World == null) return;
+            if (_boot.World == null || _boot.Phase != WorldBootstrap.SetupPhase.Playing) return;
             Keyboard keys = Keyboard.current;
             if (keys == null) return;
 
