@@ -93,7 +93,24 @@ namespace Godless.Sim.Build
             _tally.Add(need, px, pz, amount, cause);
             int k = _kindOfNeed[need];
             if (k < 0 || amount <= 0.0) return;
+            Accrue(k, px, pz, amount, cause);
+        }
 
+        /// <summary>
+        /// Pressure from something that is not a need (S2H): every kind that
+        /// content says <paramref name="source"/> presses for takes it, the same
+        /// way need pressure is taken — piled by parcel, decayed, raised past its
+        /// threshold, and carrying the records that pressed.
+        /// </summary>
+        public void Press(string source, int px, int pz, double amount, RecordId cause)
+        {
+            if (amount <= 0.0 || string.IsNullOrEmpty(source)) return;
+            for (int k = 0; k < _kinds.Count; k++)
+                if (_kinds[k].PressedBy == source) Accrue(k, px, pz, amount, cause);
+        }
+
+        void Accrue(int k, int px, int pz, double amount, RecordId cause)
+        {
             if (_outstanding[k] >= _kinds[k].MaxOpen)
             {
                 // As many open as the settlement allows: the pressure makes

@@ -1,0 +1,20 @@
+{
+  "type": "intent",
+  "id": "store",
+
+  "tell": "Where food has been rotting a store goes up — by the fire for a village living off the land, by the fields for a farm — and the chronicle can say which harvest spoiled for want of it.",
+
+  // S2H. No need raises a store: rot does. Pressure is meals lost in the open,
+  // on the parcel where they were lost.
+  "purpose": "store",
+  "pressedBy": "spoilage",
+  "threshold": 60,
+  "maxOpen": 1,
+  "halfLifeDays": 30,
+
+  // One store keeps this many meals: a season's food for a big family of
+  // villages, or a good harvest from a middling farm.
+  "storesMeals": 1500,
+
+  "budgetVoxels": 520
+}

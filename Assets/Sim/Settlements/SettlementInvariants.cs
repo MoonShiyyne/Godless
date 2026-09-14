@@ -61,7 +61,7 @@ namespace Godless.Sim.Settlements
                     }
                     foreach (Build.Project p in s.Projects)
                     {
-                        if (p.Complete && p.Host == null) houses++;
+                        if (p.Complete && p.Host == null && p.IsHome) houses++;
                         if (p.Host != null)
                         {
                             parts++;

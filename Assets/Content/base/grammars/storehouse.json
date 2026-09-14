@@ -1,0 +1,56 @@
+{
+  "type": "grammar",
+  "id": "storehouse",
+  "builds": "store",
+  "tell": "A store is a house with no windows and no hearth, lifted off the ground on posts or a plinth so the damp and the vermin stay out of the grain; the genome still decides its roof and its length.",
+
+  "axiom": "Lot",
+
+  "let": {
+    "width": "max(5, round(lerp(5, 9, gene.footprint_area) * lerp(1.0, 1.5, gene.communal_ratio)))",
+    "depth": "max(4, round(lerp(4, 6, gene.footprint_area)))",
+
+    // Always off the ground: on posts where the culture raises its houses,
+    // on a plinth where it does not.
+    "raise": "2",
+    "stilts": "gene.elevation_bias > 0.45",
+
+    "pitch": "lerp(0.3, 1.6, gene.roof_pitch)",
+    "overhang": "1",
+    "roofRise": "floor((floor((depth - 1) / 2) + overhang) * pitch) + 1",
+
+    "bodyHeight": "palette.floor + 1",
+    "height": "raise + bodyHeight + roofRise"
+  },
+
+  "rules": {
+    "Lot": { "op": "split", "axis": "v", "parts": [
+      { "size": "raise", "rule": "Base" },
+      { "size": "bodyHeight", "rule": "Body" },
+      { "size": "roofRise", "rule": "Roof" }
+    ] },
+
+    "Base": { "op": "choose", "if": "stilts", "then": "Stilts", "else": "Plinth" },
+    "Stilts": { "op": "posts", "spacing": "palette.bay / 2", "role": "post" },
+    "Plinth": { "op": "fill", "role": "plinth" },
+
+    "Body": { "op": "split", "axis": "v", "parts": [
+      { "size": 1, "rule": "Floor" },
+      { "size": "~1", "rule": { "op": "comp", "front": "Front", "back": "Wall", "ends": "Wall" } }
+    ] },
+
+    "Front": { "op": "split", "axis": "u", "parts": [
+      { "size": "~1", "rule": "Wall" },
+      { "size": "palette.door.w", "rule": "DoorBay" },
+      { "size": "~1", "rule": "Wall" }
+    ] },
+    "DoorBay": { "op": "split", "axis": "v", "parts": [
+      { "size": "palette.door.h", "rule": { "op": "fill", "role": "door" } },
+      { "size": "~1", "rule": "Wall" }
+    ] },
+
+    "Wall": { "op": "fill", "role": "wall" },
+    "Floor": { "op": "fill", "role": "floor" },
+    "Roof": { "op": "roof", "pitch": "pitch", "overhang": "overhang", "role": "roof", "gable": "wall" }
+  }
+}

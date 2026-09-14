@@ -63,6 +63,13 @@ namespace Godless.Sim.Settlements
         /// <summary>Meals in the store (S1E).</summary>
         public double Food { get; set; }
 
+        /// <summary>Meals lost to rot so far (S2H).</summary>
+        public double FoodSpoiled { get; internal set; }
+
+        // The last food.spoiled record and when, so rotting is on record weekly rather than daily (S2H).
+        internal Annals.RecordId SpoiledRecord = Annals.RecordId.None;
+        internal long SpoiledTick;
+
         /// <summary>Whether everyone ate this morning.</summary>
         public bool Fed { get; internal set; }
 

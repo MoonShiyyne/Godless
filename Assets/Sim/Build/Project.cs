@@ -29,6 +29,12 @@ namespace Godless.Sim.Build
         public Project() { Begun = RecordId.None; }
 
         public BuildIntent Intent { get; internal set; }
+
+        /// <summary>A home rather than a store (S2H): what the families, beds and roofs count.</summary>
+        public bool IsHome { get { return Intent == null || Intent.Kind.Purpose == IntentPurpose.Home; } }
+
+        /// <summary>A store for food (S2H), standing or going up.</summary>
+        public bool IsStore { get { return Intent != null && Intent.Kind.Purpose == IntentPurpose.Store; } }
         public Blueprint Plan { get; internal set; }
         public Site Site { get; internal set; }
         public Structure Built { get; internal set; }
@@ -152,6 +158,7 @@ namespace Godless.Sim.Build
                 foreach (BuildIntent intent in s.Intents.Intents)
                 {
                     if (intent.Status != IntentStatus.Open) continue;
+                    if (intent.Kind.Purpose == IntentPurpose.Farm) continue;   // fields are the farm system's (S2I)
                     Project project = Plan(s, intent, world, rng);
                     if (project == null)
                     {
@@ -208,11 +215,12 @@ namespace Godless.Sim.Build
 
             // S2O: who it is for decides how big it is; the search decides which
             // way round it goes and where, and says why.
-            DwellingProgram program = DwellingProgram.For(s, intent);
+            bool home = intent.Kind.Purpose == IntentPurpose.Home;
+            DwellingProgram program = home ? DwellingProgram.For(s, intent) : null;
             // Nobody to build it for: the request stays open until a family
             // needs it, or lapses. A shelter intent outlives the nights that
             // raised it, and building it anyway put up houses nobody moved into.
-            if (program == null && s.Households.Count > 0) return null;
+            if (home && program == null && s.Households.Count > 0) return null;
             Blueprint plan = program != null
                 ? grammar.Build(s.Genome, _palette, ParcelGrid.Size * rule.SearchRadius, ParcelGrid.Size * rule.SearchRadius,
                                 intent.BudgetVoxels, program.Overrides)

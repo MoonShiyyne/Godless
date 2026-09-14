@@ -458,7 +458,7 @@ namespace Godless.Sim.Build
         void Finish(Settlement settlement, Project project, long tick, Annalist annals)
         {
             project.Complete = true;
-            settlement.ShelterCapacity += project.Plan.Capacity;
+            if (project.IsHome) settlement.ShelterCapacity += project.Plan.Capacity;
 
             RecordId done = annals.Write(tick, CompletedKind, settlement.Id, Centre(project), project.Begun,
                                          project.Built.TotalVoxels, project.Plan.Capacity,
@@ -468,14 +468,17 @@ namespace Godless.Sim.Build
             // through the wall the two share (S2P).
             if (project.PartKind == "wing" && project.Host != null) OpenDoorway(project, tick, done);
 
-            // A bed for each sleeping place (S2S).
-            Furnishing.Furnish(project, Details, Models, _types, _materials, tick, done);
+            if (project.IsHome)
+            {
+                // A bed for each sleeping place (S2S).
+                Furnishing.Furnish(project, Details, Models, _types, _materials, tick, done);
 
-            // A wing or a storey (S2P) is more room in a home that stands: its
-            // beds are the host family's. A house of its own takes a family in
-            // (S2N): whoever had no roof, or the overflow of whoever was most crowded.
-            if (project.Host == null)
-                Households.MoveIn(settlement, project, project.Plan.Capacity, tick, annals, done);
+                // A wing or a storey (S2P) is more room in a home that stands: its
+                // beds are the host family's. A house of its own takes a family in
+                // (S2N): whoever had no roof, or the overflow of whoever was most crowded.
+                if (project.Host == null)
+                    Households.MoveIn(settlement, project, project.Plan.Capacity, tick, annals, done);
+            }
             if (project.Intent.Outstanding) settlement.Intents.Resolve(project.Intent, tick, annals, done);
         }
 

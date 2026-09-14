@@ -241,7 +241,7 @@ namespace Godless.Sim.Settlements
             if (!anyHomeless && !anyCrowded) return;
 
             var homes = new List<Project>();
-            foreach (Project p in s.Projects) if (p.Complete && p.Host == null) homes.Add(p);
+            foreach (Project p in s.Projects) if (p.Complete && p.Host == null && p.IsHome) homes.Add(p);
             if (homes.Count == 0) return;
 
             var occupied = new int[homes.Count];

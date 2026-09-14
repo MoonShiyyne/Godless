@@ -47,9 +47,19 @@ namespace Godless.Sim.Settlements
                 }
 
                 case ActionPlace.Store:
-                    // At the fire until there is a granary (S2H).
+                {
+                    // The nearest store that stands (S2H); the fire until there is one.
+                    Project store = Stores.Nearest(s, a.X, a.Z);
+                    if (store != null)
+                    {
+                        Int3 c = Stores.Door(store, index);
+                        gx = c.X; gz = c.Z; where = " at the store";
+                        return true;
+                    }
                     Movement.AtFire(s, index + 8, out gx, out gz);
+                    where = " by the fire";
                     return true;
+                }
 
                 case ActionPlace.Home:
                 {
@@ -86,7 +96,7 @@ namespace Godless.Sim.Settlements
                     if (a.ShelteredLastNight)
                     {
                         foreach (Project p in s.Projects)
-                            if (p.Complete && p.Host == null)
+                            if (p.Complete && p.Host == null && p.IsHome)
                             {
                                 Int3 c = Construction.World(p, p.Plan.Width / 2, 0, p.Plan.Depth / 2);
                                 gx = c.X; gz = c.Z; where = " under someone else's roof";
@@ -210,7 +220,7 @@ namespace Godless.Sim.Settlements
                 }
 
             var homes = new List<Project>();
-            foreach (Project p in s.Projects) if (p.Complete && p.Host == null) homes.Add(p);
+            foreach (Project p in s.Projects) if (p.Complete && p.Host == null && p.IsHome) homes.Add(p);
             foreach (Agent a in s.People)
             {
                 if (!a.ShelteredLastNight || s.BedByPerson.ContainsKey(a.Id.Hash)) continue;

@@ -77,8 +77,12 @@ namespace Godless.Sim.Tests
             DriveRules rules = DriveRules.FromContent(content);
             IntentKindTable kinds = IntentKindTable.FromContent(content, rules.Needs);
             Assert.Empty(kinds.Problems);
-            Assert.Equal(1, kinds.Count);
-            Assert.Equal(rules.Needs.IndexOf("shelter"), kinds[0].Answers);
+            // Homes answer shelter; since S2H a store answers rot rather than a need.
+            IntentKind home = null;
+            foreach (IntentKind k in kinds.All) if (k.Purpose == IntentPurpose.Home) { Assert.Null(home); home = k; }
+            Assert.NotNull(home);
+            Assert.Equal(rules.Needs.IndexOf("shelter"), home.Answers);
+            foreach (IntentKind k in kinds.All) if (k.Answers < 0) Assert.False(string.IsNullOrEmpty(k.PressedBy), k.Name);
         }
 
         [Fact]

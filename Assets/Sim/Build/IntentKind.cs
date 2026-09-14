@@ -5,6 +5,17 @@ using Godless.Sim.Drives;
 
 namespace Godless.Sim.Build
 {
+    /// <summary>What a commissioned thing is for, which decides what finishing it does.</summary>
+    public enum IntentPurpose
+    {
+        /// <summary>A home: sleeping places, beds, a family moves in (S1A, S2N, S2S).</summary>
+        Home,
+        /// <summary>A store: food kept in it keeps (S2H).</summary>
+        Store,
+        /// <summary>Fields rather than a building, laid out by the farm system (S2I).</summary>
+        Farm,
+    }
+
     /// <summary>One kind of thing a settlement can commission, as content declares it.</summary>
     public sealed class IntentKind
     {
@@ -14,8 +25,20 @@ namespace Godless.Sim.Build
         /// <summary>What a stranger sees when one of these is raised and built. Required.</summary>
         public string Tell { get; internal set; }
 
-        /// <summary>The need whose pressure raises it. Index into the NeedTable.</summary>
+        /// <summary>The need whose pressure raises it. Index into the NeedTable; -1 when something other than a need presses for it.</summary>
         public int Answers { get; internal set; }
+
+        /// <summary>
+        /// For a kind no need raises: the name of what presses for it instead
+        /// (S2H: "spoilage", the food that rots for want of somewhere to keep it).
+        /// </summary>
+        public string PressedBy { get; internal set; } = "";
+
+        /// <summary>What finishing one does. Content's "purpose"; a home unless it says otherwise.</summary>
+        public IntentPurpose Purpose { get; internal set; }
+
+        /// <summary>Meals one finished store keeps (S2H). Zero for anything else.</summary>
+        public int StoresMeals { get; internal set; }
 
         /// <summary>Accumulated pressure, in need-over-threshold agent-ticks, that raises one.</summary>
         public double Threshold { get; internal set; }
@@ -63,14 +86,18 @@ namespace Godless.Sim.Build
                 JsonValue doc = content.Get("intent", id);
                 string tell = doc["tell"].AsString(null);
                 string answers = doc["answers"].AsString("");
-                int need = needs.IndexOf(answers);
+                string pressedBy = doc["pressedBy"].AsString("");
+                int need = answers.Length == 0 && pressedBy.Length > 0 ? -1 : needs.IndexOf(answers);
+                string purposeName = doc["purpose"].AsString("home");
                 double threshold = doc["threshold"].AsDouble(0.0);
                 int maxOpen = doc["maxOpen"].AsInt32(1);
                 double halfLife = doc["halfLifeDays"].AsDouble(30.0);
 
                 string fault = null;
                 if (string.IsNullOrEmpty(tell) || tell.Trim().Length == 0) fault = "declares no tell";
-                else if (need < 0) fault = "answers need '" + answers + "', which is not loaded";
+                else if (need < 0 && pressedBy.Length == 0) fault = "answers need '" + answers + "', which is not loaded";
+                else if (purposeName != "home" && purposeName != "store" && purposeName != "farm")
+                    fault = "has purpose '" + purposeName + "'; a purpose is home, store or farm";
                 else if (!(threshold > 0.0)) fault = "has a threshold that is not above zero";
                 else if (maxOpen < 1) fault = "has maxOpen below one";
                 else if (!(halfLife > 0.0)) fault = "has a half-life that is not above zero";
@@ -90,6 +117,9 @@ namespace Godless.Sim.Build
                     MaxOpen = maxOpen,
                     HalfLifeDays = halfLife,
                     BudgetVoxels = doc["budgetVoxels"].AsInt32(0),
+                    PressedBy = pressedBy,
+                    Purpose = purposeName == "store" ? IntentPurpose.Store : purposeName == "farm" ? IntentPurpose.Farm : IntentPurpose.Home,
+                    StoresMeals = doc["storesMeals"].AsInt32(0),
                 });
             }
 
@@ -101,7 +131,7 @@ namespace Godless.Sim.Build
             var kept = new List<IntentKind>();
             foreach (IntentKind k in loaded)
             {
-                IntentKind rival = kept.Find(o => o.Answers == k.Answers);
+                IntentKind rival = k.Answers < 0 ? null : kept.Find(o => o.Answers == k.Answers);
                 if (rival != null)
                 {
                     problems.Add("intent '" + k.Name + "' answers need '" + needs[k.Answers].Name

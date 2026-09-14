@@ -110,6 +110,7 @@ namespace Godless.Sim.Settlements
 
             world.Add(new DriveSystem(rules))
                  .Add(new Subsistence(rules))
+                 .Add(new StoreSystem(FoodRules.FromContent(content)))
                  .Add(new IntentSystem())
                  .Add(new SiteSystem(GrammarTable.FromContent(content, genes),
                                      SitingTable.FromContent(content, genes, IntentKindTable.FromContent(content, rules.Needs)),

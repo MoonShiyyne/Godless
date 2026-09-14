@@ -12,6 +12,6 @@
   "at": "store",
   "uses": { "food": 7 },
   "relieves": { "hunger": 0.6 },
-  "doing": "eating by the fire",
+  "doing": "eating",
   "pose": "sit"
 }

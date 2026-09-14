@@ -822,7 +822,7 @@ namespace Godless.Sim.Headless
             s.AttachIntents(bus);
             PressureTally tally = bus.Tally;
             world.Settlements.Add(s);
-            Profiled(world, cli, new DriveSystem(rules)); Profiled(world, cli, new Subsistence(rules)); Profiled(world, cli, new IntentSystem());
+            Profiled(world, cli, new DriveSystem(rules)); Profiled(world, cli, new Subsistence(rules)); Profiled(world, cli, new StoreSystem(FoodRules.FromContent(db))); Profiled(world, cli, new IntentSystem());
 
             Console.WriteLine("seed " + seed.ToString(c) + ": " + people.ToString(c) + " people found a settlement at parcel ("
                 + px.ToString(c) + ", " + pz.ToString(c) + ") in " + (biome == null ? "no biome" : biome.Id.ToString())
