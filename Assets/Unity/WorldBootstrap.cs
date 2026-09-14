@@ -251,7 +251,7 @@ namespace Godless.Unity
             _chosenMarker.GetComponent<Renderer>().sharedMaterial.color = _chosen.CanSettle ? new Color(1f, 0.55f, 0.1f) : new Color(0.8f, 0.15f, 0.1f);
             DrawReach(at);
             GodCamera god = FindFirstObjectByType<GodCamera>();
-            if (focus && god != null) god.Focus(at, 260f);
+            if (focus && god != null) god.Focus(at, 170f);
         }
 
         void UpdateSitePicking()
@@ -547,13 +547,14 @@ namespace Godless.Unity
         void SiteChooser()
         {
             Styles();
-            float w = 360f, h = Mathf.Min(560f, Screen.height - 40f);
-            _panel = new Rect(Screen.width - w - 20f, 20f, w, h);
+            float w = 340f, h = Screen.height - 30f;
+            _panel = new Rect(Screen.width - w - 15f, 15f, w, h);
             GUI.Box(_panel, GUIContent.none, _box);
             GUILayout.BeginArea(new Rect(_panel.x + 14, _panel.y + 12, w - 28, h - 24));
 
             GUILayout.Label("Where is the first fire lit?", new GUIStyle(_title) { fontSize = 22 });
-            GUILayout.Label((Map != null ? Map.Title + ", seed " + seed : "") + "\nClick the ground to choose. Right-drag to turn, WASD or middle-drag to move, scroll to zoom. Twenty people will begin there, and the land within the ring is what they have to build with and eat.", _small);
+            GUILayout.Label((Map != null ? Map.Title + ", seed " + seed : "") + ". Twenty people begin where you click; the ring is the land they build and eat from."
+                            + "\nRight-drag turn, WASD move, scroll zoom.", _small);
             GUILayout.Space(6);
 
             if (_hover != null && (_chosen == null || _hover.ParcelX != _chosen.ParcelX || _hover.ParcelZ != _chosen.ParcelZ))
