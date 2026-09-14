@@ -107,6 +107,7 @@ namespace Godless.Unity
             float closest = 18f;
 
             foreach (List<Matrix4x4> list in _batches.Values) list.Clear();
+            CutawayView cutaway = GetComponent<CutawayView>();
 
             foreach (Settlement s in _boot.World.Settlements)
                 for (int i = 0; i < s.People.Count; i++)
@@ -127,6 +128,9 @@ namespace Godless.Unity
                     if (!moving) at = to;
                     if (pose == Pose.Lie && _bedYaw.TryGetValue(id, out bedYaw)) yaw = bedYaw;
                     else if (!_yaw.TryGetValue(id, out yaw)) yaw = (id % 360);
+
+                    // Upstairs, while the cutaway has taken the upstairs away.
+                    if (cutaway != null && cutaway.Hides(at)) continue;
 
                     float distance = Vector3.Distance(cam.transform.position, at);
                     float enlarge = Mathf.Clamp(distance * pixelScale * minPixelHeight / HeightVoxels, 1f, maxEnlarge);

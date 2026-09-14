@@ -45,6 +45,15 @@ namespace Godless.Unity
         /// <summary>Whether buildings are drawn opened.</summary>
         public bool On { get { return on; } }
 
+        /// <summary>Whether a point is inside what the cutaway has taken away, so whatever stands there should not be drawn either.</summary>
+        public bool Hides(Vector3 at)
+        {
+            if (!on || _heights == null) return false;
+            int x = Mathf.FloorToInt(at.x), z = Mathf.FloorToInt(at.z);
+            if (x < 0 || z < 0 || x >= ChunkStore.SizeX || z >= ChunkStore.SizeZ) return false;
+            return at.y >= _heights[z * ChunkStore.SizeX + x];
+        }
+
         void Awake() { _boot = GetComponent<WorldBootstrap>(); }
 
         void OnDisable() { Show(false); }
