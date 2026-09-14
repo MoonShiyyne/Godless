@@ -294,6 +294,17 @@ Registered alongside the block above:
   sharing a home's beds in family order, then the sheltered without one take
   the spare beds. Before, two households in one house both slept in its first
   bed, and guests lay in a heap in the middle of the first house.
+- **Houses only for families that need them** (found asking why beds ran 25
+  over the population): a shelter intent planned once no family was waiting
+  still went up at the genome's size; a roofless family could be in several
+  plans at once; and a crowded family built a wing beside an empty house. Now
+  an intent with nobody to house waits or lapses, a family with a house going
+  up waits for it, and the crowded move into an empty home that sleeps them.
+  Green shore, ten years: 115 sleeping places for 129 people (was 153 for 128).
+- **What stops green shore at about 120 is food, not building.** By day 1900,
+  67 of 96 people forage; by day 2300 the store is empty with 98 of 116
+  foraging, 18 are lost, and growth stops, so no more houses are asked for.
+  Foraging is finite by day; the answer is S2I (fields, fishing), not tuning.
 - **The cutaway (C):** every building opens a metre above its lowest floor, in
   the voxel shader from a per-column height map; the hill a house is backed
   into is never cut, anyone upstairs is hidden with the upstairs, and back
