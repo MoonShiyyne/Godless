@@ -100,6 +100,7 @@ namespace Godless.Unity
             foreach (int i in _written) _heights[i] = Uncut;
             _written.Clear();
 
+            Godless.Sim.World.IslandMap island = _boot.World.Island;
             foreach (Settlement s in _boot.World.Settlements)
                 foreach (Project p in s.Projects)
                 {
@@ -128,8 +129,11 @@ namespace Godless.Unity
                             Int3 at = Construction.World(p, x, 0, z);
                             if (at.X < 0 || at.Z < 0 || at.X >= ChunkStore.SizeX || at.Z >= ChunkStore.SizeZ) continue;
                             int i = at.Z * ChunkStore.SizeX + at.X;
+                            // Never below the hill: a house backed into a slope
+                            // keeps the slope, rather than opening a hole in it.
+                            float column = island != null ? Mathf.Max(cut, island.HeightAt(at.X, at.Z)) : cut;
                             if (_heights[i] == Uncut) _written.Add(i);
-                            if (cut < _heights[i]) _heights[i] = cut;
+                            if (column < _heights[i]) _heights[i] = column;
                         }
                 }
             Upload();
