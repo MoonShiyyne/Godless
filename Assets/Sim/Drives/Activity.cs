@@ -4,9 +4,35 @@ using Godless.Sim.Core;
 
 namespace Godless.Sim.Drives
 {
+    /// <summary>Where an activity is done (S2V). A person walks there, and it counts once they arrive.</summary>
+    public enum ActionPlace { Anywhere, Fire, Store, Home, Bed, Water, People, Task, Wild }
+
     /// <summary>One thing an agent can spend a tick doing, as content declares it.</summary>
     public sealed class Activity
     {
+        /// <summary>Where it is done (S2V). Anywhere means here and now, as before.</summary>
+        public ActionPlace At { get; internal set; }
+
+        /// <summary>Meals it takes from the store each time it is done (S2V). Impossible while the store has fewer.</summary>
+        public double UsesFood { get; internal set; }
+
+        /// <summary>
+        /// The share of a tick it takes (S2V). Below one it is an errand: done
+        /// when the need presses, on the side, and the rest of the tick goes to
+        /// whatever the person does next.
+        /// </summary>
+        public double Takes { get; internal set; } = 1.0;
+
+        public bool IsErrand { get { return Takes < 1.0 && !Productive; } }
+
+        /// <summary>Forager-ticks of food it brings to the store each tick it is done (S2V), at what the land gives.</summary>
+        public double GathersFood { get; internal set; }
+
+        /// <summary>What a stranger would say someone doing it is doing.</summary>
+        public string Doing { get; internal set; }
+
+        /// <summary>How a body looks doing it: stand, sit, kneel, lie, work. Presentation reads it; the sim does not.</summary>
+        public string Pose { get; internal set; }
         public Symbol Id { get; internal set; }
         public string Name { get; internal set; }
 
@@ -81,6 +107,22 @@ namespace Godless.Sim.Drives
                     else relieves[n] = rel[name].AsDouble(0.0);
                 }
 
+                ActionPlace at = ActionPlace.Anywhere;
+                string where = doc["at"].AsString("anywhere");
+                switch (where)
+                {
+                    case "anywhere": at = ActionPlace.Anywhere; break;
+                    case "fire": at = ActionPlace.Fire; break;
+                    case "store": at = ActionPlace.Store; break;
+                    case "home": at = ActionPlace.Home; break;
+                    case "bed": at = ActionPlace.Bed; break;
+                    case "water": at = ActionPlace.Water; break;
+                    case "people": at = ActionPlace.People; break;
+                    case "task": at = ActionPlace.Task; break;
+                    case "wild": at = ActionPlace.Wild; break;
+                    default: if (fault == null) fault = "is done at '" + where + "', which is not a place anyone can go"; break;
+                }
+
                 if (fault != null)
                 {
                     problems.Add("activity '" + id + "' " + fault + ".");
@@ -95,6 +137,12 @@ namespace Godless.Sim.Drives
                     Requires = requires,
                     Productive = doc["productive"].AsBool(false),
                     Relieves = relieves,
+                    At = at,
+                    UsesFood = doc["uses"]["food"].AsDouble(0.0),
+                    GathersFood = doc["gathers"]["food"].AsDouble(0.0),
+                    Takes = SimMath.Clamp(doc["takes"].AsDouble(1.0), 0.05, 1.0),
+                    Doing = doc["doing"].AsString(id),
+                    Pose = doc["pose"].AsString("stand"),
                 });
             }
 

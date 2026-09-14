@@ -1,0 +1,10 @@
+{
+  "type": "need",
+  "id": "rest",
+  "tell": "Someone who slept badly — out in the open, or in the rain — dozes at home or by the fire the next day instead of working.",
+  "start": 0.0,
+  "drift": -0.01,
+  "threshold": 0.7,
+  "urgencyPower": 2,
+  "rises": { "unsheltered": 0.2, "soaked": 0.15, "sheltered": -0.5 }
+}

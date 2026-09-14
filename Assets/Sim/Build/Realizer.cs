@@ -13,6 +13,7 @@ namespace Godless.Sim.Build
     public sealed class Structure
     {
         readonly ushort[] _voxels;
+        readonly short[] _material;
         readonly Blueprint _plan;
         readonly List<string> _compromises = new List<string>();
         readonly List<Symbol> _roleOrder = new List<Symbol>();
@@ -22,6 +23,8 @@ namespace Godless.Sim.Build
         {
             _plan = plan;
             _voxels = new ushort[plan.Width * plan.Height * plan.Depth];
+            _material = new short[_voxels.Length];
+            for (int i = 0; i < _material.Length; i++) _material[i] = -1;
             Cost = new long[materials.Count];
         }
 
@@ -41,7 +44,15 @@ namespace Godless.Sim.Build
             return _plan.InBounds(x, y, z) ? _voxels[(y * _plan.Depth + z) * _plan.Width + x] : VoxelTypes.AirId;
         }
 
-        internal void Set(int x, int y, int z, ushort type) { _voxels[(y * _plan.Depth + z) * _plan.Width + x] = type; }
+        internal void Set(int x, int y, int z, ushort type, int material)
+        {
+            int cell = (y * _plan.Depth + z) * _plan.Width + x;
+            _voxels[cell] = type;
+            _material[cell] = (short)material;
+        }
+
+        /// <summary>The material a cell was realized in, by cell index; -1 for air.</summary>
+        public int MaterialAtCell(int cell) { return _material[cell]; }
 
         internal void Note(string compromise) { _compromises.Add(compromise); }
 
@@ -361,7 +372,7 @@ namespace Godless.Sim.Build
                     for (int k = 0; k < domain.Count; k++) { roll -= weights[k]; if (roll < 0) { chosen = domain[k]; break; } }
                 }
 
-                structure.Set(x, y, z, types.IdOf(materials[chosen].Voxel));
+                structure.Set(x, y, z, types.IdOf(materials[chosen].Voxel), chosen);
                 structure.Cost[chosen]++;
             }
         }

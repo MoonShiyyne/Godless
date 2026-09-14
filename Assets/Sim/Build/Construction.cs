@@ -73,6 +73,7 @@ namespace Godless.Sim.Build
 
         /// <param name="voxelsPerTick">Voxels one builder lays in a tick. A house is days of work.</param>
         readonly DepositMap _deposits;
+        double _share = 1.0;
 
         /// <summary>The island builders walk on, so a straight walk never goes out to sea (S2G). May be null.</summary>
         public IslandMap Island { get { return _island; } set { _island = value; } }
@@ -110,6 +111,28 @@ namespace Godless.Sim.Build
         }
 
         /// <summary>
+        /// Voxels of each material still to lay, counted from the cells not yet
+        /// placed. Walls go up before roofs, so a share of the whole bill says
+        /// the thatch is nearly paid for when none of it is on yet.
+        /// </summary>
+        public static long[] Owed(Project project)
+        {
+            if (project.OwedBuilt == project.Built && project.OwedPlaced == project.Placed && project.OwedCount != null)
+                return project.OwedCount;
+            var owed = new long[project.Built.Cost.Length];
+            List<int> order = Order(project);
+            for (int i = project.Placed; i < order.Count; i++)
+            {
+                int m = project.Built.MaterialAtCell(order[i]);
+                if (m >= 0 && m < owed.Length) owed[m]++;
+            }
+            project.OwedCount = owed;
+            project.OwedPlaced = project.Placed;
+            project.OwedBuilt = project.Built;
+            return owed;
+        }
+
+        /// <summary>
         /// Whether everything still to lay can ever be had: in the yard, or
         /// still growing or lying within reach. Only an island with real
         /// deposits can say no (S2F).
@@ -118,10 +141,10 @@ namespace Godless.Sim.Build
         {
             Catchment c = settlement.Catchment;
             if (c == null || !c.HasDeposits || project.Built == null) return true;
-            double left = 1.0 - project.Placed / (double)System.Math.Max(1, Order(project).Count);
+            long[] owed = Owed(project);
             for (int m = 0; m < project.Built.Cost.Length; m++)
             {
-                long still = (long)(project.Built.Cost[m] * left);
+                long still = owed[m];
                 if (still <= 0 || settlement.Stock.Of(m) >= still) continue;
                 if (c.YieldPerLabourTick(m) <= 0.0) return false;
             }
@@ -190,6 +213,7 @@ namespace Godless.Sim.Build
             if (project == null) return false;
 
             if (Walk(settlement, agent, grid, project)) return true;
+            _share = agent.LabourShare;
             Lay(settlement, project, tick, annals, rng);
             return true;
         }
@@ -212,8 +236,10 @@ namespace Godless.Sim.Build
             List<int> order = Order(project);
             if (!project.Begun.Exists) Begin(settlement, project, tick, annals, rng);
 
+            // A builder who stopped to eat and drink lays a little less (S2V).
+            int perTick = System.Math.Max(1, (int)SimMath.Round(_perTick * _share));
             int laid = 0;
-            while (laid < _perTick && project.Placed < order.Count)
+            while (laid < perTick && project.Placed < order.Count)
             {
                 int cell = order[project.Placed];
                 Blueprint plan = project.Plan;

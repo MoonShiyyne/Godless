@@ -51,7 +51,9 @@ namespace Godless.Sim.Tests
         {
             DriveRules rules = DriveRules.FromContent(Shipped());
             Assert.Empty(rules.Problems());
-            Assert.Equal(4, rules.Needs.Count);
+            // Stratum 1's four and S2V's own: thirst, rest, company.
+            foreach (string need in new[] { "shelter", "warmth", "hunger", "safety", "thirst", "rest", "company" })
+                Assert.True(rules.Needs.IndexOf(need) >= 0, need + " is not loaded");
             foreach (Need n in rules.Needs.All) Assert.False(string.IsNullOrWhiteSpace(n.Tell), n.Name);
             Assert.True(rules.Activities.IndexOf("work") >= 0);
         }

@@ -26,8 +26,13 @@ namespace Godless.Sim.Settlements
     /// </summary>
     public static class Movement
     {
-        /// <summary>Parcels a person covers in a tick. A tick is a quarter of a day; this is what a picture can follow.</summary>
-        public const int StrideParcels = 3;
+        /// <summary>
+        /// Parcels a person covers in a tick. A tick is six hours, and the
+        /// village's whole range is a morning's walk: at three parcels a tick
+        /// (S2G's first number) a gatherer called back to the fire was still
+        /// on the way when the next tick asked again, and never arrived (S2V).
+        /// </summary>
+        public const int StrideParcels = 64;
 
         /// <summary>
         /// A tick's walk toward a column. Follows a path over the planning grid
@@ -187,10 +192,13 @@ namespace Godless.Sim.Settlements
         readonly ParcelGrid _grid;
         readonly ActivityTable _activities;
 
+        readonly NeedTable _needs;
+
         public MovementSystem(ParcelGrid grid, DriveRules rules)
         {
             _grid = grid;
             _activities = rules.Activities;
+            _needs = rules.Needs;
         }
 
         public Symbol Id { get { return SystemId; } }
@@ -206,86 +214,135 @@ namespace Godless.Sim.Settlements
             IReadOnlyList<Agent> people = s.People;
             DepositMap deposits = world.Island != null ? world.Island.Deposits : null;
             if (s.Traffic == null) s.Traffic = new InfluenceMap(Settlement.TrafficField);
-
-            // Houses, in the order they were finished, filled in roll order by
-            // whoever got a roof last night.
-            var beds = new List<Project>();
-            foreach (Project p in s.Projects) if (p.Complete && p.Host == null) beds.Add(p);
-            int house = 0, usedInHouse = 0;
+            bool families = s.Households.Count > 0;
+            NeedTable needs = _needs;
 
             for (int i = 0; i < people.Count; i++)
             {
                 Agent a = people[i];
+                Activity act = a.Activity >= 0 ? _activities[a.Activity] : null;
+                a.Talking = false;
+                a.ForageDay = world.Clock.TotalDays;
                 int gx, gz;
                 string doing;
 
-                Household family = s.Households.Count > 0 ? Households.Of(s, a) : null;
-                if (night && a.ShelteredLastNight && family != null && family.Housed && !a.Crowded)
+                // The main activity does what it does whenever its place is within
+                // the walk the rest of the tick allows (S2V) — wherever the person is
+                // drawn. Checking arrival instead let an errand, which is drawn at its
+                // own place, swallow the thing the tick was for.
+                if (families && act != null && !act.Productive && act.At != ActionPlace.Anywhere && act.At != ActionPlace.Task)
                 {
-                    // Their own bed (S2S): the family's beds, house then wings and
-                    // storeys, in the order the family's members joined it.
-                    Project home = family.Home[0];
-                    Int3 door = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);
-                    gx = door.X; gz = door.Z;
-                    doing = "asleep at home";
-                    Furnishing.Bed bed;
-                    if (BedOf(family, a, out bed)) { gx = bed.Centre.X; gz = bed.Centre.Z; doing = "asleep in bed"; }
+                    int tx, tz;
+                    string ignored;
+                    if (Places.Target(s, world.Island, a, i, act.At, night, out tx, out tz, out ignored))
+                    {
+                        double dx = tx - a.X, dz = tz - a.Z;
+                        double walk = SimMath.Sqrt(dx * dx + dz * dz);
+                        if (night || walk <= DriveSystem.VoxelsWalkedPerTick * a.LabourShare) Relieve(s, a, act, needs);
+                    }
                 }
-                else if (night && a.ShelteredLastNight && house < beds.Count)
+
+                // An errand with somewhere to go is where they are seen this tick —
+                // kneeling at the water, sitting by the store — unless they are
+                // building, which needs them on the site.
+                bool building = s.Tasks != null && s.Tasks.CurrentTask(i) >= 0 && s.Tasks.KindOf(s.Tasks.CurrentTask(i)).Verb == "build";
+                // Someone at work is mostly seen at work: their errands show a tick
+                // in four, staggered person by person, and the rest of the time
+                // they are only the "(after ...)" on what they are doing.
+                bool working = act != null && act.Productive;
+                bool seenOnErrand = !working || (world.Clock.Tick + i) % 4 == 0;
+                if (a.ErrandActivity >= 0 && !building && !night && seenOnErrand)
                 {
-                    Project home = beds[house];
-                    Int3 door = Construction.World(home, home.Plan.Width / 2, 0, home.Plan.Depth / 2);
-                    gx = door.X; gz = door.Z;
-                    doing = "asleep under a roof";
-                    if (++usedInHouse >= home.Plan.Capacity) { house++; usedInHouse = 0; }
+                    Activity errand = _activities[a.ErrandActivity];
+                    string at;
+                    if (Places.Target(s, world.Island, a, i, errand.At, night, out gx, out gz, out at))
+                    {
+                        Go(s, world, a, gx, gz);
+                        string then = act != null && act.Productive ? ", then back to work" : "";
+                        a.Doing = (a.Arrived ? errand.Doing : "on the way: " + errand.Doing) + at + then;
+                        a.Pose = a.Arrived ? errand.Pose : "walk";
+                        a.Talking = a.Arrived && errand.At == ActionPlace.People;
+                        continue;
+                    }
                 }
-                else if (night)
-                {
-                    Movement.AtFire(s, i, out gx, out gz);
-                    doing = "asleep in the open";
-                }
-                else if (a.Activity >= 0 && _activities[a.Activity].Productive && s.Tasks != null
-                         && Working(s, i, a, deposits, world.Clock.TotalDays, out gx, out gz, out doing))
+
+                if (act != null && act.Productive && s.Tasks != null
+                    && Working(s, i, a, deposits, world.Clock.TotalDays, out gx, out gz, out doing))
                 {
                     // A builder has already walked this tick (S1A does its own).
                     if (s.Tasks.CurrentTask(i) >= 0 && s.Tasks.KindOf(s.Tasks.CurrentTask(i)).Verb == "build")
                     {
                         a.Doing = doing;
+                        a.Pose = "work";
+                        a.Arrived = true;
                         continue;
                     }
+                    Go(s, world, a, gx, gz);
+                    a.Doing = (a.Arrived ? doing : "going to work") + After(a);
+                    a.Pose = a.Arrived ? "work" : "walk";
+                    continue;
+                }
+
+                if (act == null || act.Productive)
+                {
+                    Movement.AtFire(s, i, out gx, out gz);
+                    Go(s, world, a, gx, gz);
+                    a.Doing = "idle at the fire";
+                    a.Pose = a.Arrived ? "stand" : "walk";
+                    continue;
+                }
+
+                // Somewhere of their own to go (S2V): the store, the water, their
+                // bed, the others. What it does for them counts once they are there.
+                string where;
+                if (!Places.Target(s, world.Island, a, i, act.At, night, out gx, out gz, out where))
+                {
+                    Movement.AtFire(s, i, out gx, out gz);
+                    where = "";
+                }
+                Go(s, world, a, gx, gz);
+
+                if (a.Arrived)
+                {
+                    a.Doing = act.Doing + where + After(a);
+                    a.Pose = act.Pose;
+                    a.Talking = act.At == ActionPlace.People;
                 }
                 else
                 {
-                    Movement.AtFire(s, i, out gx, out gz);
-                    doing = a.Activity >= 0 && !_activities[a.Activity].Productive
-                        ? "at the fire (" + _activities[a.Activity].Name + ")"
-                        : "idle at the fire";
+                    a.Doing = "on the way: " + act.Doing + where;
+                    a.Pose = night ? "walk" : "walk";
                 }
-
-                a.Doing = doing;
-                Movement.OnLand(world.Island, ref gx, ref gz, s.Hearth.X, s.Hearth.Z);
-                Movement.Toward(a, _grid, gx, gz, s.Traffic, world.Island);
             }
         }
 
-        /// <summary>The bed a person sleeps in: their place in the family's roll, among the family's beds.</summary>
-        static bool BedOf(Household family, Agent a, out Furnishing.Bed bed)
+        /// <summary>A tick of an activity's effect: its relief, the meal it eats, the food it brings in.</summary>
+        static void Relieve(Settlement s, Agent a, Activity act, NeedTable needs)
         {
-            bed = default(Furnishing.Bed);
-            int place = family.Members.IndexOf(a.Id.Hash);
-            if (place < 0) return false;
-            foreach (Project home in family.Homes)
+            if (act.UsesFood > 0.0 && s.Food < act.UsesFood) return;
+
+            // What is gathered is what relieves: foraging bare ground fills nobody.
+            double share = 1.0;
+            if (act.GathersFood > 0.0)
             {
-                if (place < home.Beds.Count) { bed = home.Beds[place]; return true; }
-                place -= home.Beds.Count;
-                foreach (Project added in home.Added)
-                {
-                    if (!added.Complete) continue;
-                    if (place < added.Beds.Count) { bed = added.Beds[place]; return true; }
-                    place -= added.Beds.Count;
-                }
+                double asked = act.GathersFood * a.LabourShare;
+                double found = s.Catchment != null && asked > 0.0 ? s.Catchment.Forage(asked) : 0.0;
+                s.Food += found;
+                share = asked > 0.0 ? SimMath.Clamp01(found / asked) : 0.0;
             }
-            return false;
+            for (int n = 0; n < needs.Count; n++)
+                if (act.ReliefFor(n) != 0.0) a.Levels[n] = SimMath.Clamp01(a.Levels[n] - act.ReliefFor(n) * share);
+            if (act.UsesFood > 0.0) s.Food -= act.UsesFood;
+        }
+
+        /// <summary>The errands done on the side this tick, as a trailing phrase.</summary>
+        static string After(Agent a) { return a.Errands.Length == 0 ? "" : " (after " + a.Errands + ")"; }
+
+        void Go(Settlement s, SimWorld world, Agent a, int gx, int gz)
+        {
+            Movement.OnLand(world.Island, ref gx, ref gz, s.Hearth.X, s.Hearth.Z);
+            Movement.Toward(a, _grid, gx, gz, s.Traffic, world.Island);
+            a.Arrived = System.Math.Abs(a.X - gx) <= Places.Reach && System.Math.Abs(a.Z - gz) <= Places.Reach;
         }
 
         /// <summary>Where a worker's task puts them, and what to call it.</summary>

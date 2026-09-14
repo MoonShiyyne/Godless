@@ -4,7 +4,11 @@
 
   // The only thing possible at night. Where you sleep is decided before you
   // choose — roofs go to whoever needs one most — and it is where you sleep,
-  // not that you sleep, that moves your needs.
+  // not that you sleep, that moves your needs. S2V: in your own bed if your
+  // family's house has one for you.
   "base": 1.0,
-  "requires": ["night"]
+  "requires": ["night"],
+  "at": "bed",
+  "doing": "asleep",
+  "pose": "lie"
 }

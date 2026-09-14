@@ -55,8 +55,12 @@ namespace Godless.Sim.Settlements
 
             foreach (Settlement s in world.Settlements)
             {
-                Eat(s, world, rng);
-                Lose(s, world);
+                if (s.HouseholdRules != null) Starve(s, world);
+                else
+                {
+                    Eat(s, world, rng);
+                    Lose(s, world);
+                }
                 if (s.HouseholdRules != null)
                 {
                     Age(s, world, rng);
@@ -172,6 +176,41 @@ namespace Godless.Sim.Settlements
             double frac = expected - whole;
             if (rng.NextInt(1000000) < (int)(frac * 1000000.0)) whole++;
             return whole;
+        }
+
+        /// <summary>Hunger level past which a person counts as starving (S2V).</summary>
+        public const double Starving = 0.9;
+
+        /// <summary>
+        /// With families (S2V) nobody is fed at dawn: each person eats from the
+        /// store when they are hungry enough to walk there. What is left for the
+        /// day is counting who is starving. Anyone past <see cref="Starving"/>
+        /// for <see cref="StarvesAfter"/> days is lost, the longest-starving
+        /// first; the settlement is fed when nobody is starving.
+        /// </summary>
+        void Starve(Settlement s, SimWorld world)
+        {
+            if (_hungerNeed < 0) return;
+            int starving = 0, worst = -1, worstDays = 0;
+            for (int i = 0; i < s.People.Count; i++)
+            {
+                Agent a = s.People[i];
+                if (a.Level(_hungerNeed) >= Starving) { a.HungryDays++; starving++; }
+                else a.HungryDays = 0;
+                if (a.HungryDays > worstDays) { worstDays = a.HungryDays; worst = i; }
+            }
+
+            bool wasFed = s.Fed;
+            s.Fed = starving == 0;
+            s.HungryDays = worstDays;
+            if (wasFed && !s.Fed) annalHunger(s, world);
+
+            if (worst >= 0 && worstDays >= StarvesAfter)
+            {
+                Agent lost = s.People[worst];
+                world.Annals.Write(world.Clock.Tick, DiedKind, lost.Id, s.Hearth, s.Founded, worstDays);
+                s.Remove(worst, world.Streams);
+            }
         }
 
         /// <summary>What the settlement would like in the store: a season of meals.</summary>

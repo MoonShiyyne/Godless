@@ -831,6 +831,8 @@ namespace Godless.Sim.Headless
 
             // S11: what the land within hauling range offers to build with.
             MaterialTable materials = MaterialTable.FromContent(db, biomes);
+            // The same supplies the game founds a village with: a season and a half of food.
+            s.Food = people * Subsistence.MealsADay * 45;
             s.Catchment = island.Deposits != null
                 ? Catchment.FromDeposits(island, biomes, materials, island.Deposits, hx, hz)
                 : Catchment.Survey(island, biomes, materials, hx, hz);

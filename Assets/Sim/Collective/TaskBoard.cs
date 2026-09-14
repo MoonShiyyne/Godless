@@ -299,7 +299,7 @@ namespace Godless.Sim.Collective
             if (_kind[task].Verb == "forage")
             {
                 if (s.Catchment == null || s.Catchment.FoodPerLabourTick <= 0.0) return false;
-                s.Food += s.Catchment.Forage(1.0);
+                s.Food += s.Catchment.Forage(agent.LabourShare);
                 return true;
             }
 
@@ -319,13 +319,13 @@ namespace Godless.Sim.Collective
                 if (s.Catchment.HasDeposits && work != null && work.Voxels != null)
                 {
                     // S2F: the nearest tree with anything left comes down.
-                    int worked = s.Catchment.Harvest(m, 1.0, s.Stock, work.Voxels, work.Tick, work.TicksPerDay,
+                    int worked = s.Catchment.Harvest(m, agent.LabourShare, s.Stock, work.Voxels, work.Tick, work.TicksPerDay,
                                                      work.Annals, s.Id, s.Hearth, s.Founded);
                     if (worked < 0) return false;
                     agent.WorkingAt = worked;
                     return true;
                 }
-                s.Stock.Gather(m, 1.0, s.Catchment);
+                s.Stock.Gather(m, agent.LabourShare, s.Catchment);
                 return true;
             }
 
@@ -364,9 +364,8 @@ namespace Godless.Sim.Collective
                 for (int m = 0; m < p.Built.Cost.Length && m < count; m++) total += p.Built.Cost[m];
                 if (total <= 0) continue;
 
-                double left = 1.0 - (p.Placed / (double)total);
-                if (left <= 0.0) continue;
-                for (int m = 0; m < p.Built.Cost.Length && m < count; m++) _ordered[m] += p.Built.Cost[m] * left;
+                long[] owed = Construction.Owed(p);
+                for (int m = 0; m < owed.Length && m < count; m++) _ordered[m] += owed[m];
                 designed += total;
             }
 

@@ -47,6 +47,30 @@ namespace Godless.Sim.Drives
         /// <summary>Slept last night lodging, or in a family that did not fit its roof (S2N).</summary>
         public bool Crowded { get; internal set; }
 
+        /// <summary>Days in a row this person has been starving (S2V). Forty and they are lost.</summary>
+        public int HungryDays { get; internal set; }
+
+        /// <summary>At the place their activity is done this tick, rather than still walking there (S2V).</summary>
+        public bool Arrived { get; internal set; }
+
+        /// <summary>How their body looks this tick — stand, walk, sit, kneel, lie, work. Presentation reads it.</summary>
+        public string Pose { get; internal set; } = "stand";
+
+        /// <summary>Share of this tick left for their main activity after errands (S2V). Work is done at this rate.</summary>
+        public double LabourShare { get; internal set; } = 1.0;
+
+        /// <summary>The last errand this tick that had somewhere to go, by activity index, or -1 (S2V).</summary>
+        public int ErrandActivity { get; internal set; } = -1;
+
+        /// <summary>Errands done on the side this tick, in words ("eating", "drinking"), for anyone reading them.</summary>
+        public string Errands { get; internal set; } = "";
+
+        /// <summary>The day their own foraging spot was picked for (S2V), so it moves on daily.</summary>
+        internal long ForageDay;
+
+        /// <summary>Arrived and talking with others this tick (S2V), so others can come and join them.</summary>
+        public bool Talking { get; internal set; }
+
         /// <summary>
         /// Where this person stands, as a world column (S2G). Everyone starts
         /// at the hearth. The planning grid's parcel follows from it.
@@ -105,7 +129,7 @@ namespace Godless.Sim.Drives
             }
             d.Add(Activity);
             d.Add(ShelteredLastNight ? 1 : 0);
-            d.Add(Household); d.Add(Crowded ? 1 : 0);
+            d.Add(Household); d.Add(Crowded ? 1 : 0); d.Add(HungryDays); d.Add(Arrived ? 1 : 0);
             d.Add(X); d.Add(Z);
             d.Add(ProductiveTicks);
         }

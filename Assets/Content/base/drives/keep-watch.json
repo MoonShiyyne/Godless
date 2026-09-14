@@ -1,1 +1,9 @@
-{ "type": "activity", "id": "keep-watch", "requires": ["day", "hearth"], "relieves": { "safety": 0.2 } }
+{
+  "type": "activity",
+  "id": "keep-watch",
+  "requires": ["day", "hearth"],
+  "at": "fire",
+  "relieves": { "safety": 0.2 },
+  "doing": "keeping watch by the fire",
+  "pose": "stand"
+}

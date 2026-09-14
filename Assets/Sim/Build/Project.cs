@@ -45,6 +45,11 @@ namespace Godless.Sim.Build
         /// <summary>The cells to lay, bottom up. Built once, when building starts.</summary>
         internal List<int> Order;
 
+        // What is still to lay, material by material, and the state it was counted at.
+        internal long[] OwedCount;
+        internal int OwedPlaced = -1;
+        internal Structure OwedBuilt;
+
         public bool Complete { get; internal set; }
 
         /// <summary>Brought down (S2T). It is rubble now, and out of the settlement's buildings.</summary>

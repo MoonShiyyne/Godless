@@ -1,0 +1,15 @@
+{
+  "type": "activity",
+  "id": "forage",
+
+  // S2V. A hungry person does not wait for the village's foragers: they walk
+  // out to the wood or the shore, eat some of what they find, and carry the
+  // rest back to the store. The land gives what it gives (S2N's ceiling), so
+  // a hungry village on thin ground forages itself thinner.
+  "requires": ["day"],
+  "at": "wild",
+  "gathers": { "food": 1 },
+  "relieves": { "hunger": 0.25 },
+  "doing": "foraging",
+  "pose": "work"
+}

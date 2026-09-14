@@ -95,6 +95,9 @@ namespace Godless.Sim.Settlements
             if (Tasks != null) Tasks.Sync(this, streams);
         }
 
+        // S2V. Where the water is, found once.
+        internal List<Int3> WaterPointList;
+
         // S2N. Families, in the order they formed.
         internal readonly List<Household> HouseholdList = new List<Household>();
         internal int NextHousehold;

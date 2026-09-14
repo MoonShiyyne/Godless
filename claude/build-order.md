@@ -251,6 +251,39 @@ Registered alongside the block above:
 - Invariants (settled batch): every heap of rubble rests on something; every
   bed stands on a floor.
 
+### What S2V shipped: needs a person meets for themselves
+
+| ID | System | Deps | Tell |
+|----|--------|------|------|
+| S2V | Individual needs and actions | S12, S2G, S2N, S2S | One person kneels at the water while another eats by the store and a third walks to their own bed, each for their own reason |
+
+- **Needs** added to stratum 1's four: thirst, rest and company
+  (`drives/thirst.json`, `rest.json`, `company.json`); hunger now rises for
+  each person, not only when the store is empty.
+- **Actions have a place** (`at`: fire, store, home, bed, water, people, wild,
+  task): eat at the store, drink at the nearest shore, sleep in your own bed,
+  talk where others are talking, forage in the wild, rest at home. The walk is
+  part of the choice — a need weighs less the further its answer is.
+- **Errands and the tick:** a tick is six hours. An action that `takes` less
+  than a tick is an errand, done on the side when a need passes three quarters
+  of its threshold; the time and the walk come off that person's share of
+  work, so a builder who stopped to eat lays fewer voxels and a gatherer
+  carries less. Someone at work is drawn at work three ticks in four, and at
+  their errand the fourth.
+- **Relief comes from the place:** a main action relieves only when its place
+  is within the tick's walk. Foraging relieves hunger by what was actually
+  found, so bare ground feeds nobody.
+- **Starvation is per person:** a person at the worst of hunger for 40 days
+  is lost, the longest-starving first.
+- **Found on the way:** houses stalled near the top because gathering demand
+  took a share of each material's cost (`cost × (1 − placed/total)`), while
+  walls go up before roofs; the last 100 reed of a roof counted as 20.
+  `Construction.Owed` now counts what is still to lay, cell by cell.
+- Measured, ten years, seed 7: green shore 124 people, cold massif 74,
+  broad delta 111; a bare island houses 6 of 8 families by day 700.
+- Invariants (S2V, settled batch): every need lies between 0 and 1; no need is
+  at its worst for more than half a settlement.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

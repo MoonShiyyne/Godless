@@ -79,6 +79,29 @@ namespace Godless.Sim.Settlements
                         foreach (Build.Furnishing.Bed bed in p.Beds)
                             if (world.Voxels.Get(bed.Centre.X, bed.Centre.Y - 1, bed.Centre.Z) == VoxelTypes.AirId) floatingBeds++;
                 }
+                // S2V: every need a number a person can do something about, and
+                // no need left at its worst for most of the settlement at once.
+                long outOfRange = 0, worstPinned = 0;
+                foreach (Settlement s in world.Settlements)
+                {
+                    if (s.People.Count == 0) continue;
+                    int needs = s.People[0].Levels.Length;
+                    for (int n = 0; n < needs; n++)
+                    {
+                        long pinned = 0;
+                        foreach (Agent a in s.People)
+                        {
+                            double v = a.Levels[n];
+                            if (!(v >= 0.0 && v <= 1.0)) outOfRange++;
+                            if (v >= 0.999) pinned++;
+                        }
+                        long share = pinned * 100 / s.People.Count;
+                        if (share > worstPinned) worstPinned = share;
+                    }
+                }
+                into.Record("needs.out-of-range", outOfRange);
+                into.Record("needs.worst-pinned-percent", worstPinned);
+
                 into.Record("rubble.floating", floatingRubble);
                 into.Record("beds.floating", floatingBeds);
 
@@ -118,6 +141,13 @@ namespace Godless.Sim.Settlements
                     run => run.Metric("people.in-sea") == 0.0),
                 Invariant.PerRun("S2G", "everybody is somewhere on the island",
                     run => run.Metric("people.outside") == 0.0),
+
+                // S2V. Needs stay numbers between nothing and the worst, and people
+                // act on them: no one need sits at its worst for most of a village.
+                Invariant.PerRun("S2V", "every need level lies between 0 and 1",
+                    run => run.Metric("needs.out-of-range") == 0.0),
+                Invariant.PerRun("S2V", "no need is at its worst for most of a settlement",
+                    run => run.Metric("needs.worst-pinned-percent") <= 50.0),
 
                 // S2T. A fallen building's rubble lies on something; S2S, a bed stands on a floor.
                 Invariant.PerRun("S2T", "every heap of rubble rests on something",

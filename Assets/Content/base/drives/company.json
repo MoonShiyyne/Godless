@@ -1,0 +1,10 @@
+{
+  "type": "need",
+  "id": "company",
+  "tell": "Every few days people go and find each other to talk, and the ones who do it gather in little knots by the fire.",
+  "start": 0.1,
+  "drift": 0.03,
+  "threshold": 0.8,
+  "urgencyPower": 2,
+  "rises": {}
+}

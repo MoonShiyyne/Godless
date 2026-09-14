@@ -101,7 +101,9 @@ namespace Godless.Sim.Tests
             fed.Live(700);
             starving.Live(700);
 
-            Assert.True(fed.Town.Born > 0, "nobody was born on good ground");
+            Assert.True(fed.Town.Born > 0, "nobody was born on good ground: " + fed.Town.People.Count + " people, "
+                        + (int)fed.Town.Food + " meals, fed " + fed.Town.Fed + ", " + fed.Town.ShelterCapacity + " beds, "
+                        + fed.Houses + " houses, hungry days " + fed.Town.HungryDays);
             Assert.True(fed.Town.People.Count > 20, "the fed village did not grow: " + fed.Town.People.Count);
 
             Assert.True(starving.Town.Died > 0, "nobody was lost on bad ground");

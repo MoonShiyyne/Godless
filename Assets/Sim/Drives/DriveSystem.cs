@@ -40,18 +40,21 @@ namespace Godless.Sim.Drives
             foreach (Settlement s in world.Settlements)
             {
                 Sky sky = Weather.On(world.Streams, s.Biome, clock.TotalDays, clock.DaysPerYear);
-                Step(s, _rules, clock.Tick, night, sky, world.Annals);
+                Step(s, _rules, clock.Tick, night, sky, world.Annals, world.Island);
             }
         }
 
         /// <summary>One tick for one settlement. Public so tests and tools can drive the weather.</summary>
-        public static void Step(Settlement s, DriveRules rules, long tick, bool night, Sky sky, Annalist annals)
+        public static void Step(Settlement s, DriveRules rules, long tick, bool night, Sky sky, Annalist annals,
+                                World.IslandMap island = null)
         {
             NeedTable needs = rules.Needs;
             ActivityTable activities = rules.Activities;
             IReadOnlyList<Agent> people = s.People;
 
-            ulong belly = Conditions.Mask(s.Fed ? Conditions.Fed : Conditions.Hungry);
+            // With families (S2V) everyone eats for themselves, so the settlement's
+            // morning meal no longer moves anyone's hunger.
+            ulong belly = s.Households.Count > 0 ? 0UL : Conditions.Mask(s.Fed ? Conditions.Fed : Conditions.Hungry);
             ulong day = Conditions.Mask(Conditions.Day) | Conditions.Mask(Conditions.Hearth) | Weathered(sky) | belly;
             // A roof in a settlement with more people than beds is a shared
             // roof, and that presses on everyone under it (S1E).
@@ -98,13 +101,31 @@ namespace Godless.Sim.Drives
                 else { conditions = exposed; cause = exposure; }
 
                 Feel(a, needs, conditions, cause, blamed);
-                int chosen = Choose(a, needs, activities, conditions);
+
+                // Errands first (S2V): whatever presses and takes only part of the
+                // tick is done on the side, and the rest of the tick is what is
+                // left for everything else.
+                a.LabourShare = 1.0;
+                a.Errands = "";
+                a.ErrandActivity = -1;
+                if (families && !night) Errands(s, island, a, i, needs, activities, conditions);
+
+                int chosen = families ? ChooseOwn(s, island, a, i, needs, activities, conditions, night)
+                                      : Choose(a, needs, activities, conditions);
                 a.Activity = chosen;
                 if (chosen >= 0)
                 {
                     Activity act = activities[chosen];
-                    for (int n = 0; n < needs.Count; n++)
-                        if (act.Relieves[n] != 0.0) a.Levels[n] = SimMath.Clamp01(a.Levels[n] - act.Relieves[n]);
+
+                    // Done where it is done (S2V): somewhere to walk to counts on
+                    // arrival, which the movement system sees. Here and now, it counts now.
+                    bool walks = families && act.At != ActionPlace.Anywhere && act.At != ActionPlace.Task && !act.Productive;
+                    if (!walks)
+                    {
+                        for (int n = 0; n < needs.Count; n++)
+                            if (act.Relieves[n] != 0.0) a.Levels[n] = SimMath.Clamp01(a.Levels[n] - act.Relieves[n]);
+                        if (act.UsesFood > 0.0) s.Food = System.Math.Max(0.0, s.Food - act.UsesFood);
+                    }
                     if (act.Productive) a.ProductiveTicks++;
                     s.ActivityTicks[chosen]++;
                 }
@@ -165,6 +186,12 @@ namespace Godless.Sim.Drives
                 Activity act = activities[i];
                 if (!act.PossibleUnder(conditions)) continue;
 
+                // Somewhere to go that only a person with a place in the world
+                // can go (S2V): a settlement without families eats together at
+                // dawn and has no store to walk to, no water, no home of its own.
+                if (act.At == ActionPlace.Store || act.At == ActionPlace.Wild || act.At == ActionPlace.Water
+                    || act.At == ActionPlace.People || act.At == ActionPlace.Home) continue;
+
                 double u = act.Base;
                 for (int n = 0; n < needs.Count; n++)
                     if (act.Relieves[n] > 0.0) u += needs[n].Urgency(a.Levels[n]);
@@ -173,6 +200,91 @@ namespace Godless.Sim.Drives
             }
             return best;
         }
+
+        /// <summary>
+        /// A person with a place in the world choosing for themselves (S2V): the
+        /// same utility, less what only a store with food in it makes possible,
+        /// and less the walk — a drink a long way off has to be wanted more.
+        /// </summary>
+        static int ChooseOwn(Settlement s, World.IslandMap island, Agent a, int index, NeedTable needs,
+                             ActivityTable activities, ulong conditions, bool night)
+        {
+            int best = -1;
+            double bestUtility = double.NegativeInfinity;
+            for (int i = 0; i < activities.Count; i++)
+            {
+                Activity act = activities[i];
+                if (act.IsErrand) continue;                   // done on the side, above
+                if (!act.PossibleUnder(conditions)) continue;
+                if (act.UsesFood > 0.0 && s.Food < act.UsesFood) continue;
+
+                double u = act.Base;
+                for (int n = 0; n < needs.Count; n++)
+                    if (act.Relieves[n] > 0.0) u += needs[n].Urgency(a.Levels[n]);
+
+                if (act.At != ActionPlace.Anywhere && act.At != ActionPlace.Task && !act.Productive && !night)
+                {
+                    double walk = Settlements.Places.Distance(s, island, a, index, act.At, night);
+                    if (walk >= 100000.0) continue;          // nowhere to do it
+                    u -= walk / WalkPerUtility;
+                }
+
+                if (u > bestUtility) { bestUtility = u; best = i; }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// The errands a person does this tick: each one whose need is past
+        /// most of its threshold, that is possible, and that fits in what is
+        /// left of the tick with the walk there. Their effect is immediate —
+        /// they are done within the tick — and the time they take comes off the
+        /// person's share of the tick for work.
+        /// </summary>
+        static void Errands(Settlement s, World.IslandMap island, Agent a, int index, NeedTable needs,
+                            ActivityTable activities, ulong conditions)
+        {
+            double left = 1.0;
+            var done = new List<string>();
+            for (int i = 0; i < activities.Count; i++)
+            {
+                Activity act = activities[i];
+                if (!act.IsErrand || !act.PossibleUnder(conditions)) continue;
+                if (act.UsesFood > 0.0 && s.Food < act.UsesFood) continue;
+
+                bool presses = false;
+                for (int n = 0; n < needs.Count; n++)
+                    if (act.Relieves[n] > 0.0 && a.Levels[n] >= needs[n].Threshold * ErrandAt) presses = true;
+                if (!presses) continue;
+
+                double walk = act.At == ActionPlace.Anywhere ? 0.0 : Settlements.Places.Distance(s, island, a, index, act.At, false);
+                if (walk >= 100000.0) continue;
+                double cost = act.Takes + walk / VoxelsWalkedPerTick;
+                if (cost > left) continue;
+
+                for (int n = 0; n < needs.Count; n++)
+                    if (act.Relieves[n] != 0.0) a.Levels[n] = SimMath.Clamp01(a.Levels[n] - act.Relieves[n]);
+                if (act.UsesFood > 0.0) s.Food = System.Math.Max(0.0, s.Food - act.UsesFood);
+                left -= cost;
+                done.Add(act.Doing);
+                if (act.At != ActionPlace.Anywhere) a.ErrandActivity = i;
+            }
+            a.LabourShare = left;
+            a.Errands = string.Join(", ", done.ToArray());
+        }
+
+        /// <summary>Share of a need's threshold at which an errand for it gets done: before it is urgent, the way people eat before they starve.</summary>
+        public const double ErrandAt = 0.75;
+
+        /// <summary>
+        /// Voxels a person covers in a whole tick of walking: six hours at a
+        /// walking pace is many kilometres, so an errand's walk is a small share
+        /// unless the water is a long way off.
+        /// </summary>
+        public const double VoxelsWalkedPerTick = 2400.0;
+
+        /// <summary>Voxels of walking that cost as much as a full unit of need: a drink ninety metres off is a real errand.</summary>
+        public const double WalkPerUtility = 360.0;
 
         /// <summary>
         /// The roofs go to whoever needs one most; ties to founding order.

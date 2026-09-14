@@ -55,13 +55,14 @@ namespace Godless.Sim.Tests
             DepositMap deposits = world.Island.Deposits;
 
             int checkedWorkers = 0;
-            for (int day = 0; day < 40 && checkedWorkers < 10; day++)
+            for (int day = 0; day < 90 && checkedWorkers < 10; day++)
             {
                 for (int t = 0; t < world.Clock.TicksPerDay; t++) world.Tick();
                 if (world.Clock.TickOfDay == world.Clock.TicksPerDay - 1) continue;
 
                 foreach (Agent a in s.People)
                 {
+                    // Seen on an errand this tick (S2V) is not seen at the tree, and says so.
                     if (a.WorkingAt < 0 || !a.Doing.StartsWith("felling")) continue;
                     if (a.GoalX == s.Hearth.X && a.GoalZ == s.Hearth.Z) continue;   // the tree's side was sea
                     // Arrived, or on the way: never somewhere unrelated.
@@ -71,7 +72,7 @@ namespace Godless.Sim.Tests
                 }
             }
             _out.WriteLine(checkedWorkers + " fellers checked");
-            Assert.True(checkedWorkers > 0, "nobody felled anything in forty days");
+            Assert.True(checkedWorkers > 0, "nobody felled anything in ninety days");
         }
 
         [Fact]
