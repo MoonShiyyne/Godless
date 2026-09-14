@@ -54,7 +54,7 @@ namespace Godless.Sim.Build
         internal readonly Dictionary<string, Expr> Prefer = new Dictionary<string, Expr>();
 
         public static readonly string[] Preferences =
-            { "doorToFire", "doorToSun", "doorDownhill", "backIntoSlope", "nearKin", "wing", "storey", "apart" };
+            { "doorToFire", "doorToSun", "doorDownhill", "backIntoSlope", "nearKin", "nearWork", "wing", "storey", "apart" };
 
         /// <summary>A preference's weight for a genome, or zero if content gives none.</summary>
         public double Weight(string name, Genome genome)
@@ -109,12 +109,16 @@ namespace Godless.Sim.Build
             return null;
         }
 
-        static readonly string[] Known =
+        /// <summary>The facts about a parcel content expressions may read.</summary>
+        public static readonly string[] Known =
         {
             "field.sun", "field.snow", "field.damp", "field.exposure", "field.flood",
-            "parcel.slope", "parcel.height", "parcel.water", "parcel.hearth", "parcel.land", "parcel.wet",
+            "parcel.slope", "parcel.height", "parcel.elevation", "parcel.water", "parcel.hearth", "parcel.land", "parcel.wet",
             "intent.budget",
         };
+
+        /// <summary>Checks an expression reads only parcel facts and genes that exist; the fault in words, or null.</summary>
+        public static string Check(Expr e, GeneTable genes) { return CheckNames(e, genes); }
 
         public static SitingTable FromContent(ContentDatabase content, GeneTable genes, IntentKindTable intents = null)
         {
@@ -314,6 +318,13 @@ namespace Godless.Sim.Build
             return rule.Score.Eval(scope);
         }
 
+        /// <summary>A parcel's facts as an expression scope: fields, the grid, the genome (S2I: what crops are weighed on).</summary>
+        public static IExprScope Facts(Settlement settlement, ParcelGrid grid, ConstraintFields fields, Genome genome, int px, int pz)
+        {
+            return new ParcelScope { Fields = fields, Grid = grid, Genome = genome, X = px, Z = pz,
+                                     HearthX = settlement.HearthParcelX, HearthZ = settlement.HearthParcelZ };
+        }
+
         /// <summary>Walkable-from-the-fire parcels, once per planning pass (S1B).</summary>
         public static bool[] ReachableFromFire(Settlement settlement, ParcelGrid grid) { return Reachable(settlement, grid); }
 
@@ -406,6 +417,7 @@ namespace Godless.Sim.Build
                     case "field.flood": return Fields.FloodRisk[X, Z];
                     case "parcel.slope": return Grid.Slope[X, Z];
                     case "parcel.height": return Grid.Height[X, Z];
+                    case "parcel.elevation": return Grid.Height[X, Z] - (Fields != null ? Fields.SeaLevel : World.IslandMap.DefaultSeaLevel);
                     case "parcel.water": return Grid.WaterDistance[X, Z];
                     case "parcel.land": return Grid.IsLand(X, Z) ? 1.0 : 0.0;
                     case "parcel.wet": return Grid.WetColumns(X, Z);
@@ -418,6 +430,7 @@ namespace Godless.Sim.Build
                 }
                 if (name.StartsWith("gene.", System.StringComparison.Ordinal))
                 {
+                    if (Genome == null) return 0.5;
                     double v = Genome[Symbol.For(name)];
                     return double.IsNaN(v) ? 0.0 : v;
                 }

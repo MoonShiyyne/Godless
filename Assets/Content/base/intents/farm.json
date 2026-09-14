@@ -1,0 +1,19 @@
+{
+  "type": "intent",
+  "id": "farm",
+
+  "tell": "When the land round the fire no longer feeds everyone, fields are broken for the plough — and the chronicle can say which hungry months asked for them.",
+
+  // S2I. Hunger raises it: people past their threshold, day after day, once
+  // foraging no longer keeps up. Fields rather than a building.
+  "purpose": "farm",
+  "answers": "hunger",
+
+  // And the land picked clean day after day while food runs low: a village
+  // can be short of food long before anyone is past hungry.
+  "pressedBy": "shortage",
+  "threshold": 120,
+  "maxOpen": 1,
+  "halfLifeDays": 20,
+  "budgetVoxels": 0
+}

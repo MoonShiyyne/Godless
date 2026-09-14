@@ -87,7 +87,7 @@ namespace Godless.Sim.Build
                 string tell = doc["tell"].AsString(null);
                 string answers = doc["answers"].AsString("");
                 string pressedBy = doc["pressedBy"].AsString("");
-                int need = answers.Length == 0 && pressedBy.Length > 0 ? -1 : needs.IndexOf(answers);
+                int need = answers.Length == 0 ? -1 : needs.IndexOf(answers);
                 string purposeName = doc["purpose"].AsString("home");
                 double threshold = doc["threshold"].AsDouble(0.0);
                 int maxOpen = doc["maxOpen"].AsInt32(1);
@@ -95,7 +95,7 @@ namespace Godless.Sim.Build
 
                 string fault = null;
                 if (string.IsNullOrEmpty(tell) || tell.Trim().Length == 0) fault = "declares no tell";
-                else if (need < 0 && pressedBy.Length == 0) fault = "answers need '" + answers + "', which is not loaded";
+                else if (need < 0 && (answers.Length > 0 || pressedBy.Length == 0)) fault = "answers need '" + answers + "', which is not loaded";
                 else if (purposeName != "home" && purposeName != "store" && purposeName != "farm")
                     fault = "has purpose '" + purposeName + "'; a purpose is home, store or farm";
                 else if (!(threshold > 0.0)) fault = "has a threshold that is not above zero";

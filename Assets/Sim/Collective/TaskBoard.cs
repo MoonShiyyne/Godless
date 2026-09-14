@@ -219,6 +219,21 @@ namespace Godless.Sim.Collective
                 // Put a task down when nothing more of it is wanted, and
                 // otherwise now and then, to look round again.
                 int j = _current[i];
+
+                // Work that means one task (S2I: someone gone to the fields)
+                // takes that task while it is wanted, whatever they were doing.
+                string verb = _activities[a.Activity].TaskVerb;
+                if (verb.Length > 0)
+                {
+                    int meant = -1;
+                    for (int t = 0; t < tasks; t++) if (_kind[t].Verb == verb && _demand[t] > 0.0) { meant = t; break; }
+                    j = meant;
+                    if (j >= 0 && !Do(s, j, a, work, rng)) j = -1;
+                    _current[i] = j;
+                    if (j >= 0) { workers[j]++; _work[i][j]++; } else _idle++;
+                    Learn(i, j);
+                    continue;
+                }
                 if (j >= 0 && (_demand[j] <= 0.0 || Roll(rng) < _kind[j].QuitChance)) j = -1;
                 if (j < 0)
                 {
@@ -242,12 +257,7 @@ namespace Godless.Sim.Collective
                 if (j >= 0) { workers[j]++; _work[i][j]++; }
                 if (j < 0) _idle++;
 
-                for (int t = 0; t < tasks; t++)
-                {
-                    TaskKind k = _kind[t];
-                    double th = _threshold[i][t] + (t == j ? -k.Learn : k.Forget);
-                    _threshold[i][t] = th < k.ThresholdMin ? k.ThresholdMin : (th > k.ThresholdMax ? k.ThresholdMax : th);
-                }
+                Learn(i, j);
             }
 
             // Stimulus follows what is wanted now, smoothed, rather than
@@ -257,7 +267,9 @@ namespace Godless.Sim.Collective
             // houses it needed went unbuilt.
             for (int t = 0; t < tasks; t++)
             {
-                double target = _kind[t].StimulusGrowth * _demand[t] - _kind[t].WorkDone * workers[t];
+                double call = _kind[t].StimulusGrowth * _demand[t];
+                if (call > _kind[t].StimulusCap) call = _kind[t].StimulusCap;
+                double target = call - _kind[t].WorkDone * workers[t];
                 if (target < 0.0) target = 0.0;
                 _stimulus[t] += (target - _stimulus[t]) * Smoothing;
                 if (_stimulus[t] < 0.0) _stimulus[t] = 0.0;
@@ -265,6 +277,17 @@ namespace Godless.Sim.Collective
         }
 
         static double Roll(RngStream rng) { return rng.NextInt(1000000) / 1000000.0; }
+
+        /// <summary>Doing a task lowers a person's threshold for it; not doing the others raises theirs.</summary>
+        void Learn(int person, int doing)
+        {
+            for (int t = 0; t < _kind.Length; t++)
+            {
+                TaskKind k = _kind[t];
+                double th = _threshold[person][t] + (t == doing ? -k.Learn : k.Forget);
+                _threshold[person][t] = th < k.ThresholdMin ? k.ThresholdMin : (th > k.ThresholdMax ? k.ThresholdMax : th);
+            }
+        }
 
         /// <summary>
         /// The task with the kth loudest call for this person: its stimulus
@@ -299,6 +322,12 @@ namespace Godless.Sim.Collective
             {
                 if (work == null || work.Builder == null) return false;
                 return work.Builder.Work(s, agent, work.Grid, work.Tick, work.Annals, rng);
+            }
+
+            if (_kind[task].Verb == "farm")
+            {
+                if (work == null || s.Farms.Count == 0) return false;
+                return Farms.Work(s, agent, work.Tick, work.Annals);
             }
 
             if (_kind[task].Verb == "haul")
@@ -403,11 +432,23 @@ namespace Godless.Sim.Collective
                 // Every demand in the same unit — ticks of work it would take
                 // — so a settlement can weigh a house against a meal.
                 if (_kind[t].Verb == "build") { _demand[t] = Construction.Remaining(s) / 4.0; continue; }
+                if (_kind[t].Verb == "farm")
+                {
+                    // A tick in a field is worth many ticks foraging, and it is
+                    // only a few ticks: while food is short the plots waiting
+                    // call as loud as the hunger does, so they get their hands
+                    // before the whole village goes back to the woods.
+                    double fields = Farms.Wanted(s);
+                    _demand[t] = fields > 0.0 ? System.Math.Max(fields, FoodDemand(s) * 1.5) : 0.0;
+                    continue;
+                }
                 if (_kind[t].Verb == "haul")
                 {
-                    // Loads lying about, food counting for more while the store is low.
+                    // Loads lying about. Food lying in a field rots by the day, so
+                    // while any is out there it calls as loud as the hunger it
+                    // would answer — a harvest is fetched before it is lost.
                     double loads = work != null ? Hauling.Loads(s, work.Hauling) : 0.0;
-                    if (loads > 0.0 && s.Food < Subsistence.Wanted(s) * 0.5 && Hauling.Piled(s, -1) > 0.0) loads *= 2.0;
+                    if (loads > 0.0 && s.HarvestToFetch >= 1.0) loads = System.Math.Max(loads, FoodDemand(s) * 1.2 + 1.0);
                     _demand[t] = loads;
                     continue;
                 }
@@ -419,12 +460,13 @@ namespace Godless.Sim.Collective
                     // store and starve beside a full yard, which is what
                     // happened. An emptying store multiplies its own demand,
                     // so hunger takes the hands it needs and gives them back.
+                    // Loud as the hunger, but the task's stimulus cap (content)
+                    // stops it drowning every other call once enough are at it:
+                    // without one, at the food ceiling nothing else ever got a
+                    // hand again and no house went up for ten years.
                     double shortfall = Subsistence.Wanted(s) - s.Food - Hauling.Piled(s, -1);
-                    if (shortfall <= 0.0) { _demand[t] = 0.0; continue; }
-                    double days = s.People.Count > 0 ? s.Food / (s.People.Count * Subsistence.MealsADay) : 30.0;
-                    double urgency = days >= 30.0 ? 1.0 : 1.0 + 9.0 * (30.0 - days) / 30.0;
                     double rate = s.Catchment != null && s.Catchment.ForageRateNow > 0.0 ? s.Catchment.ForageRateNow : 1.0;
-                    _demand[t] = shortfall / rate * urgency;
+                    _demand[t] = shortfall <= 0.0 ? 0.0 : shortfall / rate * FoodUrgency(s);
                     continue;
                 }
 
@@ -446,6 +488,30 @@ namespace Godless.Sim.Collective
                 if (per <= 0.0) per = 1.0;
                 _demand[t] = d > 0.0 ? d / per : 0.0;
             }
+        }
+
+        /// <summary>
+        /// Food wanted, in ticks of foraging it would take: the shortfall
+        /// against a season in the store, louder the emptier the store.
+        /// </summary>
+        static double FoodDemand(Settlement s)
+        {
+            double shortfall = Subsistence.Wanted(s) - s.Food - Hauling.Piled(s, -1);
+            if (shortfall <= 0.0) return 0.0;
+            return shortfall / FoodRate(s) * FoodUrgency(s);
+        }
+
+        /// <summary>Meals a tick of foraging brings at the full rate.</summary>
+        static double FoodRate(Settlement s)
+        {
+            return s.Catchment != null && s.Catchment.FoodPerLabourTick > 0.0 ? s.Catchment.FoodPerLabourTick : 1.0;
+        }
+
+        /// <summary>How loud an emptying store makes food: once, up to ten times with nothing left.</summary>
+        static double FoodUrgency(Settlement s)
+        {
+            double days = s.People.Count > 0 ? s.Food / (s.People.Count * Subsistence.MealsADay) : 30.0;
+            return days >= 30.0 ? 1.0 : 1.0 + 9.0 * (30.0 - days) / 30.0;
         }
 
         public ulong Digest()

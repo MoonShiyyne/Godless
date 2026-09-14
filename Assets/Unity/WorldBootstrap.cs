@@ -277,6 +277,10 @@ namespace Godless.Unity
                       + "   " + Town.People.Count + " people, " + Town.ShelterCapacity + " sleeping places"
                       + "\nhouses: " + standing + " standing, " + under + " going up"
                       + "   intents " + Town.Intents.Intents.Count;
+                int plots = 0;
+                foreach (Farm farm in Town.Farms) plots += farm.Plots.Count;
+                text += "\nfood " + Town.Food.ToString("0") + "   farms " + Town.Farms.Count + " (" + plots + " plots)   stores keep "
+                      + Stores.Capacity(Town).ToString("0") + "   heaps " + Town.Piles.Count + "   rotted " + Town.FoodSpoiled.ToString("0");
             }
 
             if (GetComponent<SimSpeed>() != null) text += "\n" + SimSpeed.Keys + (GetComponent<CutawayView>() != null ? "   " + CutawayView.Keys : "");

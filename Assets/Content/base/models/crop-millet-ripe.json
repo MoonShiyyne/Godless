@@ -1,0 +1,67 @@
+{
+  // S2I. Millet ripe: tall stalks with heavy red-brown heads. One per ground column, 12.5 cm cells, rows along x.
+  "type": "model",
+  "id": "crop-millet-ripe",
+  "tell": "Each plot of a farm shows where it is in its round, a column of plants at a time: sprouts, then the crop's own growth, gold or red or broad-leaved when ripe, then stubble.",
+  "size": {
+    "x": 4,
+    "y": 7,
+    "z": 4
+  },
+  "paint": {
+    "s": {
+      "hue": 70,
+      "saturation": 35,
+      "value": 42
+    },
+    "r": {
+      "hue": 18,
+      "saturation": 55,
+      "value": 45
+    }
+  },
+  "layers": [
+    [
+      "s.s.",
+      "....",
+      "s.s.",
+      "...."
+    ],
+    [
+      "s.s.",
+      "....",
+      "s.s.",
+      "...."
+    ],
+    [
+      "s.s.",
+      "....",
+      "s.s.",
+      "...."
+    ],
+    [
+      "s.s.",
+      "....",
+      "s.s.",
+      "...."
+    ],
+    [
+      "s.s.",
+      "....",
+      "s.s.",
+      "...."
+    ],
+    [
+      "rrrr",
+      "....",
+      "rrrr",
+      "...."
+    ],
+    [
+      "r.r.",
+      "....",
+      "r.r.",
+      "...."
+    ]
+  ]
+}

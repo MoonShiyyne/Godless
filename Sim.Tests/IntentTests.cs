@@ -53,6 +53,23 @@ namespace Godless.Sim.Tests
                 S.AttachIntents(Bus);
             }
 
+            /// <summary>The home kind's index: since S2H and S2I there are store and farm kinds beside it.</summary>
+            public int K
+            {
+                get { for (int i = 0; i < Bus.Kinds.Count; i++) if (Bus.Kinds[i].Purpose == IntentPurpose.Home) return i; return -1; }
+            }
+
+            /// <summary>The shelter intents raised, in order; a hungry test town also asks for farms.</summary>
+            public System.Collections.Generic.List<BuildIntent> Shelters
+            {
+                get
+                {
+                    var list = new System.Collections.Generic.List<BuildIntent>();
+                    foreach (BuildIntent i in Bus.Intents) if (i.Kind.Purpose == IntentPurpose.Home) list.Add(i);
+                    return list;
+                }
+            }
+
             public void Live(int days, System.Func<long, Sky> weather = null)
             {
                 for (int i = 0; i < days; i++, Day++)
@@ -114,7 +131,7 @@ namespace Godless.Sim.Tests
             var town = new Town(20, 0);
             town.Live(10);
 
-            BuildIntent first = town.Bus.Intents[0];
+            BuildIntent first = town.Shelters[0];
             AnnalRecord raised = town.Annals.Get(first.Record);
 
             Assert.Equal(IntentBus.RaisedKind, raised.Kind);
@@ -146,15 +163,15 @@ namespace Godless.Sim.Tests
         {
             var town = new Town(20, 0);
             town.Live(20);
-            int max = town.Bus.Kinds[0].MaxOpen;
-            Assert.Equal(max, town.Bus.Intents.Count);
+            int max = town.Bus.Kinds[town.K].MaxOpen;
+            Assert.Equal(max, town.Shelters.Count);
 
-            BuildIntent newest = town.Bus.Intents[max - 1];
+            BuildIntent newest = town.Shelters[max - 1];
             double before = newest.Weight;
             town.Live(10);
-            Assert.Equal(max, town.Bus.Intents.Count);
+            Assert.Equal(max, town.Shelters.Count);
             Assert.True(newest.Weight > before, "the unanswered one grows more urgent");
-            Assert.Equal(0.0, town.Bus.Pending(0));
+            Assert.Equal(0.0, town.Bus.Pending(town.K));
         }
 
         [Fact]
@@ -162,7 +179,7 @@ namespace Godless.Sim.Tests
         {
             var town = new Town(20, 0);
             town.Live(20);
-            BuildIntent first = town.Bus.Intents[0];
+            BuildIntent first = town.Shelters[0];
 
             // Stand-in for S1A: a finished structure, caused by the intent.
             RecordId built = town.Annals.Write(town.Now, Symbol.For("structure.completed"), Symbol.For("structure.1"),
@@ -173,10 +190,10 @@ namespace Godless.Sim.Tests
             Assert.Equal(first.Record, r.Cause);
             Assert.Equal(new[] { built }, r.Contributors);
             Assert.Equal(IntentStatus.Resolved, first.Status);
-            Assert.Equal(1, town.Bus.OutstandingCount(0));
+            Assert.Equal(1, town.Bus.OutstandingCount(town.K));
 
             town.Live(10);
-            Assert.Equal(3, town.Bus.Intents.Count);
+            Assert.Equal(3, town.Shelters.Count);
         }
 
         [Fact]
@@ -184,7 +201,7 @@ namespace Godless.Sim.Tests
         {
             var town = new Town(20, 0);
             town.Live(20);
-            BuildIntent a = town.Bus.Intents[0], b = town.Bus.Intents[1];
+            BuildIntent a = town.Shelters[0], b = town.Shelters[1];
 
             town.Bus.Claim(a, town.Now, town.Annals, RecordId.None);
             Assert.Throws<System.InvalidOperationException>(() => town.Bus.Claim(a, town.Now, town.Annals, RecordId.None));
@@ -193,11 +210,11 @@ namespace Godless.Sim.Tests
             Assert.Throws<System.InvalidOperationException>(() => town.Bus.Abandon(a, town.Now, town.Annals, RecordId.None));
 
             town.Bus.Abandon(b, town.Now, town.Annals, RecordId.None);
-            Assert.Equal(0, town.Bus.OutstandingCount(0));
+            Assert.Equal(0, town.Bus.OutstandingCount(town.K));
 
             var other = new Town(20, 0);
             other.Live(20);
-            Assert.Throws<System.ArgumentException>(() => town.Bus.Claim(other.Bus.Intents[0], town.Now, town.Annals, RecordId.None));
+            Assert.Throws<System.ArgumentException>(() => town.Bus.Claim(other.Shelters[0], town.Now, town.Annals, RecordId.None));
         }
 
         [Fact]
@@ -206,11 +223,11 @@ namespace Godless.Sim.Tests
             var town = new Town(20, 20);
             int shelter = town.Rules.Needs.IndexOf("shelter");
             town.Bus.Add(shelter, 25, 25, 30.0, town.S.Founded);
-            Assert.Equal(30.0, town.Bus.Pending(0));
+            Assert.Equal(30.0, town.Bus.Pending(town.K));
 
             town.Live(400, d => Sky.Fair);   // twenty half-lives
-            Assert.Empty(town.Bus.Intents);
-            Assert.True(town.Bus.Pending(0) < 1e-3, "pending " + town.Bus.Pending(0));
+            Assert.Empty(town.Shelters);
+            Assert.True(town.Bus.Pending(town.K) < 1e-3, "pending " + town.Bus.Pending(town.K));
         }
 
         [Fact]
@@ -221,7 +238,7 @@ namespace Godless.Sim.Tests
             town.Bus.Add(shelter, 25, 26, 100.0, RecordId.None);
             town.Bus.Evaluate(town.S, 4, town.Annals);
 
-            BuildIntent i = town.Bus.Intents.Single();
+            BuildIntent i = town.Shelters.Single();
             Assert.Equal(new[] { town.S.Founded }, i.Causes);
             Assert.Equal(25, i.ParcelX);
             Assert.Equal(26, i.ParcelZ);

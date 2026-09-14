@@ -1,0 +1,16 @@
+{
+  "type": "task",
+  "id": "farm",
+  "tell": "Nobody is told to work the fields, yet the same few are always bent over them, sowing in one plot while the next is cut.",
+
+  "verb": "farm",
+
+  // Demand is labour ticks the plots want now, and a ripe plot will not wait.
+  "threshold": { "min": 0.03, "max": 0.8 },
+  "learn": 0.03,
+  "forget": 0.003,
+  "quitChance": 0.03,
+
+  "stimulusGrowth": 0.01,
+  "workDone": 0.03
+}

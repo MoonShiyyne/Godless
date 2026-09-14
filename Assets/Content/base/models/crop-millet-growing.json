@@ -1,0 +1,56 @@
+{
+  // S2I. Millet growing: sparse dark stalks in wide rows. One per ground column, 12.5 cm cells, rows along x.
+  "type": "model",
+  "id": "crop-millet-growing",
+  "tell": "Each plot of a farm shows where it is in its round, a column of plants at a time: sprouts, then the crop's own growth, gold or red or broad-leaved when ripe, then stubble.",
+  "size": {
+    "x": 4,
+    "y": 6,
+    "z": 4
+  },
+  "paint": {
+    "g": {
+      "hue": 110,
+      "saturation": 45,
+      "value": 38
+    }
+  },
+  "layers": [
+    [
+      "g.g.",
+      "....",
+      "g.g.",
+      "...."
+    ],
+    [
+      "g.g.",
+      "....",
+      "g.g.",
+      "...."
+    ],
+    [
+      "g.g.",
+      "....",
+      "g.g.",
+      "...."
+    ],
+    [
+      "g.g.",
+      "....",
+      "g.g.",
+      "...."
+    ],
+    [
+      "g.g.",
+      "....",
+      "g.g.",
+      "...."
+    ],
+    [
+      "....",
+      "....",
+      "....",
+      "...."
+    ]
+  ]
+}

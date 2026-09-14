@@ -36,6 +36,14 @@ namespace Godless.Sim.Collective
         /// <summary>Stimulus added per tick per unit of unmet demand.</summary>
         public double StimulusGrowth { get; internal set; }
 
+        /// <summary>
+        /// The loudest demand can call, before work done quiets it. A shortfall
+        /// of thousands of meals wants so many foragers and no more: past this,
+        /// the people already at it are enough to quiet the call, and the rest
+        /// are free for other work. Unbounded unless content says.
+        /// </summary>
+        public double StimulusCap { get; internal set; } = double.PositiveInfinity;
+
         /// <summary>Stimulus removed per worker-tick. Work done is what quiets the call for more.</summary>
         public double WorkDone { get; internal set; }
 
@@ -93,6 +101,7 @@ namespace Godless.Sim.Collective
                     Forget = doc["forget"].AsDouble(0.0),
                     QuitChance = doc["quitChance"].AsDouble(0.1),
                     StimulusGrowth = doc["stimulusGrowth"].AsDouble(0.001),
+                    StimulusCap = doc["stimulusCap"].AsDouble(double.PositiveInfinity),
                     WorkDone = doc["workDone"].AsDouble(0.05),
                     ReserveVoxels = doc["reserveVoxels"].AsInt32(0),
                 });

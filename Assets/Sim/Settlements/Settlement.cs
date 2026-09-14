@@ -63,9 +63,20 @@ namespace Godless.Sim.Settlements
         /// <summary>Meals in the store (S1E).</summary>
         public double Food { get; set; }
 
+        // Farms, in the order they were laid (S2I).
+        internal readonly List<Farm> FarmList = new List<Farm>();
+        public IReadOnlyList<Farm> Farms { get { return FarmList; } }
+
         // Heaps waiting to be carried in (S2X), in the order they were started.
         internal readonly List<Pile> PileList = new List<Pile>();
         public IReadOnlyList<Pile> Piles { get { return PileList; } }
+
+        /// <summary>Meals lying in the fields that there is somewhere to put, as of the last tick (S2X).</summary>
+        public double HarvestToFetch { get; internal set; }
+
+        /// <summary>Meals rotting a day, lately: a slow average the farms read before they grow (S2I).</summary>
+        public double RotPerDay { get; internal set; }
+        internal double SpoiledYesterday;
 
         /// <summary>Meals lost to rot so far (S2H).</summary>
         public double FoodSpoiled { get; internal set; }
@@ -73,6 +84,10 @@ namespace Godless.Sim.Settlements
         // The last food.spoiled record and when, so rotting is on record weekly rather than daily (S2H).
         internal Annals.RecordId SpoiledRecord = Annals.RecordId.None;
         internal long SpoiledTick;
+
+        // The last food.short record and when (S2I).
+        internal Annals.RecordId ShortRecord = Annals.RecordId.None;
+        internal long ShortTick;
 
         /// <summary>Whether everyone ate this morning.</summary>
         public bool Fed { get; internal set; }

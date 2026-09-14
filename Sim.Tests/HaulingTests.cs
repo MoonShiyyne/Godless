@@ -100,7 +100,16 @@ namespace Godless.Sim.Tests
             Assert.True(s.FoodSpoiled > spoiledBefore);
             Assert.NotEmpty(world.Annals.OfKind(Stores.SpoiledKind));
 
-            // And the heap is fetched in: food in the store grows, the heap shrinks.
+            // With no store and the larder by the fire full, it has nowhere to go:
+            // it stays in the field (and goes on rotting there).
+            HaulRules rules = HaulRules.FromContent(Content);
+            s.Food = s.People.Count * rules.LarderMealsPerPerson * 2;
+            double lying = heap.Amount;
+            for (int t = 0; t < world.Clock.TicksPerDay; t++) world.Tick();
+            Assert.True(!Contains(s, heap) ? false : heap.Amount >= lying * 0.9, "a heap was carried to a full larder");
+
+            // Room made, it is fetched in: food in hand grows, the heap shrinks.
+            s.Food = 0.0;
             double foodBefore = s.Food, heapBefore = heap.Amount;
             for (int t = 0; t < 8 * world.Clock.TicksPerDay && s.Piles.Count > 0; t++) world.Tick();
             Assert.True(heap.Amount < heapBefore * 0.5 || !Contains(s, heap), "the heap of food was not fetched in: " + heap.Amount.ToString("0"));

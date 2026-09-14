@@ -47,6 +47,13 @@ namespace Godless.Sim.Settlements
         /// <summary>Part of a tick spent picking a load up and putting it down, on top of the walk.</summary>
         public double HandlingTicks { get; private set; }
 
+        /// <summary>
+        /// Meals of harvest a person's share of the larder by the fire takes in
+        /// from the fields, with no store (S2H). A harvest is more than that:
+        /// the rest waits in the field, and rots, until there is a store to put it in.
+        /// </summary>
+        public double LarderMealsPerPerson { get; private set; }
+
         /// <summary>Detail models for a heap, smallest first, and the amount (in loads) each is shown from.</summary>
         internal readonly List<string> FoodModelList = new List<string>();
         internal readonly List<string> MaterialModelList = new List<string>();
@@ -65,6 +72,7 @@ namespace Godless.Sim.Settlements
                     LoadVoxels = doc["loadVoxels"].AsDouble(4.0),
                     LoadMeals = doc["loadMeals"].AsDouble(12.0),
                     HandlingTicks = doc["handlingTicks"].AsDouble(0.05),
+                    LarderMealsPerPerson = doc["larderMealsPerPerson"].AsDouble(double.PositiveInfinity),
                 };
                 JsonValue heaps = doc["heaps"];
                 for (int i = 0; i < heaps.Count; i++)
@@ -123,13 +131,23 @@ namespace Godless.Sim.Settlements
             return sum;
         }
 
-        /// <summary>Loads of work lying in heaps: the hauling task's demand.</summary>
+        /// <summary>Loads of work lying in heaps that can be carried somewhere now: the hauling task's demand.</summary>
         public static double Loads(Settlement s, HaulRules rules)
         {
             if (rules == null) return 0.0;
-            double loads = 0.0;
-            foreach (Pile p in s.PileList) loads += p.Amount / (p.IsFood ? rules.LoadMeals : rules.LoadVoxels);
-            return loads;
+            double loads = 0.0, food = 0.0;
+            foreach (Pile p in s.PileList)
+                if (p.IsFood) food += p.Amount; else loads += p.Amount / rules.LoadVoxels;
+            double room = RoomForFood(s, rules);
+            return loads + (food < room ? food : room) / rules.LoadMeals;
+        }
+
+        /// <summary>Meals of harvest there is somewhere to put: the stores' room and the larder's, less what is already kept.</summary>
+        public static double RoomForFood(Settlement s, HaulRules rules)
+        {
+            if (rules == null) return 0.0;
+            double room = Stores.Capacity(s) + s.People.Count * rules.LarderMealsPerPerson - s.Food;
+            return room > 0.0 ? room : 0.0;
         }
 
         /// <summary>Where a heap goes: food to the nearest store (the fire until there is one), material to the yard.</summary>
@@ -170,6 +188,7 @@ namespace Godless.Sim.Settlements
         {
             if (rules == null || s.PileList.Count == 0) return false;
             bool hungry = s.Food < Subsistence.Wanted(s) * 0.5;
+            double room = RoomForFood(s, rules);
 
             Pile best = null;
             double bestScore = double.NegativeInfinity;
@@ -177,6 +196,7 @@ namespace Godless.Sim.Settlements
             for (int i = 0; i < s.PileList.Count; i++)
             {
                 Pile p = s.PileList[i];
+                if (p.IsFood && room < 1.0) continue;   // nowhere to put it
                 int dx, dz;
                 string ignored;
                 Destination(s, p, out dx, out dz, out ignored);
@@ -199,6 +219,7 @@ namespace Godless.Sim.Settlements
             double capacity = best.IsFood ? rules.LoadMeals : rules.LoadVoxels;
             double moved = loadsNow * capacity;
             if (moved > best.Amount) moved = best.Amount;
+            if (best.IsFood && moved > room) moved = room;
 
             if (best.IsFood) s.Food += moved;
             else
@@ -312,6 +333,7 @@ namespace Godless.Sim.Settlements
             foreach (Settlement s in world.Settlements)
             {
                 if (world.Clock.IsFirstTickOfDay) Hauling.Weather(s, _food, world.Details, world.Clock.Tick, world.Annals);
+                s.HarvestToFetch = System.Math.Min(Hauling.Piled(s, -1), Hauling.RoomForFood(s, _rules));
                 Hauling.Show(s, _rules, world.Details, _models, _grid, world.VoxelTypes, world.Clock.Tick);
             }
         }

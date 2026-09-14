@@ -1,0 +1,17 @@
+{
+  "type": "voxel",
+  "id": "tilled",
+  "solid": true,
+  "hardness": 1,
+
+  // S2I. Ground broken for the plough: soil turned dark and wet-looking, so a
+  // field reads as a field from the whole-island view before anything grows.
+  // Scenery, like rubble: ground under your feet, never a building material,
+  // so the contrast rule between walls and roofs has nothing to say about it.
+  "ground": true,
+  "scenery": true,
+  "value": 30,
+  "hue": 26,
+  "saturation": 45,
+  "class": "earth"
+}

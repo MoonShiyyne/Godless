@@ -1,0 +1,44 @@
+{
+  // S2I. Barley growing: short, pale green rows. One per ground column, 12.5 cm cells, rows along x.
+  "type": "model",
+  "id": "crop-barley-growing",
+  "tell": "Each plot of a farm shows where it is in its round, a column of plants at a time: sprouts, then the crop's own growth, gold or red or broad-leaved when ripe, then stubble.",
+  "size": {
+    "x": 4,
+    "y": 4,
+    "z": 4
+  },
+  "paint": {
+    "g": {
+      "hue": 85,
+      "saturation": 40,
+      "value": 58
+    }
+  },
+  "layers": [
+    [
+      "....",
+      "gggg",
+      "....",
+      "gggg"
+    ],
+    [
+      "....",
+      "gggg",
+      "....",
+      "gggg"
+    ],
+    [
+      "....",
+      "gggg",
+      "....",
+      "gggg"
+    ],
+    [
+      "....",
+      "....",
+      "....",
+      "...."
+    ]
+  ]
+}

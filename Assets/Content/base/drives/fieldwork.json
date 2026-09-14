@@ -1,0 +1,18 @@
+{
+  "type": "activity",
+  "id": "fieldwork",
+
+  // S2I. While plots wait to be sown or cut, the hungry go to the fields
+  // rather than the woods: a tick of sowing feeds more people for longer than
+  // a tick of foraging, and everyone knows it. It is work — the task board
+  // says which plot — and it feeds nobody today, so once the plots are done
+  // the hungry go back to foraging.
+  "requires": ["day", "fields"],
+  "productive": true,
+  "base": 0.35,
+  "at": "task",
+  "task": "farm",
+  "relieves": { "hunger": 0.001 },
+  "doing": "working the fields",
+  "pose": "work"
+}

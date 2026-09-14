@@ -117,6 +117,12 @@ namespace Godless.Sim.Drives
         public string HaulWhat { get; internal set; } = "";
         public string HaulTo { get; internal set; } = "";
 
+        // S2I: the plot last worked — its middle column, its farm's record index, and the work.
+        public int FieldX { get; internal set; } = -1;
+        public int FieldZ { get; internal set; } = -1;
+        public int FieldFarm { get; internal set; } = -1;
+        public string FieldWork { get; internal set; } = "";
+
         /// <summary>Ticks spent on productive activity, ever.</summary>
         public long ProductiveTicks { get; internal set; }
 

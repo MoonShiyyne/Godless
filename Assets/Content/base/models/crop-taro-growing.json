@@ -1,0 +1,43 @@
+{
+  // S2I. Taro growing: a clump of broad dark leaves. One per ground column, 12.5 cm cells, rows along x.
+  "type": "model",
+  "id": "crop-taro-growing",
+  "tell": "Each plot of a farm shows where it is in its round, a column of plants at a time: sprouts, then the crop's own growth, gold or red or broad-leaved when ripe, then stubble.",
+  "size": {
+    "x": 4,
+    "y": 3,
+    "z": 4
+  },
+  "paint": {
+    "n": {
+      "hue": 120,
+      "saturation": 40,
+      "value": 35
+    },
+    "l": {
+      "hue": 130,
+      "saturation": 55,
+      "value": 40
+    }
+  },
+  "layers": [
+    [
+      "....",
+      ".nn.",
+      ".nn.",
+      "...."
+    ],
+    [
+      "....",
+      ".ll.",
+      ".ll.",
+      "...."
+    ],
+    [
+      ".ll.",
+      "llll",
+      "llll",
+      ".ll."
+    ]
+  ]
+}

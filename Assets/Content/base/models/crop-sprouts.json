@@ -1,0 +1,32 @@
+{
+  // S2I. Just sown: a green prickle along the furrows. One per ground column, 12.5 cm cells, rows along x.
+  "type": "model",
+  "id": "crop-sprouts",
+  "tell": "Each plot of a farm shows where it is in its round, a column of plants at a time: sprouts, then the crop's own growth, gold or red or broad-leaved when ripe, then stubble.",
+  "size": {
+    "x": 4,
+    "y": 2,
+    "z": 4
+  },
+  "paint": {
+    "g": {
+      "hue": 100,
+      "saturation": 55,
+      "value": 55
+    }
+  },
+  "layers": [
+    [
+      "....",
+      "g.g.",
+      "....",
+      ".g.g"
+    ],
+    [
+      "....",
+      "g...",
+      "....",
+      ".g.."
+    ]
+  ]
+}

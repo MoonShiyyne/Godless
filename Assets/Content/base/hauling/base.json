@@ -13,6 +13,12 @@
   // loads, one at the edge of the woods in ten.
   "handlingTicks": 0.05,
 
+  // S2H. With no store, the larder by the fire takes in about a fortnight of
+  // harvest a person. A field's harvest is more than that: the rest waits in
+  // the field, going grey, until there is a store to carry it to. Foraged
+  // food is eaten as it comes and never waits for room.
+  "larderMealsPerPerson": 15,
+
   // How a heap is drawn as it grows, in loads.
   "heaps": [
     { "fromLoads": 0.01, "food": "heap-sacks-small", "material": "heap-stack-small" },

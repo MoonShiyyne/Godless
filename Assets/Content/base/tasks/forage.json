@@ -14,5 +14,10 @@
   "quitChance": 0.05,
 
   "stimulusGrowth": 0.0025,
+
+  // S2I. However short food is, the call to forage goes no louder than this,
+  // so the people already foraging quiet it and the rest can build, farm and
+  // carry. Without it, a village at the food ceiling stopped building for good.
+  "stimulusCap": 2.5,
   "workDone": 0.03
 }

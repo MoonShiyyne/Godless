@@ -23,6 +23,10 @@
     "backIntoSlope": "lerp(1.2, 0.0, gene.elevation_bias)",
     "nearKin": "lerp(0.02, 0.2, gene.communal_ratio)",
 
+    // S2I. A family that works a farm would rather live by its fields; a
+    // communal culture minds the walk less than it minds leaving the fire.
+    "nearWork": "lerp(0.2, 0.06, gene.communal_ratio)",
+
     // S2P. What a crowded family would rather do than move out: add a wing
     // beside the house, add a storey on top of it, or build again apart.
     "wing": "lerp(0.4, 1.4, gene.communal_ratio)",

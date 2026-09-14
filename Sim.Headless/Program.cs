@@ -885,6 +885,7 @@ namespace Godless.Sim.Headless
             Profiled(world, cli, new SupportSystem(solid, materials, DetailModelTable.FromContent(db), grid));
             Profiled(world, cli, new TaskSystem(construction, grid, HaulRules.FromContent(db)));
             Profiled(world, cli, new HaulingSystem(HaulRules.FromContent(db), FoodRules.FromContent(db), DetailModelTable.FromContent(db), grid));
+            Profiled(world, cli, new FarmSystem(FarmRules.FromContent(db), CropTable.FromContent(db, genes), grid, constraints, DetailModelTable.FromContent(db)));
             Profiled(world, cli, new MovementSystem(grid, rules));
             world.BeginHistory();
 
@@ -1090,6 +1091,57 @@ namespace Godless.Sim.Headless
             if (s.Households.Count > 0)
             {
                 // S2N: who lives where.
+                // S2I, S2H, S2X: fields, stores and what is lying about.
+                Console.WriteLine("\nfarms (S2I): " + s.Farms.Count.ToString(c));
+                foreach (Farm f in s.Farms)
+                {
+                    int[] byState = new int[4];
+                    double fert = 0.0;
+                    foreach (Plot p in f.Plots) { byState[(int)p.State]++; fert += p.Fertility; }
+                    Console.WriteLine("  " + f.Record + " " + f.Crop.Name.PadRight(7) + f.Plots.Count.ToString(c).PadLeft(3) + " plots ("
+                        + byState[0].ToString(c) + " fallow, " + byState[1].ToString(c) + " growing, " + byState[2].ToString(c) + " ripe, "
+                        + byState[3].ToString(c) + " stubble), soil " + (fert / Math.Max(1, f.Plots.Count)).ToString("0.00", c)
+                        + ", " + f.MealsPerDay.ToString("0.0", c) + " meals a day; last weighed growing: " + f.LastGrowth);
+                }
+                int farmTask = -1;
+                for (int j = 0; j < s.Tasks.Count; j++) if (s.Tasks.KindOf(j).Verb == "farm") farmTask = j;
+                if (farmTask >= 0)
+                    Console.WriteLine("  farm task: demand " + s.Tasks.Demand(farmTask).ToString("0.0", c) + ", stimulus "
+                        + s.Tasks.Stimulus(farmTask).ToString("0.000", c) + ", " + s.Tasks.TotalWork(farmTask).ToString(c) + " ticks worked");
+                else Console.WriteLine("  no farm task on the board");
+                var hands = new SortedDictionary<string, int>();
+                for (int i = 0; i < s.People.Count; i++)
+                {
+                    int ct = s.Tasks.CurrentTask(i);
+                    string key = ct < 0 ? "(none)" : s.Tasks.TaskId(ct).ToString();
+                    hands[key] = (hands.ContainsKey(key) ? hands[key] : 0) + 1;
+                }
+                var handText = new List<string>();
+                foreach (KeyValuePair<string, int> kv in hands) handText.Add(kv.Key + " " + kv.Value.ToString(c));
+                Console.WriteLine("  hands now: " + string.Join(", ", handText));
+                for (int j = 0; j < s.Tasks.Count; j++)
+                    if (s.Tasks.Demand(j) > 0.0)
+                        Console.WriteLine("    " + s.Tasks.TaskId(j) + " demand " + s.Tasks.Demand(j).ToString("0.0", c) + " stimulus " + s.Tasks.Stimulus(j).ToString("0.00", c));
+                long harvests = world.Annals.OfKind(Farms.HarvestedKind).Count, sowings = world.Annals.OfKind(Farms.SownKind).Count;
+                Console.WriteLine("  " + sowings.ToString(c) + " sowings, " + harvests.ToString(c) + " harvests on record");
+                foreach (Project p in s.Projects)
+                {
+                    if (p.Complete || p.Destroyed || p.Built == null) continue;
+                    long[] owed = Construction.Owed(p);
+                    var bill = new List<string>();
+                    for (int m = 0; m < owed.Length; m++)
+                        if (owed[m] > 0)
+                            bill.Add(materials[m].Name + " " + owed[m].ToString(c) + " (held " + s.Stock.Of(m).ToString(c) + ", heaped "
+                                     + Hauling.Piled(s, m).ToString("0", c) + ", a tick brings " + s.Catchment.YieldPerLabourTick(m).ToString("0.00", c) + ")");
+                    Console.WriteLine("unfinished " + p.Site.Record + " " + p.Intent.Kind.Name + (p.Host != null ? " " + p.PartKind : "")
+                        + ": " + p.Placed.ToString(c) + " laid, begun " + p.Begun.Exists + ", ready " + Construction.Ready(s, p)
+                        + ", obtainable " + Construction.Obtainable(s, p) + "; owes " + string.Join(", ", bill));
+                }
+                Console.WriteLine("stores (S2H): " + Stores.Capacity(s).ToString("0", c) + " meals kept in stores; "
+                    + s.FoodSpoiled.ToString("0", c) + " meals rotted so far");
+                double heapedFood = Hauling.Piled(s, -1);
+                Console.WriteLine("heaps (S2X): " + s.Piles.Count.ToString(c) + ", " + heapedFood.ToString("0", c) + " meals of food lying about");
+
                 Households.Settle(s);
                 int housed = 0, crowded = 0, roofless = 0;
                 foreach (Household h in s.Households) { if (!h.Housed) roofless++; else if (h.Crowded) crowded++; else housed++; }

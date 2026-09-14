@@ -359,6 +359,15 @@ namespace Godless.Sim.Settlements
 
             // S2X: a tick at the heap, a tick at where it goes, turn about —
             // the loads in between are too many to draw one by one.
+            // S2I: in the plot, spread out a little so a field's hands are not one figure.
+            if (kind.Verb == "farm")
+            {
+                gx = a.FieldX + (i % 3) - 1;
+                gz = a.FieldZ + (i / 3 % 3) - 1;
+                doing = a.FieldWork;
+                return a.FieldX >= 0;
+            }
+
             if (kind.Verb == "haul")
             {
                 if ((tick + i) % 2 == 0) { gx = a.HaulFromX; gz = a.HaulFromZ; doing = "loading " + a.HaulWhat; }

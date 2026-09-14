@@ -33,6 +33,9 @@ namespace Godless.Sim.Drives
 
         /// <summary>How a body looks doing it: stand, sit, kneel, lie, work. Presentation reads it; the sim does not.</summary>
         public string Pose { get; internal set; }
+
+        /// <summary>For work that means one task (S2I: "farm"), the task's verb; empty for work the task board chooses.</summary>
+        public string TaskVerb { get; internal set; } = "";
         public Symbol Id { get; internal set; }
         public string Name { get; internal set; }
 
@@ -143,6 +146,7 @@ namespace Godless.Sim.Drives
                     Takes = SimMath.Clamp(doc["takes"].AsDouble(1.0), 0.05, 1.0),
                     Doing = doc["doing"].AsString(id),
                     Pose = doc["pose"].AsString("stand"),
+                    TaskVerb = doc["task"].AsString(""),
                 });
             }
 

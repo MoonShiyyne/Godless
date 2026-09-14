@@ -26,6 +26,10 @@ namespace Godless.Sim.Build
         /// <summary>A crowded family with a home, whose room this is for (S2P); null when it is for the roofless.</summary>
         public Household Crowded { get; private set; }
 
+        /// <summary>The fields most of the families' hands work, in parcels, or -1 (S2I).</summary>
+        public int WorkX { get; private set; } = -1;
+        public int WorkZ { get; private set; } = -1;
+
         /// <summary>Beds it must hold, the families' own and the room they will grow into.</summary>
         public int Beds { get; private set; }
 
@@ -112,8 +116,41 @@ namespace Godless.Sim.Build
                 p.KinZ = kin.Homes[0].Site.ParcelZ;
             }
 
+            // S2I: where the families' farm hands work, if most of their hands farm.
+            int fieldX = 0, fieldZ = 0, farming = 0, members = 0;
+            foreach (Household h in p.Families)
+                foreach (ulong id in h.Members)
+                    foreach (Drives.Agent a in s.People)
+                    {
+                        if (a.Id.Hash != id) continue;
+                        members++;
+                        if (a.FieldFarm >= 0 && s.Tasks != null && FarmsMost(s, a))
+                        { fieldX += a.FieldX / ParcelGrid.Size; fieldZ += a.FieldZ / ParcelGrid.Size; farming++; }
+                        break;
+                    }
+            if (farming > 0 && farming * 2 >= members)
+            {
+                p.WorkX = fieldX / farming;
+                p.WorkZ = fieldZ / farming;
+            }
+
             p.Overrides = new Dictionary<string, double> { { "capacity", p.Beds } };
             return p;
+        }
+
+        /// <summary>Whether the fields are this person's main work: more of their ticks than any other task.</summary>
+        static bool FarmsMost(Settlement s, Drives.Agent a)
+        {
+            int row = -1;
+            for (int i = 0; i < s.People.Count; i++) if (s.People[i] == a) { row = i; break; }
+            if (row < 0) return false;
+            long farm = 0, other = 0;
+            for (int t = 0; t < s.Tasks.Count; t++)
+            {
+                long w = s.Tasks.WorkBy(row, t);
+                if (s.Tasks.KindOf(t).Verb == "farm") farm += w; else if (w > other) other = w;
+            }
+            return farm > 0 && farm >= other;
         }
 
         static double Gene(Genome g, string name)
@@ -159,6 +196,7 @@ namespace Godless.Sim.Build
             double downhill = rule.Weight("doorDownhill", genome);
             double intoSlope = rule.Weight("backIntoSlope", genome);
             double nearKin = rule.Weight("nearKin", genome);
+            double nearWork = rule.Weight("nearWork", genome);
 
             bool[] reachable = SiteScorer.ReachableFromFire(s, grid);
             int baseDoor = plan.DoorSide();
@@ -181,7 +219,7 @@ namespace Godless.Sim.Build
                 {
                     var c = new Candidate { Plan = turned, Site = site, DoorSide = door };
                     c.Score = site.Score;
-                    Weigh(c, s, grid, program, toFire, toSun, downhill, intoSlope, nearKin);
+                    Weigh(c, s, grid, program, toFire, toSun, downhill, intoSlope, nearKin, nearWork);
                     if (best == null || c.Score > best.Score) best = c;
                 }
             }
@@ -189,7 +227,7 @@ namespace Godless.Sim.Build
         }
 
         static void Weigh(Candidate c, Settlement s, ParcelGrid grid, DwellingProgram program,
-                          double toFire, double toSun, double downhill, double intoSlope, double nearKin)
+                          double toFire, double toSun, double downhill, double intoSlope, double nearKin, double nearWork = 0.0)
         {
             Site site = c.Site;
             double cx = site.ParcelX + (site.ParcelsWide - 1) * 0.5, cz = site.ParcelZ + (site.ParcelsDeep - 1) * 0.5;
@@ -234,6 +272,12 @@ namespace Godless.Sim.Build
                 terms.Add(new KeyValuePair<double, string>(-nearKin * (d > 30.0 ? 30.0 : d),
                                                            program.Crowded != null ? "it stands by the family's old house"
                                                                                    : "it stands near the family it came from"));
+            }
+
+            if (program != null && program.WorkX >= 0)
+            {
+                double d = Distance((int)cx, (int)cz, program.WorkX, program.WorkZ);
+                terms.Add(new KeyValuePair<double, string>(-nearWork * (d > 30.0 ? 30.0 : d), "it stands near the fields they work"));
             }
 
             foreach (var t in terms) c.Score += t.Key;

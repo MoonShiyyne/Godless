@@ -55,7 +55,9 @@ namespace Godless.Sim.Drives
             // With families (S2V) everyone eats for themselves, so the settlement's
             // morning meal no longer moves anyone's hunger.
             ulong belly = s.Households.Count > 0 ? 0UL : Conditions.Mask(s.Fed ? Conditions.Fed : Conditions.Hungry);
-            ulong day = Conditions.Mask(Conditions.Day) | Conditions.Mask(Conditions.Hearth) | Weathered(sky) | belly;
+            ulong day = Conditions.Mask(Conditions.Day) | Conditions.Mask(Conditions.Hearth) | Weathered(sky) | belly
+                      | (s.Farms.Count > 0 && Settlements.Farms.Wanted(s) > 0.0 ? Conditions.Mask(Conditions.Fields) : 0UL)
+                      | (s.HarvestToFetch >= HarvestWorthFetching ? Conditions.Mask(Conditions.Harvest) : 0UL);
             // A roof in a settlement with more people than beds is a shared
             // roof, and that presses on everyone under it (S1E).
             // With families (S2N) crowding is each person's own: their family
@@ -272,6 +274,9 @@ namespace Godless.Sim.Drives
             a.LabourShare = left;
             a.Errands = string.Join(", ", done.ToArray());
         }
+
+        /// <summary>Meals lying in the fields that are worth downing tools to fetch (S2X).</summary>
+        public const double HarvestWorthFetching = 12.0;
 
         /// <summary>Share of a need's threshold at which an errand for it gets done: before it is urgent, the way people eat before they starve.</summary>
         public const double ErrandAt = 0.75;

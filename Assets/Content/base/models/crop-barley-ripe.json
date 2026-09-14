@@ -1,0 +1,55 @@
+{
+  // S2I. Barley ripe: pale straw rows, heads nodding over. One per ground column, 12.5 cm cells, rows along x.
+  "type": "model",
+  "id": "crop-barley-ripe",
+  "tell": "Each plot of a farm shows where it is in its round, a column of plants at a time: sprouts, then the crop's own growth, gold or red or broad-leaved when ripe, then stubble.",
+  "size": {
+    "x": 4,
+    "y": 5,
+    "z": 4
+  },
+  "paint": {
+    "p": {
+      "hue": 50,
+      "saturation": 35,
+      "value": 76
+    },
+    "h": {
+      "hue": 42,
+      "saturation": 45,
+      "value": 62
+    }
+  },
+  "layers": [
+    [
+      "....",
+      "pppp",
+      "....",
+      "pppp"
+    ],
+    [
+      "....",
+      "pppp",
+      "....",
+      "pppp"
+    ],
+    [
+      "....",
+      "pppp",
+      "....",
+      "pppp"
+    ],
+    [
+      "....",
+      "pppp",
+      "h.h.",
+      "pppp"
+    ],
+    [
+      "....",
+      "....",
+      "....",
+      "...."
+    ]
+  ]
+}

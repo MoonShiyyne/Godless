@@ -51,9 +51,13 @@ namespace Godless.Sim.World
         /// <summary>1 where water reaches in a flood, 0 where it never has.</summary>
         public InfluenceMap FloodRisk { get; private set; }
 
+        /// <summary>The island's sea level, so a parcel's height can be read as height above the sea (S2I).</summary>
+        public int SeaLevel { get; private set; } = IslandMap.DefaultSeaLevel;
+
         public static ConstraintFields Compute(IslandMap map, ParcelGrid grid, BiomeTable biomes)
         {
             var f = new ConstraintFields();
+            if (map != null) f.SeaLevel = map.SeaLevel;
             int size = ParcelGrid.Size;
 
             for (int pz = 0; pz < ParcelGrid.Depth; pz++)

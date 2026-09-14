@@ -1,0 +1,61 @@
+{
+  // S2I. Wheat ripe: tall gold rows with darker heads. One per ground column, 12.5 cm cells, rows along x.
+  "type": "model",
+  "id": "crop-wheat-ripe",
+  "tell": "Each plot of a farm shows where it is in its round, a column of plants at a time: sprouts, then the crop's own growth, gold or red or broad-leaved when ripe, then stubble.",
+  "size": {
+    "x": 4,
+    "y": 6,
+    "z": 4
+  },
+  "paint": {
+    "y": {
+      "hue": 45,
+      "saturation": 60,
+      "value": 68
+    },
+    "h": {
+      "hue": 38,
+      "saturation": 65,
+      "value": 55
+    }
+  },
+  "layers": [
+    [
+      "....",
+      "yyyy",
+      "....",
+      "yyyy"
+    ],
+    [
+      "....",
+      "yyyy",
+      "....",
+      "yyyy"
+    ],
+    [
+      "....",
+      "yyyy",
+      "....",
+      "yyyy"
+    ],
+    [
+      "....",
+      "yyyy",
+      "....",
+      "yyyy"
+    ],
+    [
+      "....",
+      "hyhy",
+      "....",
+      "hyhy"
+    ],
+    [
+      "....",
+      ".h.h",
+      "....",
+      ".h.h"
+    ]
+  ]
+}

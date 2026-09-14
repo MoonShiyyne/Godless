@@ -324,6 +324,9 @@ namespace Godless.Sim.Settlements
             foreach (int f in _vegetation)
                 if (_deposits.Standing(f))
                     ForagePerDay += _deposits.KindOf(f).Shape == FeatureShape.Tree ? MealsPerTreeDay : MealsPerTuftDay;
+            // Whether yesterday's foraging picked the land clean: what says the
+            // land alone no longer feeds the village (S2I).
+            PickedCleanYesterday = _forageLeft <= 0.0;
             _forageLeft = ForagePerDay;
 
             // How fast a forager fills a basket follows how much the land has
@@ -364,6 +367,12 @@ namespace Godless.Sim.Settlements
 
         /// <summary>Meals the land in reach gives up a day, however many forage it (S2N). Zero on a bare island, which is unlimited.</summary>
         public double ForagePerDay { get; private set; }
+
+        /// <summary>The land in reach gave up everything it had yesterday, and foragers were left with scraps (S2I).</summary>
+        public bool PickedCleanYesterday { get; private set; }
+
+        /// <summary>Meals the land in reach still gives up today at the full rate; after that, only scraps. Unbounded where there are no real deposits.</summary>
+        public double ForageLeft { get { return _deposits == null ? double.PositiveInfinity : _forageLeft; } }
 
         /// <summary>Meals a tick of foraging brings in right now: the full rate while today's yield lasts, scraps after.</summary>
         public double ForageRateNow

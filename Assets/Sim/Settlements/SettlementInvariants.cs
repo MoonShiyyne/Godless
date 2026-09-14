@@ -109,6 +109,22 @@ namespace Godless.Sim.Settlements
                         if (!(p.Amount >= 0.0) || (p.Detail >= 0 && world.Details.Get(p.Detail) == null)) badHeaps++;
                 into.Record("heaps.broken", badHeaps);
 
+                // S2I: every plot stands on ground its own farm claims, its soil a share
+                // of full, and every plant drawn on it exists. S2H: food is never below nothing.
+                long badPlots = 0, negativeFood = 0;
+                foreach (Settlement s in world.Settlements)
+                {
+                    if (!(s.Food >= 0.0)) negativeFood++;
+                    foreach (Farm f in s.Farms)
+                        foreach (Plot p in f.Plots)
+                        {
+                            if (s.ClaimOn(p.ParcelX, p.ParcelZ) != f.Record || !(p.Fertility >= 0.0 && p.Fertility <= 1.0)) badPlots++;
+                            foreach (int id in p.Details) if (world.Details.Get(id) == null) { badPlots++; break; }
+                        }
+                }
+                into.Record("plots.broken", badPlots);
+                into.Record("food.negative", negativeFood);
+
                 into.Record("rubble.floating", floatingRubble);
                 into.Record("beds.floating", floatingBeds);
 
@@ -155,6 +171,13 @@ namespace Godless.Sim.Settlements
                     run => run.Metric("needs.out-of-range") == 0.0),
                 Invariant.PerRun("S2V", "no need is at its worst for most of a settlement",
                     run => run.Metric("needs.worst-pinned-percent") <= 50.0),
+
+                // S2I. A field is its farm's ground, and what grows on it is drawn.
+                Invariant.PerRun("S2I", "every plot lies on its own farm's claim, with soil between none and full, drawn by details that exist",
+                    run => run.Metric("plots.broken") == 0.0),
+                // S2H. Rot and eating never take a store below empty.
+                Invariant.PerRun("S2H", "no settlement holds less than no food",
+                    run => run.Metric("food.negative") == 0.0),
 
                 // S2X. What waits to be carried is a real heap, drawn where it lies.
                 Invariant.PerRun("S2X", "every heap holds something and is drawn by a detail that exists",

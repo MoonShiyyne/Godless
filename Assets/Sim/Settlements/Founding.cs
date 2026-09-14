@@ -130,6 +130,8 @@ namespace Godless.Sim.Settlements
                  }, grid, HaulRules.FromContent(content)))
                  .Add(new HaulingSystem(HaulRules.FromContent(content), FoodRules.FromContent(content),
                                         DetailModelTable.FromContent(content), grid))
+                 .Add(new FarmSystem(FarmRules.FromContent(content), CropTable.FromContent(content, genes), grid, fields,
+                                     DetailModelTable.FromContent(content)))
                  .Add(new MovementSystem(grid, rules));
         }
 
