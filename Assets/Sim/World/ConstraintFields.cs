@@ -14,7 +14,7 @@ namespace Godless.Sim.World
     ///
     /// Every field runs 0 to 1 so a genome can weigh them against each other
     /// without knowing their units. They are computed once from the island and
-    /// change only when the ground does.
+    /// change only when the ground does (<see cref="Refresh"/>).
     /// </summary>
     public sealed class ConstraintFields
     {
@@ -58,10 +58,40 @@ namespace Godless.Sim.World
         {
             var f = new ConstraintFields();
             if (map != null) f.SeaLevel = map.SeaLevel;
+            int w = ParcelGrid.Width - 1, d = ParcelGrid.Depth - 1;
+            f.Fill(map, grid, biomes, 0, 0, w, d, 0, 0, w, d);
+            return f;
+        }
+
+        /// <summary>
+        /// Recomputes the fields over an inclusive rectangle of world columns
+        /// whose ground has changed, in place, so everything holding these
+        /// fields sees the new ground (S07: the god's brush). Sun reads the
+        /// parcels either side and exposure the three round, so the rectangle
+        /// is widened by as much. What reads the water table (damp, flood)
+        /// stays as worldgen left it until drainage is recomputed (S2J).
+        /// </summary>
+        public void Refresh(IslandMap map, ParcelGrid grid, BiomeTable biomes, int x0, int z0, int x1, int z1)
+        {
+            int p0x = x0 / ParcelGrid.Size, p0z = z0 / ParcelGrid.Size;
+            int p1x = x1 / ParcelGrid.Size, p1z = z1 / ParcelGrid.Size;
+            int w = ParcelGrid.Width - 1, d = ParcelGrid.Depth - 1;
+            Fill(map, grid, biomes,
+                 Clamp(p0x - 1, w), Clamp(p0z - 1, d), Clamp(p1x + 1, w), Clamp(p1z + 1, d),
+                 Clamp(p0x - 3, w), Clamp(p0z - 3, d), Clamp(p1x + 3, w), Clamp(p1z + 3, d));
+        }
+
+        static int Clamp(int v, int most) { return v < 0 ? 0 : (v > most ? most : v); }
+
+        /// <summary>The per-parcel fields over one rectangle of parcels, then exposure over another.</summary>
+        void Fill(IslandMap map, ParcelGrid grid, BiomeTable biomes,
+                  int a0x, int a0z, int a1x, int a1z, int e0x, int e0z, int e1x, int e1z)
+        {
+            ConstraintFields f = this;
             int size = ParcelGrid.Size;
 
-            for (int pz = 0; pz < ParcelGrid.Depth; pz++)
-                for (int px = 0; px < ParcelGrid.Width; px++)
+            for (int pz = a0z; pz <= a1z; pz++)
+                for (int px = a0x; px <= a1x; px++)
                 {
                     // The parcel's own columns: how high, how far above water,
                     // and which biome it mostly is.
@@ -104,8 +134,8 @@ namespace Godless.Sim.World
                 }
 
             // Exposure needs the neighbourhood, so it comes after the heights.
-            for (int pz = 0; pz < ParcelGrid.Depth; pz++)
-                for (int px = 0; px < ParcelGrid.Width; px++)
+            for (int pz = e0z; pz <= e1z; pz++)
+                for (int px = e0x; px <= e1x; px++)
                 {
                     double sum = 0.0;
                     int n = 0;
@@ -120,8 +150,6 @@ namespace Godless.Sim.World
                     double around = n > 0 ? sum / n : grid.Height[px, pz];
                     f.Exposure[px, pz] = SimMath.Clamp01(0.5 + (grid.Height[px, pz] - around) / 12.0);
                 }
-
-            return f;
         }
 
         public InfluenceMap Find(Symbol field)

@@ -77,6 +77,17 @@ namespace Godless.Sim.Deltas
                     + " has already been snapshotted. History would lose this change: advance the clock before writing.");
         }
 
+        /// <summary>
+        /// Whether a change at this tick could still be recorded: nothing newer
+        /// is on record and the tick has not been snapshotted. The god's hand
+        /// asks before acting in the present (S07).
+        /// </summary>
+        public bool CanRecord(long tick)
+        {
+            if (_deltas.Count > 0 && tick < _deltas[_deltas.Count - 1].Tick) return false;
+            return _snapshotTicks.Count == 0 || tick > LastSnapshotTick;
+        }
+
         internal void Append(VoxelDelta delta)
         {
             EnsureCanRecord(delta.Tick);

@@ -440,7 +440,17 @@ namespace Godless.Unity
         public void RunTicks(int ticks)
         {
             for (int i = 0; i < ticks; i++) World.Tick();
+            ShowChanges();
+        }
 
+        /// <summary>
+        /// Hands the renderer every voxel changed since it last looked, from
+        /// the delta log — the simulation's ticks and the god's hand alike, so
+        /// a stroke while paused is drawn at once and never drawn twice.
+        /// </summary>
+        public void ShowChanges()
+        {
+            if (World == null || View == null) return;
             IReadOnlyList<VoxelDelta> log = World.Voxels.Log.All();
             for (; _deltaCursor < log.Count; _deltaCursor++)
                 View.MarkDirty(ChunkStore.PositionOf(log[_deltaCursor].ChunkIndex, log[_deltaCursor].VoxelIndex));
@@ -502,9 +512,9 @@ namespace Godless.Unity
             if (GetComponent<SimSpeed>() != null) text += "\n" + SimSpeed.Keys + (GetComponent<CutawayView>() != null ? "   " + CutawayView.Keys : "") + (GetComponent<BorderView>() != null ? "   " + BorderView.Keys : "");
 
             TerrainEditor editor = GetComponent<TerrainEditor>();
-            if (editor != null) text += "\n" + editor.Status + "\nstrokes " + editor.Strokes;
+            if (editor != null) text += "\n" + TerrainEditor.Keys + "\n" + editor.Status + "   strokes " + editor.Strokes;
 
-            GUI.Label(new Rect(12, 10, 900, 210), text);
+            GUI.Label(new Rect(12, 10, 900, 240), text);
         }
 
         // ── the screens before the world runs ───────────────────────────────

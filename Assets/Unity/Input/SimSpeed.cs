@@ -6,7 +6,9 @@ namespace Godless.Unity
 {
     /// <summary>
     /// The speed controls: space to pause, number keys for a speed, brackets
-    /// to step up and down, full stop to take one day while paused.
+    /// to step up and down, N to take the next day while paused. Full stop and
+    /// comma are the timeline's (Timeline), and minus and equals the brush's
+    /// (TerrainEditor): one key, one thing.
     ///
     /// This component holds no state of its own. Everything it does is move
     /// the bootstrap's pacer, which decides how many whole ticks are due; the
@@ -26,7 +28,7 @@ namespace Godless.Unity
         void Awake() { _boot = GetComponent<WorldBootstrap>(); }
 
         /// <summary>What the keys are, for the HUD to say out loud.</summary>
-        public static string Keys { get { return "space pause   1-8 speed   [ ] slower faster   . step a day"; } }
+        public static string Keys { get { return "space pause   1-8 speed   [ ] slower faster   N next day"; } }
 
         void Update()
         {
@@ -50,7 +52,7 @@ namespace Godless.Unity
             // A step is the same ticks by another road: it goes through the
             // pacer's debt, so the frame budget and the mesher still get their
             // say and a held key cannot outrun the picture.
-            if (keys.periodKey.wasPressedThisFrame)
+            if (keys.nKey.wasPressedThisFrame)
                 pacer.Request(stepDays * _boot.World.Clock.TicksPerDay);
         }
     }

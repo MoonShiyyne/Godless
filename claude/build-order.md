@@ -481,6 +481,38 @@ Registered alongside the block above:
   yet carry myth or salience (S23, S24 will read them); the work party's
   afternoon is drawn but not taken off their own work.
 
+### The god's hand reaches the simulation (S07, S10 revisited)
+
+Found playing: the player's only verbs did not reach the people.
+
+- **A raised hill was a picture.** The brush wrote voxels and remeshed, and
+  nothing refreshed the planning grid, so a hill raised 36 voxels beside the
+  green-shore village (seed 7) still read flat on the grid a year later —
+  sited over, farmed and walked as if absent. Now the brush marks the grid
+  dirty (`ParcelGrid.MarkDirty`) and `World/GroundSystem`, first in the tick
+  order, refreshes it at the start of the next tick together with the
+  constraint fields over the same ground (`ConstraintFields.Refresh`, widened
+  for sun and exposure) and the deposits under it (`DepositMap.Recount`: a
+  wood buried under a hill is no longer there to fell).
+- **A stroke took a tick of its own.** Each stroke advanced the clock and
+  wrote into a tick no system ran; at a stroke every 0.08 s, holding the
+  mouse skipped about twelve ticks a second with nobody eating, working or
+  building. `GodHand` (raise, lower, bring down) acts on the present tick
+  instead; the Editor, `sim settle --demolish-day` and the tests all use it.
+  Every voxel still cites its `god.*` record, the delta log stays in tick
+  order, and the timeline and saves agree with it.
+- **Keys:** `[` `]` were both speed and brush size, and `.` was both "step a
+  day" and "timeline forward". Now `[` `]` speed, `-` `=` brush size, `N` next
+  day, `,` `.` the timeline.
+- Invariants (settled batch): a hill the god raises beside the fire is on the
+  grid by the next tick (S10), and a stroke moves the clock by no tick the
+  systems did not run (S07); every batch checks every tick counted was run (S01).
+- **Still S2J's:** water does not re-flow. The island's water table, rivers,
+  lakes and which columns are sea (`IslandMap.IsLand`, `HeightAboveWaterAt`)
+  stay as worldgen left them, so land raised out of the sea is still sea to a
+  walker, and damp and flood risk on a new hill read the old ground. Lowering
+  the ground under a tree leaves the tree standing on air.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.
@@ -864,9 +896,15 @@ need an Editor).
 - **Call `SimWorld.BeginHistory()` once worldgen finishes.** It snapshots the
   baseline every reconstruction replays from. Without it a world plays but
   cannot be scrubbed back.
-- **Advance the clock before writing voxels.** Snapshots are end-of-tick, so a
+- **Only `SimWorld.Tick` moves the clock.** Snapshots are end-of-tick, so a
   write on an already-snapshotted tick is refused; `VoxelWorld.Set` validates
-  before it touches the store, so a refused write leaves no trace.
+  before it touches the store, so a refused write leaves no trace. The old
+  answer — advance the clock before writing — made every brush stroke a tick
+  no system ran (a held mouse skipped three days a second). Acts from outside
+  the tick go through `World/GodHand`: they land on the present tick, and when
+  the present is closed (`DeltaLog.CanRecord` false: tick 0, or a snapshot
+  tick) the world runs its next tick whole first. `SimWorld.TicksRun` and the
+  S01 invariant hold the line.
 - **World digests compare contents, not allocation.** A chunk emptied back to
   air is freed. Two worlds with the same voxels digest the same.
 

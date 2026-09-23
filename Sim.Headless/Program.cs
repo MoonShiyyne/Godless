@@ -914,10 +914,9 @@ namespace Godless.Sim.Headless
                     foreach (Project candidate in s.Projects) if (candidate.Complete && candidate.Host == null) { target = candidate; break; }
                     if (target != null)
                     {
-                        RecordId by = world.Annals.Write(world.Clock.Tick, Symbol.For("god.brought-down"), s.Id,
-                                                         Construction.World(target, target.Plan.Width / 2, 0, target.Plan.Depth / 2), RecordId.None);
                         int parts = target.Added.Count;
-                        int fell = Collapse.BringDown(world, s, target, by, solid, materials, DetailModelTable.FromContent(db), grid);
+                        int fell = new GodHand(world, grid).BringDown(s, target,
+                                       Construction.World(target, target.Plan.Width / 2, 0, target.Plan.Depth / 2));
                         Console.WriteLine("  -- day " + world.Clock.TotalDays.ToString(c) + ": a god brought down " + target.Site.Record + " and "
                             + parts.ToString(c) + " addition(s); " + fell.ToString(c) + " voxels fell");
                     }

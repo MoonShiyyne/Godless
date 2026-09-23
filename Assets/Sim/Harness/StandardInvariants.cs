@@ -31,6 +31,12 @@ namespace Godless.Sim.Harness
                 Invariant.PerRun("S01", "the clock lands exactly on the requested year",
                     run => run.Ticks == (long)run.Years * 360L * 4L),
 
+                // S01 — and every one of those ticks was run: needs, work and
+                // building all had their turn. Nothing moves the clock but a
+                // tick, not even the god's hand (S07).
+                Invariant.PerRun("S01", "every tick the clock counted was run by the systems",
+                    run => run.Metric("clock.ticks-not-run") == 0.0),
+
                 // S03 — the island stays resident. Measured at ~2 MB for a
                 // full surface; this fails long before a profiler would.
                 // A full island surface measures about 14 MB at 1024 columns

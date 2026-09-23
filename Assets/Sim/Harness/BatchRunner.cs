@@ -83,6 +83,7 @@ namespace Godless.Sim.Harness
 
             result.Record("annals.count", world.Annals.Count);
             result.Record("deltas.count", world.Voxels.Log.Count);
+            result.Record("clock.ticks-not-run", world.Clock.Tick - world.TicksRun);
             result.Record("world.chunks", world.Voxels.Store.AllocatedChunks);
             result.Record("world.megabytes", world.Voxels.Store.MemoryBytes / 1048576.0);
             return result;

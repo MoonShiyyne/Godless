@@ -265,6 +265,53 @@ namespace Godless.Sim.World
         }
 
         /// <summary>
+        /// Reads back what is left of every feature near a rectangle of
+        /// columns after something other than gathering changed the ground
+        /// there: the god's brush burying a wood under a hill or planing a
+        /// boulder off (S07). A feature's voxel that is no longer its material
+        /// is gone from it — a tree whose trunk is buried is gone whole, and
+        /// rock or earth loses what was taken off it as if it had been dug.
+        /// Nothing is scheduled to grow back where it was buried; Regrow would
+        /// refuse the ground anyway. Returns how many features lost anything.
+        /// </summary>
+        public int Recount(ChunkStore store, int x0, int z0, int x1, int z1)
+        {
+            int lost = 0;
+            var here = new List<int>();
+            var cells = new List<Int3>();
+            const int widest = 16;  // no feature reaches further than this from where it stands (a tree's size is its height)
+            for (int pz = (z0 - widest) / ParcelGrid.Size - 1; pz <= (z1 + widest) / ParcelGrid.Size + 1; pz++)
+                for (int px = (x0 - widest) / ParcelGrid.Size - 1; px <= (x1 + widest) / ParcelGrid.Size + 1; px++)
+                {
+                    here.Clear();
+                    InParcel(px, pz, here);
+                    foreach (int f in here)
+                    {
+                        if (_remaining[f] <= 0) continue;
+                        int reach = _size[f];
+                        if (_x[f] + reach < x0 || _x[f] - reach > x1 || _z[f] + reach < z0 || _z[f] - reach > z1) continue;
+                        FeatureKind kind = _kinds[_kind[f]];
+                        bool plant = kind.Shape == FeatureShape.Tree || kind.Shape == FeatureShape.Tuft;
+                        if (plant && !_standing[f]) continue;   // already felled: what is left lies in the yard's reckoning
+
+                        cells.Clear();
+                        Cells(kind, _x[f], _y[f], _z[f], _size[f], cells, yielding: true);
+                        int present = 0;
+                        foreach (Int3 at in cells)
+                            if (ChunkStore.InBounds(at.X, at.Y, at.Z) && store.Get(at) == kind.Voxel) present++;
+
+                        int left = present * kind.PerVoxel;
+                        if (left >= _remaining[f]) continue;
+                        _remaining[f] = left;
+                        if (plant && present == 0) _standing[f] = false;
+                        if (!plant && _voxels[f] - present > _dug[f]) _dug[f] = _voxels[f] - present;
+                        lost++;
+                    }
+                }
+            return lost;
+        }
+
+        /// <summary>
         /// Grows back whatever is due by this tick, into air only — a house
         /// built over a felled wood stays a house. Each regrowth names the cut
         /// that made room for it. Returns how many came back.

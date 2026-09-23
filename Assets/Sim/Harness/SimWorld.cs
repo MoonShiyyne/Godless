@@ -99,9 +99,18 @@ namespace Godless.Sim.Harness
             Voxels.Log.Snapshot(Clock.Tick, Voxels.Store);
         }
 
+        /// <summary>
+        /// Ticks this world has run through its systems. The clock may only
+        /// move here, so on a world begun at tick 0 the two agree; a tick the
+        /// clock counted that no system ran is a tick of nobody eating,
+        /// working or building (the old god's brush took a dozen a second).
+        /// </summary>
+        public long TicksRun { get; private set; }
+
         public void Tick()
         {
             Clock.Advance();
+            TicksRun++;
             for (int i = 0; i < _systems.Count; i++) _systems[i].Tick(this);
             Voxels.EndTick(Clock.Tick);
         }

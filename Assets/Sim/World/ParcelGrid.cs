@@ -123,6 +123,44 @@ namespace Godless.Sim.World
             Version++;
         }
 
+        // Ground changed since the last refresh by something that does not
+        // refresh the grid itself (the god's brush): columns, inclusive.
+        bool _pending;
+        int _px0, _pz0, _px1, _pz1;
+
+        /// <summary>Whether ground has changed that the grid has not read yet.</summary>
+        public bool HasPending { get { return _pending; } }
+
+        /// <summary>
+        /// Notes a rectangle of columns whose ground changed, to be read at the
+        /// start of the next tick (<see cref="GroundSystem"/>) rather than once
+        /// per stroke: a held brush lands a dozen strokes a second.
+        /// </summary>
+        public void MarkDirty(int x0, int z0, int x1, int z1)
+        {
+            if (!_pending) { _px0 = x0; _pz0 = z0; _px1 = x1; _pz1 = z1; _pending = true; return; }
+            if (x0 < _px0) _px0 = x0;
+            if (z0 < _pz0) _pz0 = z0;
+            if (x1 > _px1) _px1 = x1;
+            if (z1 > _pz1) _pz1 = z1;
+        }
+
+        /// <summary>
+        /// Refreshes whatever <see cref="MarkDirty"/> noted, and hands back the
+        /// columns it covered (clamped to the world) so what is derived from
+        /// the grid can follow. False when nothing was pending.
+        /// </summary>
+        public bool RefreshPending(ChunkStore store, out int x0, out int z0, out int x1, out int z1)
+        {
+            x0 = System.Math.Max(0, _px0); z0 = System.Math.Max(0, _pz0);
+            x1 = System.Math.Min(ChunkStore.SizeX - 1, _px1); z1 = System.Math.Min(ChunkStore.SizeZ - 1, _pz1);
+            if (!_pending) return false;
+            _pending = false;
+            if (x0 > x1 || z0 > z1) return false;
+            Refresh(store, x0, z0, x1, z1);
+            return true;
+        }
+
         static bool Matches(bool[] table, ushort id) { return id < table.Length && table[id]; }
         static int Clamp(int v, int n) { return v < 0 ? 0 : (v >= n ? n - 1 : v); }
 

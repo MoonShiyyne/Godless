@@ -196,9 +196,9 @@ namespace Godless.Sim.Settlements
         }
 
         /// <summary>
-        /// The stratum-1 systems, in tick order: needs, then what the
-        /// settlement decides to ask for, then where it puts it, then who does
-        /// the work of gathering and building it.
+        /// The stratum-1 systems, in tick order: the ground as the god left it,
+        /// then needs, then what the settlement decides to ask for, then where
+        /// it puts it, then who does the work of gathering and building it.
         /// </summary>
         public static void AddSystems(SimWorld world, ContentDatabase content, ParcelGrid grid,
                                       ConstraintFields fields, BiomeTable biomes)
@@ -209,7 +209,8 @@ namespace Godless.Sim.Settlements
             TileSet tiles = TileSet.FromContent(content, materials);
             Palette palette = Palette.FromContent(content);
 
-            world.Add(new DriveSystem(rules))
+            world.Add(new GroundSystem(grid, fields, biomes))
+                 .Add(new DriveSystem(rules))
                  .Add(new Subsistence(rules))
                  .Add(new StoreSystem(FoodRules.FromContent(content)))
                  .Add(new IntentSystem())

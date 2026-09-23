@@ -196,7 +196,64 @@ namespace Godless.Sim.Settlements
                     }
                 into.Record("deposits.overfull", overfull);
                 into.Record("deposits.worked", worked);
+
+                // Last, because it changes the world it measures.
+                GodStroke(world, into);
             };
+        }
+
+        /// <summary>
+        /// S07, S10: the god raises a hill beside the first fire of a lived-in
+        /// world. The next tick's planning grid must read the ground the brush
+        /// left, parcel for parcel, and the clock must have moved only by ticks
+        /// the systems ran — the brush used to take a tick of its own per stroke.
+        /// </summary>
+        static void GodStroke(SimWorld world, RunResult into)
+        {
+            GroundSystem ground = null;
+            foreach (ISimSystem system in world.Systems)
+                if (system is GroundSystem g) { ground = g; break; }
+            if (ground == null || ground.Grid == null || world.Settlements.Count == 0) return;
+
+            ParcelGrid grid = ground.Grid;
+            Settlement first = world.Settlements[0];
+            int px = -1, pz = -1;
+            int[] offsets = { 6, 0, -6, 0, 0, 6, 0, -6 };
+            for (int i = 0; i < offsets.Length && px < 0; i += 2)
+            {
+                int x = first.HearthParcelX + offsets[i], z = first.HearthParcelZ + offsets[i + 1];
+                if (ParcelGrid.InBounds(x, z) && grid.IsLand(x, z)) { px = x; pz = z; }
+            }
+            if (px < 0) return;
+
+            var hand = new GodHand(world, grid);
+            int cx = px * ParcelGrid.Size + ParcelGrid.Size / 2, cz = pz * ParcelGrid.Size + ParcelGrid.Size / 2;
+            const int radius = 6;
+            long clock = world.Clock.Tick, ran = world.TicksRun;
+            hand.Raise(new Int3(cx, grid.GroundAt(cx, cz), cz), radius, 10);
+
+            // What the grid should read, taken from the ground as the brush left it.
+            int p0x = (cx - radius) / ParcelGrid.Size, p1x = (cx + radius) / ParcelGrid.Size;
+            int p0z = (cz - radius) / ParcelGrid.Size, p1z = (cz + radius) / ParcelGrid.Size;
+            var expected = new double[(p1x - p0x + 1) * (p1z - p0z + 1)];
+            for (int z = p0z; z <= p1z; z++)
+                for (int x = p0x; x <= p1x; x++)
+                {
+                    int sum = 0;
+                    for (int dz = 0; dz < ParcelGrid.Size; dz++)
+                        for (int dx = 0; dx < ParcelGrid.Size; dx++)
+                            sum += world.Voxels.Store.TopMatching(x * ParcelGrid.Size + dx, z * ParcelGrid.Size + dz, hand.Solid);
+                    expected[(z - p0z) * (p1x - p0x + 1) + x - p0x] = sum / (double)(ParcelGrid.Size * ParcelGrid.Size);
+                }
+
+            world.Tick();
+
+            long stale = 0;
+            for (int z = p0z; z <= p1z; z++)
+                for (int x = p0x; x <= p1x; x++)
+                    if (grid.Height[x, z] != expected[(z - p0z) * (p1x - p0x + 1) + x - p0x]) stale++;
+            into.Record("god.stale-parcels", stale);
+            into.Record("god.ticks-not-run", (world.Clock.Tick - clock) - (world.TicksRun - ran));
         }
 
         static bool Contains(IReadOnlyList<Build.Project> list, Build.Project p)
@@ -209,6 +266,13 @@ namespace Godless.Sim.Settlements
         {
             return new List<Invariant>
             {
+                // S07, S10. The god's hand reaches the ground people plan on, in
+                // the tick after it lands, and takes no tick of its own.
+                Invariant.PerRun("S10", "a hill the god raises is on the planning grid by the next tick",
+                    run => run.Metric("god.stale-parcels") == 0.0),
+                Invariant.PerRun("S07", "a stroke of the brush moves the clock by no tick the systems did not run",
+                    run => run.Metric("god.ticks-not-run") == 0.0),
+
                 // S2G. People go where their work and their needs put them, and
                 // none of that is ever out in the sea or off the edge of the world.
                 Invariant.PerRun("S2G", "nobody stands in the sea",

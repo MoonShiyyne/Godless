@@ -1,8 +1,6 @@
-using Godless.Sim.Settlements;
 using Godless.Sim.Build;
-using System.Collections.Generic;
-using Godless.Sim.Annals;
-using Godless.Sim.Core;
+using Godless.Sim.Harness;
+using Godless.Sim.Settlements;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using UnityEngine;
@@ -15,16 +13,18 @@ namespace Godless.Unity
     ///
     ///   left-click / hold          raise
     ///   shift + left-click / hold  lower
-    ///   [ and ]                    brush radius
+    ///   - and =                    brush radius
+    ///   X                          bring down the building under the pointer
     ///
-    /// Everything real happens in the sim: VoxelRaycast finds the column,
-    /// TerrainBrush moves it, and every voxel is written through
-    /// VoxelWorld.Set under an annal record naming the stroke. This class
-    /// only turns a mouse into those calls.
+    /// Everything real happens in the sim: VoxelRaycast finds the column and
+    /// GodHand does the rest — the brush, the god.* record every voxel cites,
+    /// and marking the planning grid, which reads the new ground at the start
+    /// of the next tick. This class only turns a mouse into those calls.
     ///
-    /// Each stroke advances the clock before it writes. History snapshots at
-    /// the end of a tick, and a change landing on a tick already snapshotted
-    /// would be refused — the guard that stroke used to trip.
+    /// A stroke lands on the tick the world is at. It used to advance the
+    /// clock first, so a held button ran a dozen ticks a second that no system
+    /// saw; GodHand only moves the world on when history has already closed
+    /// the present, and then by a whole tick with every system in it.
     /// </summary>
     [RequireComponent(typeof(WorldBootstrap))]
     public sealed class TerrainEditor : MonoBehaviour
@@ -36,13 +36,15 @@ namespace Godless.Unity
 
         WorldBootstrap _boot;
         Timeline _timeline;
-        bool[] _solid;
-        ushort _stone, _water;
+        GodHand _hand;
+        SimWorld _handWorld;
         float _nextStroke;
-        readonly List<Int3> _changed = new List<Int3>();
 
         public int Strokes { get; private set; }
         public string Status { get; private set; }
+
+        /// <summary>What the keys are, for the HUD to say out loud.</summary>
+        public static string Keys { get { return "click raise   shift-click lower   - = brush size   X bring down the building under the pointer"; } }
 
         void Awake()
         {
@@ -50,23 +52,29 @@ namespace Godless.Unity
             _timeline = GetComponent<Timeline>();
         }
 
+        /// <summary>The hand for the world on screen, made again when the world is.</summary>
+        GodHand Hand()
+        {
+            SimWorld world = _boot.World;
+            if (world == null) return null;
+            if (_hand == null || _handWorld != world)
+            {
+                _hand = new GodHand(world, _boot.Parcels, _boot.Ground);
+                _handWorld = world;
+            }
+            return _hand;
+        }
+
         void Update()
         {
             var world = _boot.World;
             if (world == null || _boot.Phase != WorldBootstrap.SetupPhase.Playing) return;   // no god before there is anyone
 
-            if (_solid == null)
-            {
-                _solid = TerrainBrush.SolidTable(world.Content, world.VoxelTypes);
-                _stone = world.VoxelTypes.IdOf(Symbol.For("voxel.granite"));
-                _water = world.VoxelTypes.IdOf(Symbol.For("voxel.water"));
-            }
-
             Keyboard keys = Keyboard.current;
             if (keys != null)
             {
-                if (keys.leftBracketKey.wasPressedThisFrame) radius = Mathf.Max(1, radius - 1);
-                if (keys.rightBracketKey.wasPressedThisFrame) radius = Mathf.Min(24, radius + 1);
+                if (keys.minusKey.wasPressedThisFrame || keys.numpadMinusKey.wasPressedThisFrame) radius = Mathf.Max(1, radius - 1);
+                if (keys.equalsKey.wasPressedThisFrame || keys.numpadPlusKey.wasPressedThisFrame) radius = Mathf.Min(24, radius + 1);
             }
 
             Mouse mouse = Mouse.current;
@@ -78,7 +86,7 @@ namespace Godless.Unity
                 Status = "viewing the past — return to the present to act";
                 return;
             }
-            Status = "brush radius " + radius + "   (click raise, shift-click lower, [ ] size, X bring down the building under the pointer)";
+            Status = "brush radius " + radius;
 
             // S2T: a god's hand on a building.
             if (keys != null && keys.xKey.wasPressedThisFrame) DemolishAt(mouse.position.ReadValue());
@@ -98,47 +106,19 @@ namespace Godless.Unity
         /// </summary>
         public bool DemolishAt(Vector2 pointer)
         {
-            var world = _boot.World;
+            GodHand hand = Hand();
             Settlement town = _boot.Town;
-            if (world == null || town == null || _solid == null) return false;
-            Camera cam = Camera.main;
-            if (cam == null) return false;
-            Ray ray = cam.ScreenPointToRay(pointer);
+            if (hand == null || town == null) return false;
+            if (_timeline != null && _timeline.IsScrubbed) return false;
 
             VoxelRaycast.Hit hit;
-            if (!VoxelRaycast.Cast(world.Voxels.Store, ray.origin.x, ray.origin.y, ray.origin.z,
-                                   ray.direction.x, ray.direction.y, ray.direction.z, 3000,
-                                   id => id != VoxelTypes.AirId && id != _water, out hit))
-                return false;
+            ushort water = hand.Water;
+            if (!Pick(pointer, id => id != VoxelTypes.AirId && id != water, out hit)) return false;
 
-            Project target = null;
-            foreach (Project p in town.Projects)
-            {
-                if (p.Host != null) continue;
-                Int3 a = Construction.World(p, 0, 0, 0);
-                Int3 b = Construction.World(p, p.Plan.Width - 1, p.Plan.Height - 1, p.Plan.Depth - 1);
-                bool inside = hit.Voxel.X >= a.X && hit.Voxel.X <= b.X && hit.Voxel.Z >= a.Z && hit.Voxel.Z <= b.Z && hit.Voxel.Y >= a.Y - 1 && hit.Voxel.Y <= b.Y;
-                foreach (Project added in p.Added)
-                {
-                    Int3 c = Construction.World(added, 0, 0, 0);
-                    Int3 d = Construction.World(added, added.Plan.Width - 1, added.Plan.Height - 1, added.Plan.Depth - 1);
-                    if (hit.Voxel.X >= c.X && hit.Voxel.X <= d.X && hit.Voxel.Z >= c.Z && hit.Voxel.Z <= d.Z && hit.Voxel.Y >= c.Y - 1 && hit.Voxel.Y <= d.Y) inside = true;
-                }
-                if (inside) { target = p; break; }
-            }
+            Project target = GodHand.BuildingAt(town, hit.Voxel);
             if (target == null) return false;
-
-            world.Clock.Advance();
-            long tick = world.Clock.Tick;
-            int before = world.Voxels.Log.Count;
-            RecordId by = world.Annals.Write(tick, Symbol.For("god.brought-down"), Symbol.None, hit.Voxel, RecordId.None);
-            BiomeTable biomes = BiomeTable.FromContent(world.Content);
-            Collapse.BringDown(world, town, target, by, _solid, MaterialTable.FromContent(world.Content, biomes),
-                               DetailModelTable.FromContent(world.Content), _boot.Parcels);
-
-            IReadOnlyList<Godless.Sim.Deltas.VoxelDelta> log = world.Voxels.Log.All();
-            for (int i = before; i < log.Count; i++) _boot.View.MarkDirty(ChunkStore.PositionOf(log[i].ChunkIndex, log[i].VoxelIndex));
-            world.Voxels.EndTick(tick);
+            hand.BringDown(town, target, hit.Voxel);
+            _boot.ShowChanges();
             return true;
         }
 
@@ -152,40 +132,34 @@ namespace Godless.Unity
         /// </summary>
         public bool StrokeAt(Vector2 pointer, bool lower)
         {
-            var world = _boot.World;
-            if (world == null || _solid == null) return false;
+            GodHand hand = Hand();
+            if (hand == null) return false;
             if (_timeline != null && (_timeline.IsScrubbed || _timeline.Covers(pointer))) return false;
-
-            Camera cam = Camera.main;
-            if (cam == null) return false;
-            Ray ray = cam.ScreenPointToRay(pointer);
 
             // Water stops the ray too, so clicking the sea finds the column
             // under it — the brush then builds up from the seabed.
+            bool[] solid = hand.Solid;
+            ushort water = hand.Water;
             VoxelRaycast.Hit hit;
-            if (!VoxelRaycast.Cast(world.Voxels.Store, ray.origin.x, ray.origin.y, ray.origin.z,
-                                   ray.direction.x, ray.direction.y, ray.direction.z, 3000,
-                                   id => id < _solid.Length && (_solid[id] || id == _water), out hit))
+            if (!Pick(pointer, id => id < solid.Length && (solid[id] || (id == water && water != VoxelTypes.AirId)), out hit))
                 return false;
 
-            world.Clock.Advance();
-            long tick = world.Clock.Tick;
-            RecordId stroke = world.Annals.Write(tick, Symbol.For(lower ? "god.lowered-ground" : "god.raised-ground"),
-                                                 Symbol.None, hit.Voxel, RecordId.None, radius, strength);
+            if (lower) hand.Lower(hit.Voxel, radius, strength);
+            else hand.Raise(hit.Voxel, radius, strength);
 
-            _changed.Clear();
-            if (lower)
-                TerrainBrush.Lower(world.Voxels, _solid, hit.Voxel.X, hit.Voxel.Z, radius, strength,
-                                   _water, world.Island != null ? world.Island.SeaLevel : IslandMap.DefaultSeaLevel,
-                                   tick, stroke, _changed);
-            else
-                TerrainBrush.Raise(world.Voxels, _solid, hit.Voxel.X, hit.Voxel.Z, radius, strength,
-                                   _stone, tick, stroke, _changed, _boot.Ground);
-
-            for (int i = 0; i < _changed.Count; i++) _boot.View.MarkDirty(_changed[i]);
-            world.Voxels.EndTick(tick);
+            _boot.ShowChanges();
             Strokes++;
             return true;
+        }
+
+        bool Pick(Vector2 pointer, System.Func<ushort, bool> stops, out VoxelRaycast.Hit hit)
+        {
+            hit = default(VoxelRaycast.Hit);
+            Camera cam = Camera.main;
+            if (cam == null) return false;
+            Ray ray = cam.ScreenPointToRay(pointer);
+            return VoxelRaycast.Cast(_boot.World.Voxels.Store, ray.origin.x, ray.origin.y, ray.origin.z,
+                                     ray.direction.x, ray.direction.y, ray.direction.z, 3000, stops, out hit);
         }
     }
 }
