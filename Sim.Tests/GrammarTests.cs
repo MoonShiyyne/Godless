@@ -5,7 +5,6 @@ using Godless.Sim.Build;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
 using Godless.Sim.Culture;
-using Godless.Sim.Drives;
 using Godless.Sim.World;
 using Xunit;
 
@@ -63,8 +62,7 @@ namespace Godless.Sim.Tests
 
         static Grammar Dwelling()
         {
-            DriveRules rules = DriveRules.FromContent(Content);
-            GrammarTable table = GrammarTable.FromContent(Content, Genes, IntentKindTable.FromContent(Content, rules.Needs));
+            GrammarTable table = GrammarTable.FromContent(Content, Genes);
             Assert.Empty(table.Problems);
             return table.For("shelter");
         }

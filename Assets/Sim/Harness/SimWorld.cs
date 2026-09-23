@@ -3,7 +3,6 @@ using Godless.Sim.Annals;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
 using Godless.Sim.Deltas;
-using Godless.Sim.Settlements;
 using Godless.Sim.Voxels;
 
 namespace Godless.Sim.Harness
@@ -37,7 +36,8 @@ namespace Godless.Sim.Harness
             Seed = seed;
             Content = content;
             VoxelTypes = voxelTypes;
-            Clock = SimClock.Default();
+            Time = TimeRules.FromContent(content);
+            Clock = Time.NewClock();
             Streams = new StreamRegistry(seed);
             Annals = new Annalist();
             Voxels = new VoxelWorld(new ChunkStore(), new DeltaLog(snapshotInterval));
@@ -45,6 +45,12 @@ namespace Godless.Sim.Harness
 
         public ulong Seed { get; private set; }
         public SimClock Clock { get; private set; }
+
+        /// <summary>How time runs in this world, from content (v2 M0).</summary>
+        public TimeRules Time { get; private set; }
+
+        /// <summary>The god's acts, waiting to land at the start of the next step (v2 M0).</summary>
+        public CommandQueue Commands { get; } = new CommandQueue();
         public StreamRegistry Streams { get; private set; }
         public Annalist Annals { get; private set; }
         public VoxelWorld Voxels { get; private set; }
@@ -60,12 +66,6 @@ namespace Godless.Sim.Harness
         /// downstream has to re-derive terrain it could just read.
         /// </summary>
         public World.IslandMap Island { get; set; }
-
-        /// <summary>
-        /// The settlements on the island, in founding order. Stratum 1 has one.
-        /// Systems iterate this list, so its order is tick order.
-        /// </summary>
-        public List<Settlement> Settlements { get; } = new List<Settlements.Settlement>();
 
         /// <summary>
         /// Part 22: a code mod voids the determinism guarantee, so the save
@@ -111,6 +111,8 @@ namespace Godless.Sim.Harness
         {
             Clock.Advance();
             TicksRun++;
+            // The god first: every system this step sees what was done.
+            if (Commands.Pending > 0) Commands.ApplyNow(this);
             for (int i = 0; i < _systems.Count; i++) _systems[i].Tick(this);
             Voxels.EndTick(Clock.Tick);
         }

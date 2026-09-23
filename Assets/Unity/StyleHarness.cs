@@ -1,7 +1,5 @@
 using System.Collections.Generic;
 using System.IO;
-using Godless.Sim.Build;
-using Godless.Sim.Settlements;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using UnityEngine;
@@ -27,7 +25,7 @@ namespace Godless.Unity
         [Tooltip("Run the plate on play, then leave play mode. Off for ordinary play.")]
         [SerializeField] bool capture;
 
-        [Tooltip("Years to photograph the settlement at.")]
+        [Tooltip("Years to photograph the world at.")]
         [SerializeField] int[] years = { 1, 2, 4 };
 
         [SerializeField] int width = 960;
@@ -50,7 +48,7 @@ namespace Godless.Unity
 
         void LateUpdate()
         {
-            if (!capture || _done || _boot.World == null || _boot.Town == null) return;
+            if (!capture || _done || _boot.World == null || _boot.Phase != WorldBootstrap.SetupPhase.Playing) return;
 
             // Run the sim as fast as it will go to the next year wanted, then
             // let the mesher catch up before the shutter.
@@ -66,7 +64,7 @@ namespace Godless.Unity
             }
             if (_boot.View.ChunksQueued > 0 || _boot.View.ChunksInFlight > 0) return;
 
-            Shoot("village-y" + years[_next], Village());
+            Shoot("ground-y" + years[_next], Ground());
             Shoot("island-y" + years[_next], Island());
 
             if (++_next < years.Length) return;
@@ -86,16 +84,19 @@ namespace Godless.Unity
                 _boot.View.MarkDirty(ChunkStore.PositionOf(all[i].ChunkIndex, all[i].VoxelIndex));
         }
 
-        /// <summary>Over the settlement's shoulder, close enough to read a roof.</summary>
-        (Vector3, Vector3) Village()
+        /// <summary>
+        /// Close on the flattest dry ground by water, where people will come to
+        /// live once they exist (v2 M1 on); until then, the ground itself.
+        /// </summary>
+        (Vector3, Vector3) Ground()
         {
-            Settlement town = _boot.Town;
-            var centre = new Vector3(town.Hearth.X, town.Hearth.Y, town.Hearth.Z);
-            foreach (Project project in town.Projects)
+            var centre = new Vector3(ChunkStore.SizeX * 0.5f, _boot.World.Island != null ? _boot.World.Island.SeaLevel : 40f, ChunkStore.SizeZ * 0.5f);
+            int px, pz;
+            if (_boot.Parcels != null && _boot.World.Island != null
+                && Survey.FlattestNearWater(_boot.Parcels, _boot.World.Island, BiomeTable.FromContent(_boot.World.Content), Godless.Sim.Core.Symbol.None, out px, out pz))
             {
-                if (!project.Complete) continue;
-                centre = new Vector3(project.Site.ParcelX * ParcelGrid.Size, project.Site.Ground, project.Site.ParcelZ * ParcelGrid.Size);
-                break;
+                int x = px * ParcelGrid.Size + 2, z = pz * ParcelGrid.Size + 2;
+                centre = new Vector3(x, _boot.Parcels.GroundAt(x, z), z);
             }
             return (centre + new Vector3(-26f, 22f, -26f), centre + new Vector3(0f, 2f, 0f));
         }

@@ -1,16 +1,21 @@
-# Godless
+# Godless (v2)
 
-Emergent voxel civilization godsim. Unity 6, solo build.
+WorldBox in 3D. A voxel god sandbox where civilisations rise and fall, and
+where the land records them: dug, terraced, walled, paved and abandoned by the
+people who lived on it. Unity 6, solo build.
 
-The player is a god who acts only on the world and never on the agents.
-Settlements build from instinct — a numeric culture genome bent by scars,
-salience and myth. Every session ends in the Silence: powers withdrawn,
-200 years unattended, scored on what of you is still legible.
+Three pillars. **Rise and fall**: kingdoms have life cycles — founding,
+expansion, golden age, strain, crisis, fall — and ruins are reoccupied.
+**Emergent terraforming**: only the god paints terrain; people dig, clear,
+terrace, irrigate, pave and wall because they need to, and every voxel they
+move says why. **Emergent construction**: buildings grow from need, culture,
+material and technology age. The god touches everything — land and creatures.
 
-**Design source of truth:** the `Godless` artifact, design & technical plan
-rev 7, 27 parts. The build order and system registry are *derived* from it.
-Stage plan and current queue: `claude/build-order.md`. Read it before starting
-any system. Do not open a system whose dependencies are not done.
+**Design source of truth:** the Godless v2 Plan artifact
+(https://claude.ai/artifact/3Mi5ZTo4XNKAFj8nNAdkrt). Milestones, gates and
+the current queue: `claude/build-order.md`. v1 (the "act only on the world"
+culture-genome game, with the Silence) is archived whole on tag `v1-archive`
+and branch `archive/v1`; its design lives in the rev 7 design artifact.
 
 ## Laws
 
@@ -36,7 +41,7 @@ L2 DETERMINISM. All randomness through seeded per-system streams keyed by
     stay legal.
 L3 PROVENANCE. Every voxel change, intent and gene mutation carries the
     event that caused it, from the first line that writes one. The chronicle,
-    the Silence scoring, the stratigraphic probe and the timelapse all read
+    the terraforming record, kingdom histories, the feed and the timeline all read
     this. Retrofitting it across twenty systems is the single most expensive
     mistake available in this project.
 L4 VISIBLE TELL. No system merges without one sentence answering "what does
@@ -46,23 +51,34 @@ L5 CONTENT IS DATA. Tilesets, biomes, events, genes, grammar rules and
     scenarios load from `Assets/Content` through the mod pipeline. No
     privileged base-game code path, ever. Deleting `Assets/Content/base` must
     leave a game that boots with nothing to build.
-L6 DEPTH ORDER. Check `depends_on` in the registry before starting. Strata
-    are not a schedule you can compress by working ahead.
-L7 ONE ASSERTION. From stratum 2 on, every system ships with at least one
-    invariant in the batch harness, over 200 seeds, not one.
+L6 DEPTH ORDER. Build milestones in order (`claude/build-order.md`). A
+    milestone is done when its gate passes in `sim eval`, not when its code
+    is written.
+L7 ONE ASSERTION. Every system ships with at least one invariant in the
+    batch harness, over 200 seeds, not one.
+L8 TIME TO CONSEQUENCE. What a system does must be visible to a watcher
+    within minutes at 1x, and a god power within a second. v1's first farm
+    took 68 real hours at 1x; nobody saw it happen.
+L9 LIVENESS. Nothing waits for ever. Every job, project and plan is
+    re-evaluated as the world changes, and the harness asserts progress —
+    no project stuck past a year, no roofless town that never builds. v1's
+    job board was built once at founding and a town stopped growing in year 8.
+L10 BUDGET. Every per-unit cost is counted against 2,000+ units at 60 fps.
+    Units are data, not objects; distant cities may run in aggregate. v1's
+    350 people cost 60 s per 20 years.
 
-## Four rules the laws do not cover
+## Rules the laws do not cover
 
 - **The gene rule.** Every gene must change the silhouette at normal camera
   distance. If you cannot name what a stranger would see, cut the gene.
 - **The modding rule.** All RNG streams seed from hashed stable string IDs,
   never load-order indices. No content outside `Assets/Content`.
-- **The memory rule.** Scar, salience and myth are three separate layers and
-  no code path may collapse them. A scar is felt and individual. Salience is
-  collective attention held up by monuments. A myth is a transmissible account
-  that outlives both — a settlement with zero drowning scars and no monument
-  still builds high, because that is what the story says people do. Collapsing
-  these destroys the central mechanic.
+- **One door for the god.** Every god power is an `IGodCommand` through
+  `SimWorld.Commands`: it lands at the start of the next step, writes its own
+  god.* record, and everything that reads the ground or the creatures hears of
+  it that step. Nothing edits the world from the Unity side directly.
+- **Tell the player.** A system that makes something happen worth seeing
+  gives it a feed line (`Assets/Content/base/feed`) with a place to go.
 - **No model in the tick.** Use a model at design time to author rule sets,
   and optionally out-of-band for chronicle prose. Nothing in the simulation
   tick calls one. Nondeterminism there breaks saves, replays and repro.
@@ -70,27 +86,26 @@ L7 ONE ASSERTION. From stratum 2 on, every system ships with at least one
 ## Layout
 
     Assets/Sim/         plain C#, no UnityEngine, the whole game
-      Drives/           utility AI, needs
-      Culture/          genome, mutation, inheritance, motifs, diffusion
-      Collective/       quorum decisions, response thresholds, grievance
-      Transmit/         myth themes, attractors, conformity, the floating gap
-      Literacy/         script invention, textualization, canon and heresy
-      Memory/           scars, salience, decay, inheritance, TraumaProfile
-      Annals/           deterministic event record, era naming, place queries
+      Core/             clock, seeded streams, stable hash, SimMath, digests
+      Content/          the mod pipeline: JSON with comments, patches, load order
+      Voxels/           chunk store, detail cells, raycast
       Deltas/           voxel delta log, snapshots, seek and replay
-      Build/            intents, site scoring, grammar, WFC
-      Chronicle/        provenance presentation over the annals
-      Settlements/      a settlement's people, hearth and roofs; what drives and intents belong to
-      World/            island, biomes, weather, parcel grid and influence maps
+      Annals/           deterministic event record with causes
+      Chronicle/        the player's side of the record: the event feed
+      Harness/          SimWorld, time rules, the command queue, batch runner, invariants, pacer
+      World/            island, biomes, rivers, parcel grid, influence maps, the god's terrain hand
+      Economy/          materials, what the land gives, stock
+      Build/            building grammar, realizer, tiles, silhouettes, terrain negotiation
+      Culture/          genome and gene tells (cultures, religions and languages from M6)
     Assets/Unity/       rendering, meshing jobs, input, UI
     Assets/Content/     base game shipped AS MODS
     Sim/                library csproj — compiles Assets/Sim for tooling
-    Sim.Headless/       headless CLI runner (S08)
+    Sim.Headless/       headless CLI runner, including `sim eval`
     Sim.Tests/          xUnit + the batch harness
-    Tools/              law guard, screenshot harness, gene inspector
+    Tools/              law guard, verify
 
-`Collective/`, `Transmit/` and `Literacy/` exist because design doc rev 7
-added Parts 16, 09 and 10. Do not file that material under `Culture/`.
+New folders arrive with their milestone: units (M1), settlements (M2),
+earthworks (M3), polities (M4), and so on; see `claude/build-order.md`.
 
 ## Unity rules
 
@@ -115,7 +130,7 @@ is the only way to start one — it returns the preset *and* the biome subset
 together, because a map's biome list decides the biome indices the island
 stores, so taking one without the other generates a world that loads back as a
 different one. `sim maps` lists them; `--map <id>` picks one on run, island,
-parcels, separate and settle; the Editor picks one in the inspector; a save
+parcels, separate and eval; the Editor picks one in the inspector; a save
 records its name.
 
 Two rules that keep falling out of this:
@@ -134,7 +149,10 @@ Two rules that keep falling out of this:
 
 ## Speed is a display decision
 
-The player can pause and run at 1x to 16x (`Assets/Sim/Harness/TickPacer.cs`,
+A tick is a step, and at v2's default a step is a day (`time.json`): people
+act a step at a time, the calendar is months and years of steps, and politics
+is weighed once a year. At 1x ten steps run a real second, so a year takes
+36 s. The player can pause and speed up (`Assets/Sim/Harness/TickPacer.cs`,
 driven by `Assets/Unity/Input/SimSpeed.cs`). None of it reaches the
 simulation: a tick is a tick, and the pacer only decides how many whole ticks
 are due this frame. Same seed plus same tick count gives the same world,
@@ -167,10 +185,16 @@ human looking at a screen. Build once, then:
     Sim.Headless/bin/Release/net10.0/sim verify   # same seed twice, byte-identical
     Sim.Headless/bin/Release/net10.0/sim run      # 200 seeds x 300 years, all invariants
     Sim.Headless/bin/Release/net10.0/sim content  # what Assets/Content actually loads
+    Sim.Headless/bin/Release/net10.0/sim eval     # the game against each milestone's goals
+
+`sim eval` is how a milestone is judged (L6): each milestone adds goals — a
+measurable sentence and a threshold — and it exits 1 on any miss. It exists
+because v1's behaviour check found a town that stopped building in year 8
+that 400 passing tests had not.
 
 Do not use `dotnet run -v q -- <cmd>`; the -v flag eats the app's arguments.
-Every system you add from stratum 2 on owes an entry in StandardInvariants,
-owned by its registry id. That is law L7 and `sim run` prints what it checked.
+Every system you add owes an entry in StandardInvariants, owned by its
+milestone. That is law L7 and `sim run` prints what it checked.
 
 If `unity status` or `unity command` will not connect, the Editor is almost
 certainly in Safe Mode from a compile error. Run `unity pipeline list` to
@@ -179,8 +203,8 @@ files by hand.
 
 ## Working agreement
 
-- One commit per system, message naming the registry id (`S01: ...`).
-  When something breaks in stratum 3, the bisect is free.
-- A branch per stratum. Never start a session on a dirty tree.
-- Name the system by its registry id when starting work. That is what the ids
-  are for, and it stops a session drifting into whatever seems interesting.
+- One commit per system, message naming the milestone (`M1: ...`).
+  When something breaks later, the bisect is free.
+- Never start a session on a dirty tree.
+- Name the milestone and system when starting work, so a session does not
+  drift into whatever seems interesting.

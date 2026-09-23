@@ -6,7 +6,7 @@ using Godless.Sim.Content;
 using Godless.Sim.Core;
 using Godless.Sim.Deltas;
 using Godless.Sim.Harness;
-using Godless.Sim.Settlements;
+using Godless.Sim.Economy;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using Xunit;
@@ -43,11 +43,11 @@ namespace Godless.Sim.Tests
             public ParcelGrid Grid;
             public ConstraintFields Fields;
             public BiomeTable Biomes;
-            public Settlement Town;
             public GodHand Hand;
+            public int FocusX, FocusZ;   // a flat dry parcel near the middle of the land
         }
 
-        /// <summary>Green shore, seed 7, twenty people at the suggested site, every system running — as the Editor starts.</summary>
+        /// <summary>Green shore, seed 7, with the ground and deposit systems running — as the Editor starts a world.</summary>
         static Village Settle()
         {
             WorldChoice choice = WorldChoice.Pick(Content, "green-shore");
@@ -55,32 +55,41 @@ namespace Godless.Sim.Tests
             world.Island = TestIslands.Generate(world.Voxels.Store, world.Streams, choice.Biomes, world.VoxelTypes, choice.Preset, choice.Features);
             world.BeginHistory();
             ConstraintFields fields;
-            ParcelGrid grid = Founding.Survey(world, Content, choice.Biomes, out fields);
-            int px, pz;
-            Assert.True(Founding.StandInSite(grid, world.Island, choice.Biomes, Symbol.For("biome.temperate"), out px, out pz)
-                        || Founding.StandInSite(grid, world.Island, choice.Biomes, Symbol.None, out px, out pz));
-            Settlement town = Founding.Begin(world, Content, grid, choice.Biomes, "first", 20, px, pz, null);
-            Founding.AddSystems(world, Content, grid, fields, choice.Biomes);
-            return new Village
+            ParcelGrid grid = Survey.Of(world, Content, choice.Biomes, out fields);
+            world.Add(new GroundSystem(grid, fields, choice.Biomes)).Add(new DepositSystem(grid));
+            var v = new Village
             {
-                World = world, Grid = grid, Fields = fields, Biomes = choice.Biomes, Town = town,
+                World = world, Grid = grid, Fields = fields, Biomes = choice.Biomes,
                 Hand = new GodHand(world, grid, GroundPalette.From(world.Island, choice.Biomes, world.VoxelTypes)),
             };
+            int best = int.MaxValue;
+            for (int pz = 16; pz < ParcelGrid.Depth - 16; pz++)
+                for (int px = 16; px < ParcelGrid.Width - 16; px++)
+                {
+                    if (!grid.IsLand(px, pz) || grid.WetColumns(px, pz) > 0 || grid.Slope[px, pz] >= 2) continue;
+                    int d = System.Math.Abs(px - ParcelGrid.Width / 2) + System.Math.Abs(pz - ParcelGrid.Depth / 2);
+                    if (d < best) { best = d; v.FocusX = px; v.FocusZ = pz; }
+                }
+            Assert.True(best < int.MaxValue, "no flat dry land on the island");
+            return v;
         }
 
-        /// <summary>Land six parcels from the fire, in the first direction that has any.</summary>
+        /// <summary>Land six parcels from the focus, in the first direction that has any.</summary>
         static void BesideTheFire(Village v, out int px, out int pz)
         {
             int[] offsets = { 6, 0, -6, 0, 0, 6, 0, -6 };
             for (int i = 0; i < offsets.Length; i += 2)
             {
-                px = v.Town.HearthParcelX + offsets[i];
-                pz = v.Town.HearthParcelZ + offsets[i + 1];
+                px = v.FocusX + offsets[i];
+                pz = v.FocusZ + offsets[i + 1];
                 if (v.Grid.IsLand(px, pz) && v.Grid.WetColumns(px, pz) == 0) return;
             }
             px = pz = -1;
-            Assert.Fail("no dry land beside the fire");
+            Assert.Fail("no dry land beside the focus");
         }
+
+        /// <summary>Flat enough to build on: the test the v1 site report used for a fire.</summary>
+        static bool Flat(Village v, int px, int pz) { return v.Grid.IsLand(px, pz) && v.Grid.Slope[px, pz] < 6; }
 
         static Int3 Column(Village v, int px, int pz)
         {
@@ -100,7 +109,7 @@ namespace Godless.Sim.Tests
         /// <summary>
         /// The report's own case: a hill raised about 36 voxels beside the
         /// fire. The next tick the grid reads it — height, slope, exposure —
-        /// and siting, which reads the grid, sees ground too steep to build on
+        /// and anything that reads the grid sees ground too steep to build on
         /// where it was flat.
         /// </summary>
         [Fact]
@@ -113,15 +122,13 @@ namespace Godless.Sim.Tests
             BesideTheFire(v, out px, out pz);
             double height = v.Grid.Height[px, pz];
             double exposure = v.Fields.Exposure[px, pz];
-            IExprScope facts = SiteScorer.Facts(v.Town, v.Grid, v.Fields, v.Town.Genome, px, pz);
-            Assert.Equal(height, facts.Resolve("parcel.height"));
 
             // Parcels on the hill's flank that a fire could have been lit on.
             const int radius = 10;
             var flatBefore = new List<int>();
             for (int z = pz - 3; z <= pz + 3; z++)
                 for (int x = px - 3; x <= px + 3; x++)
-                    if (Founding.Appraise(v.World, null, v.Grid, v.Biomes, x, z).CanSettle) flatBefore.Add(z * ParcelGrid.Width + x);
+                    if (Flat(v, x, z)) flatBefore.Add(z * ParcelGrid.Width + x);
             Assert.NotEmpty(flatBefore);
 
             long tick = v.World.Clock.Tick;
@@ -147,15 +154,10 @@ namespace Godless.Sim.Tests
             Assert.True(raised >= 30.0, "the hill is " + raised + " voxels on the grid");
             Assert.True(v.Fields.Exposure[px, pz] > exposure, "a hill stands above the land round it");
 
-            facts = SiteScorer.Facts(v.Town, v.Grid, v.Fields, v.Town.Genome, px, pz);
-            Assert.Equal(v.Grid.Height[px, pz], facts.Resolve("parcel.height"));
 
             int steep = 0;
             foreach (int p in flatBefore)
-            {
-                SiteReport r = Founding.Appraise(v.World, null, v.Grid, v.Biomes, p % ParcelGrid.Width, p / ParcelGrid.Width);
-                if (!r.CanSettle && r.Why == "too steep for a fire") steep++;
-            }
+                if (!Flat(v, p % ParcelGrid.Width, p / ParcelGrid.Width)) steep++;
             _out.WriteLine(steep + " of " + flatBefore.Count + " settleable parcels are now too steep");
             Assert.True(steep > 0, "no parcel on the hill's flanks turned steep");
         }
@@ -207,16 +209,10 @@ namespace Godless.Sim.Tests
             Assert.Equal(v.World.Voxels.Store.Digest(), view.Store.Digest());
             Assert.NotEqual(before, v.World.Voxels.Store.Digest());
 
-            // And the next tick is a real one: needs move, the clock moves by one.
-            var person = v.Town.People[0];
-            var levels = new double[4];
-            for (int n = 0; n < levels.Length; n++) levels[n] = person.Level(n);
+            // And the next tick is a real one: every system runs, the clock moves by one.
             v.World.Tick();
             Assert.Equal(tick + 1, v.World.Clock.Tick);
             Assert.Equal(v.World.Clock.Tick, v.World.TicksRun);
-            bool moved = false;
-            for (int n = 0; n < levels.Length; n++) if (person.Level(n) != levels[n]) moved = true;
-            Assert.True(moved, "nobody's needs moved in the tick after the strokes");
         }
 
         /// <summary>
@@ -247,7 +243,7 @@ namespace Godless.Sim.Tests
             Assert.Equal(1, v.World.Clock.Tick);
         }
 
-        /// <summary>A wood the god buries under a hill is gone from what the village can fell.</summary>
+        /// <summary>A wood the god buries under a hill is gone from what anyone can fell.</summary>
         [Fact]
         public void ATreeBuriedUnderAHillIsNoLongerThereToFell()
         {
@@ -258,9 +254,9 @@ namespace Godless.Sim.Tests
 
             // The nearest standing tree to the fire.
             int tree = -1;
-            foreach (int f in deposits.Within(v.Town.Hearth.X, v.Town.Hearth.Z, 120))
+            foreach (int f in deposits.Within(v.FocusX * ParcelGrid.Size, v.FocusZ * ParcelGrid.Size, 200))
                 if (deposits.KindOf(f).Shape == FeatureShape.Tree && deposits.Standing(f) && deposits.Remaining(f) > 0) { tree = f; break; }
-            Assert.True(tree >= 0, "no tree near the fire");
+            Assert.True(tree >= 0, "no tree near the focus");
             int remaining = deposits.Remaining(tree);
 
             var at = new Int3(deposits.X(tree), deposits.Y(tree) - 1, deposits.Z(tree));

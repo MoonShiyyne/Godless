@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
-using Godless.Sim.Settlements;
+using Godless.Sim.Economy;
 using Godless.Sim.World;
 
 namespace Godless.Sim.Build

@@ -2,7 +2,7 @@ using System.IO;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
 using Godless.Sim.Harness;
-using Godless.Sim.Settlements;
+using Godless.Sim.Economy;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using Xunit;
@@ -124,14 +124,8 @@ namespace Godless.Sim.Tests
             world.Island = TestIslands.Generate(world.Voxels.Store, world.Streams, biomes, types);
 
             ConstraintFields fields;
-            ParcelGrid grid = Founding.Survey(world, Content, biomes, out fields);
-            int px, pz;
-            Assert.True(Founding.StandInSite(grid, world.Island, biomes, Symbol.None, out px, out pz));
-            Settlement town = Founding.Begin(world, Content, grid, biomes, "test", 20, px, pz, null);
-
-            MaterialTable materials = MaterialTable.FromContent(Content, biomes);
-            for (int m = 0; m < materials.Count; m++) if (town.Catchment.Offers(m)) town.Stock.Add(m, 3000);
-            Founding.AddSystems(world, Content, grid, fields, biomes);
+            ParcelGrid grid = Survey.Of(world, Content, biomes, out fields);
+            world.Add(new GroundSystem(grid, fields, biomes)).Add(new DepositSystem(grid));
             world.BeginHistory();
             return world;
         }
@@ -167,7 +161,6 @@ namespace Godless.Sim.Tests
             Assert.Equal(ticks, (int)ragged.Clock.Tick);
             Assert.Equal(whole.Annals.Digest(), ragged.Annals.Digest());
             Assert.Equal(whole.Voxels.Store.Digest(), ragged.Voxels.Store.Digest());
-            Assert.Equal(whole.Settlements[0].Digest(), ragged.Settlements[0].Digest());
         }
 
         /// <summary>And a pause is not a slower world, it is a stopped one: nothing moves.</summary>

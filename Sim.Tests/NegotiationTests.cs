@@ -6,7 +6,7 @@ using Godless.Sim.Content;
 using Godless.Sim.Core;
 using Godless.Sim.Culture;
 using Godless.Sim.Harness;
-using Godless.Sim.Settlements;
+using Godless.Sim.Economy;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using Xunit;
@@ -118,96 +118,6 @@ namespace Godless.Sim.Tests
             high.Mutate(Symbol.For("gene.elevation_bias"), 0.95, 0, Symbol.None, RecordId.None, new Annalist());
             Assert.Equal(GroundStrategy.CutAndFill, Island.At(flatX, flatZ, new Genome(Genes)).Strategy);
             Assert.Equal(GroundStrategy.Stilt, Island.At(flatX, flatZ, high).Strategy);
-        }
-
-        sealed class Village
-        {
-            public SimWorld World;
-            public Settlement Town;
-
-            public Village(double elevationBias, string biome)
-            {
-                BiomeTable biomes = BiomeTable.FromContent(Content);
-                VoxelTypes types = VoxelTypes.FromContent(Content);
-                World = new SimWorld(7, Content, types);
-                World.Island = TestIslands.Generate(World.Voxels.Store, World.Streams, biomes, types);
-
-                ConstraintFields fields;
-                ParcelGrid grid = Founding.Survey(World, Content, biomes, out fields);
-                int px, pz;
-                Assert.True(Founding.StandInSite(grid, World.Island, biomes, Symbol.For("biome." + biome), out px, out pz)
-                            || Founding.StandInSite(grid, World.Island, biomes, Symbol.None, out px, out pz));
-
-                var genome = new Genome(Genes);
-                genome.Mutate(Symbol.For("gene.elevation_bias"), elevationBias, 0, Symbol.None, RecordId.None, World.Annals);
-                Town = Founding.Begin(World, Content, grid, biomes, "test", 20, px, pz, genome);
-                MaterialTable materials = MaterialTable.FromContent(Content, biomes);
-                for (int m = 0; m < materials.Count; m++) if (Town.Catchment.Offers(m)) Town.Stock.Add(m, 6000);
-                Town.Food = 100000;
-                Founding.AddSystems(World, Content, grid, fields, biomes);
-                World.BeginHistory();
-            }
-
-            public bool RunUntilBuilt(int days = 400)
-            {
-                for (int i = 0; i < days * 4; i++)
-                {
-                    World.Tick();
-                    foreach (Project p in Town.Projects) if (p.Complete) return true;
-                }
-                return false;
-            }
-
-            public Project Finished
-            {
-                get { foreach (Project p in Town.Projects) if (p.Complete) return p; return null; }
-            }
-        }
-
-        /// <summary>Cut and fill leaves a level pad where the ground was not level.</summary>
-        [Fact]
-        public void LevellingASiteLeavesItLevel()
-        {
-            var village = new Village(0.1, "temperate");
-            Assert.True(village.RunUntilBuilt(), "nothing was built");
-            Project p = village.Finished;
-            Assert.NotNull(p.Ground);
-            if (p.Ground.Strategy == GroundStrategy.Stilt) return;   // this site wanted posts
-
-            // Every column under the house now stands at the floor level.
-            for (int z = 0; z < p.Ground.Depth; z++)
-                for (int x = 0; x < p.Ground.Width; x++)
-                {
-                    int level = p.Ground.LevelAt(x, z);
-                    if (level < 0) continue;
-                    Assert.Equal(p.Site.Ground, p.Ground.Strategy == GroundStrategy.CutAndFill ? level : p.Site.Ground);
-                }
-            Assert.True(p.Ground.Moved >= 0);
-        }
-
-        /// <summary>Stilts move no earth at all, and their posts reach the ground.</summary>
-        [Fact]
-        public void StiltsLeaveTheGroundAlone()
-        {
-            var village = new Village(0.95, "temperate");
-            Assert.True(village.RunUntilBuilt(), "nothing was built");
-            Project p = village.Finished;
-            Assert.Equal(GroundStrategy.Stilt, p.Ground.Strategy);
-            Assert.Equal(0, p.Ground.Moved);
-
-            Symbol post = Symbol.For("role.post");
-            bool reached = false;
-            for (int z = 0; z < p.Plan.Depth && !reached; z++)
-                for (int x = 0; x < p.Plan.Width && !reached; x++)
-                {
-                    if (p.Plan.At(x, 0, z) != post) continue;
-                    int drop = Construction.PostReach(p, x, z);
-                    if (drop <= 0) continue;
-                    Int3 foot = Construction.World(p, x, 0, z);
-                    Assert.NotEqual(VoxelTypes.AirId, village.World.Voxels.Store.Get(foot.X, foot.Y - drop, foot.Z));
-                    reached = true;
-                }
-            Assert.True(reached, "no post had to reach down at all");
         }
 
         [Fact]

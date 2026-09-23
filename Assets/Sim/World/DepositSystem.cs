@@ -1,13 +1,12 @@
 using Godless.Sim.Core;
 using Godless.Sim.Harness;
-using Godless.Sim.Settlements;
 
 namespace Godless.Sim.World
 {
     /// <summary>
-    /// Once a day: what was cut grows back where it can, every settlement
-    /// re-reads what is left in reach, and the planning grid catches up with
-    /// the ground that was dug away. S2F.
+    /// Once a day: what was cut grows back where it can, and the planning
+    /// grid catches up with the ground that was dug away. S2F. Whoever keeps a
+    /// catchment re-reads it themselves.
     ///
     /// Daily rather than per basket because nothing downstream reads finer:
     /// siting, the grid and the task board's demand all think in days.
@@ -35,8 +34,6 @@ namespace Godless.Sim.World
                               x1 >= Voxels.ChunkStore.SizeX ? Voxels.ChunkStore.SizeX - 1 : x1,
                               z1 >= Voxels.ChunkStore.SizeZ ? Voxels.ChunkStore.SizeZ - 1 : z1);
 
-            foreach (Settlement s in world.Settlements)
-                if (s.Catchment != null) s.Catchment.Refresh();
         }
     }
 }

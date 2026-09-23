@@ -2,7 +2,7 @@ using System.IO;
 using Godless.Sim.Annals;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
-using Godless.Sim.Settlements;
+using Godless.Sim.Economy;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using Xunit;

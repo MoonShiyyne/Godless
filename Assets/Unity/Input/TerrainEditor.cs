@@ -1,6 +1,4 @@
-using Godless.Sim.Build;
 using Godless.Sim.Harness;
-using Godless.Sim.Settlements;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using UnityEngine;
@@ -14,17 +12,13 @@ namespace Godless.Unity
     ///   left-click / hold          raise
     ///   shift + left-click / hold  lower
     ///   - and =                    brush radius
-    ///   X                          bring down the building under the pointer
     ///
     /// Everything real happens in the sim: VoxelRaycast finds the column and
-    /// GodHand does the rest — the brush, the god.* record every voxel cites,
-    /// and marking the planning grid, which reads the new ground at the start
-    /// of the next tick. This class only turns a mouse into those calls.
-    ///
-    /// A stroke lands on the tick the world is at. It used to advance the
-    /// clock first, so a held button ran a dozen ticks a second that no system
-    /// saw; GodHand only moves the world on when history has already closed
-    /// the present, and then by a whole tick with every system in it.
+    /// a RaiseGround or LowerGround command goes through the world's command
+    /// queue (v2 M0), which lands it at the start of the next step — or at
+    /// once while paused — with the god.* record every voxel cites, and the
+    /// planning grid reads the new ground the step after. This class only
+    /// turns a mouse into those commands.
     /// </summary>
     [RequireComponent(typeof(WorldBootstrap))]
     public sealed class TerrainEditor : MonoBehaviour
@@ -44,7 +38,7 @@ namespace Godless.Unity
         public string Status { get; private set; }
 
         /// <summary>What the keys are, for the HUD to say out loud.</summary>
-        public static string Keys { get { return "click raise   shift-click lower   - = brush size   X bring down the building under the pointer"; } }
+        public static string Keys { get { return "click raise   shift-click lower   - = brush size"; } }
 
         void Awake()
         {
@@ -68,7 +62,7 @@ namespace Godless.Unity
         void Update()
         {
             var world = _boot.World;
-            if (world == null || _boot.Phase != WorldBootstrap.SetupPhase.Playing) return;   // no god before there is anyone
+            if (world == null || _boot.Phase != WorldBootstrap.SetupPhase.Playing) return;   // no god before there is a world
 
             Keyboard keys = Keyboard.current;
             if (keys != null)
@@ -88,38 +82,12 @@ namespace Godless.Unity
             }
             Status = "brush radius " + radius;
 
-            // S2T: a god's hand on a building.
-            if (keys != null && keys.xKey.wasPressedThisFrame) DemolishAt(mouse.position.ReadValue());
-
             if (!mouse.leftButton.isPressed) return;
             if (Time.unscaledTime < _nextStroke) return;
             _nextStroke = Time.unscaledTime + strokeInterval;
 
             bool lower = keys != null && (keys.leftShiftKey.isPressed || keys.rightShiftKey.isPressed);
             StrokeAt(mouse.position.ReadValue(), lower);
-        }
-
-        /// <summary>
-        /// Brings down whatever building stands under a screen point, and
-        /// everything added to it (S2T). The same collapse any cause uses; this
-        /// one's cause is the god. Returns false when nothing was hit.
-        /// </summary>
-        public bool DemolishAt(Vector2 pointer)
-        {
-            GodHand hand = Hand();
-            Settlement town = _boot.Town;
-            if (hand == null || town == null) return false;
-            if (_timeline != null && _timeline.IsScrubbed) return false;
-
-            VoxelRaycast.Hit hit;
-            ushort water = hand.Water;
-            if (!Pick(pointer, id => id != VoxelTypes.AirId && id != water, out hit)) return false;
-
-            Project target = GodHand.BuildingAt(town, hit.Voxel);
-            if (target == null) return false;
-            hand.BringDown(town, target, hit.Voxel);
-            _boot.ShowChanges();
-            return true;
         }
 
         /// <summary>
@@ -144,9 +112,12 @@ namespace Godless.Unity
             if (!Pick(pointer, id => id < solid.Length && (solid[id] || (id == water && water != VoxelTypes.AirId)), out hit))
                 return false;
 
-            if (lower) hand.Lower(hit.Voxel, radius, strength);
-            else hand.Raise(hit.Voxel, radius, strength);
-
+            // Through the one door every god power uses (v2 M0): it lands at the
+            // start of the next step, or at once while the world is paused.
+            IGodCommand act = lower ? (IGodCommand)new LowerGround(hand, hit.Voxel, radius, strength)
+                                    : new RaiseGround(hand, hit.Voxel, radius, strength);
+            _boot.World.Commands.Submit(act, _boot.World.Clock.Tick);
+            if (_boot.Pacer == null || _boot.Pacer.IsPaused) _boot.World.Commands.ApplyNow(_boot.World);
             _boot.ShowChanges();
             Strokes++;
             return true;

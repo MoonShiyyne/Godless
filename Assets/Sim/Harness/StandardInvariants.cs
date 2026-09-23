@@ -29,7 +29,7 @@ namespace Godless.Sim.Harness
                 // S01 — the clock is exact. Integer ticks, so "roughly 300
                 // years" is not a thing that can happen.
                 Invariant.PerRun("S01", "the clock lands exactly on the requested year",
-                    run => run.Ticks == (long)run.Years * 360L * 4L),
+                    run => run.Ticks == (long)run.Years * (long)run.Metric("clock.ticks-per-year")),
 
                 // S01 — and every one of those ticks was run: needs, work and
                 // building all had their turn. Nothing moves the clock but a

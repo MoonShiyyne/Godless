@@ -1,0 +1,14 @@
+{
+  "type": "time",
+  "id": "base",
+  "tell": "At 1x a person walks across a village in a few seconds while a year goes by in about half a minute, so a kingdom rises in a sitting.",
+
+  // v2: one step is a day. People act a step at a time; the calendar is
+  // months and years of steps; politics is weighed once a year.
+  "ticksPerDay": 1,
+  "daysPerMonth": 30,
+  "daysPerYear": 360,
+
+  // Display only: steps a real second shows at 1x. 10 makes a year 36 s.
+  "ticksPerSecondAt1x": 10
+}

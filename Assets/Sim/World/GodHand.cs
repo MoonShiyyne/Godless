@@ -1,17 +1,16 @@
 using System.Collections.Generic;
 using Godless.Sim.Annals;
-using Godless.Sim.Build;
 using Godless.Sim.Core;
 using Godless.Sim.Harness;
-using Godless.Sim.Settlements;
 using Godless.Sim.Voxels;
 
 namespace Godless.Sim.World
 {
     /// <summary>
-    /// The god's verbs on the world: raise the ground, lower it, bring a
-    /// building down. S07's brush and S2T's hand on a building, in the sim so
-    /// the Editor, the harness and the tests all act the same way.
+    /// The god's verbs on the ground: raise it and lower it. S07's brush, in
+    /// the sim so the Editor, the harness and the tests all act the same way.
+    /// v2 routes every god power through the command queue; this stays the
+    /// voxel half of the terrain powers.
     ///
     /// The god acts in the present tick, never in a tick of its own. A stroke
     /// used to advance the clock before it wrote, so a held brush took a dozen
@@ -31,7 +30,6 @@ namespace Godless.Sim.World
     {
         public static readonly Symbol RaisedKind = Symbol.For("god.raised-ground");
         public static readonly Symbol LoweredKind = Symbol.For("god.lowered-ground");
-        public static readonly Symbol BroughtDownKind = Symbol.For("god.brought-down");
 
         readonly SimWorld _world;
         readonly ParcelGrid _grid;
@@ -90,42 +88,6 @@ namespace Godless.Sim.World
         void Touched(Int3 at, int radius)
         {
             if (_grid != null) _grid.MarkDirty(at.X - radius, at.Z - radius, at.X + radius, at.Z + radius);
-        }
-
-        /// <summary>
-        /// The building of a settlement a voxel belongs to — a house, or the
-        /// house a wing or storey was added to — or null.
-        /// </summary>
-        public static Project BuildingAt(Settlement town, Int3 voxel)
-        {
-            foreach (Project p in town.Projects)
-            {
-                if (p.Host != null) continue;
-                if (Covers(p, voxel)) return p;
-                foreach (Project added in p.Added) if (Covers(added, voxel)) return p;
-            }
-            return null;
-        }
-
-        static bool Covers(Project p, Int3 v)
-        {
-            Int3 a = Construction.World(p, 0, 0, 0);
-            Int3 b = Construction.World(p, p.Plan.Width - 1, p.Plan.Height - 1, p.Plan.Depth - 1);
-            return v.X >= a.X && v.X <= b.X && v.Z >= a.Z && v.Z <= b.Z && v.Y >= a.Y - 1 && v.Y <= b.Y;
-        }
-
-        /// <summary>
-        /// Brings a building and everything added to it down (S2T), the god
-        /// named as the cause. Collapse refreshes the grid over the heap itself.
-        /// Returns how many voxels fell.
-        /// </summary>
-        public int BringDown(Settlement town, Project target, Int3 at)
-        {
-            long tick = Present();
-            RecordId by = _world.Annals.Write(tick, BroughtDownKind, town.Id, at, RecordId.None);
-            BiomeTable biomes = BiomeTable.FromContent(_world.Content);
-            return Collapse.BringDown(_world, town, target, by, Solid, MaterialTable.FromContent(_world.Content, biomes),
-                                      DetailModelTable.FromContent(_world.Content), _grid);
         }
     }
 }

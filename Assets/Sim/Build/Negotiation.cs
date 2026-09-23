@@ -103,15 +103,9 @@ namespace Godless.Sim.Build
         }
 
         /// <summary>
-        /// How this culture will meet this ground, and the level each column
-        /// of the footprint should end up at. Stilts leave the ground alone.
+        /// How this culture will meet the ground at a parcel, and the level each
+        /// column of the footprint should end up at. Stilts leave the ground alone.
         /// </summary>
-        public GroundPlan Choose(Site site, ParcelGrid grid, ConstraintFields fields, Genome genome, int width, int depth)
-        {
-            return Choose(site.ParcelX, site.ParcelZ, grid, fields, genome, width, depth);
-        }
-
-        /// <summary>The same, for a parcel that has not become a site yet — the measuring instrument's way in.</summary>
         public GroundPlan Choose(int parcelX, int parcelZ, ParcelGrid grid, ConstraintFields fields, Genome genome, int width, int depth)
         {
             int x0 = parcelX * ParcelGrid.Size, z0 = parcelZ * ParcelGrid.Size;

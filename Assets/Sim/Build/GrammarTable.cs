@@ -48,7 +48,7 @@ namespace Godless.Sim.Build
             return null;
         }
 
-        public static GrammarTable FromContent(ContentDatabase content, GeneTable genes, IntentKindTable intents = null)
+        public static GrammarTable FromContent(ContentDatabase content, GeneTable genes, System.Collections.Generic.ICollection<string> builds = null)
         {
             var problems = new List<string>();
             var loaded = new List<Grammar>();
@@ -56,7 +56,7 @@ namespace Godless.Sim.Build
             foreach (string id in content.Ids("grammar"))
             {
                 var loader = new Loader(id, genes);
-                Grammar g = loader.Load(content.Get("grammar", id), intents);
+                Grammar g = loader.Load(content.Get("grammar", id), builds);
                 if (loader.Fault != null) { problems.Add("grammar '" + id + "' " + loader.Fault + "."); continue; }
                 loaded.Add(g);
             }
@@ -78,7 +78,7 @@ namespace Godless.Sim.Build
 
             void Fail(string why) { if (Fault == null) Fault = why; }
 
-            public Grammar Load(JsonValue doc, IntentKindTable intents)
+            public Grammar Load(JsonValue doc, System.Collections.Generic.ICollection<string> builds)
             {
                 var g = new Grammar
                 {
@@ -95,7 +95,7 @@ namespace Godless.Sim.Build
                 };
 
                 if (g.Tell.Length == 0) Fail("declares no tell");
-                if (intents != null && FindIntent(intents, g.Builds) < 0) Fail("builds '" + g.Builds + "', which no intent kind raises");
+                if (builds != null && !builds.Contains(g.Builds)) Fail("builds '" + g.Builds + "', which nothing asks for");
 
                 JsonValue lets = doc["let"];
                 for (int i = 0; i < lets.Keys.Count && Fault == null; i++)
@@ -130,11 +130,6 @@ namespace Godless.Sim.Build
                 return g;
             }
 
-            static int FindIntent(IntentKindTable intents, string name)
-            {
-                for (int i = 0; i < intents.Count; i++) if (intents[i].Name == name) return i;
-                return -1;
-            }
 
             void CheckName(string n, Grammar g, bool inRule)
             {

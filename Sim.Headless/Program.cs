@@ -7,12 +7,9 @@ using System.Text;
 using Godless.Sim.Content;
 using Godless.Sim.Annals;
 using Godless.Sim.Build;
-using Godless.Sim.Collective;
 using Godless.Sim.Core;
-using Godless.Sim.Drives;
-using Activity = Godless.Sim.Drives.Activity;
 using Godless.Sim.Harness;
-using Godless.Sim.Settlements;
+using Godless.Sim.Economy;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 
@@ -43,10 +40,11 @@ namespace Godless.Sim.Headless
                 case "content": return Content(cli);
                 case "island": return Island(cli);
                 case "parcels": return Parcels(cli);
-                case "settle": return Settle(cli);
                 case "blueprint": return BlueprintCmd(cli);
                 case "separate": return Separate(cli);
                 case "maps": return Maps(cli);
+                case "eval": return Eval.Run(cli.Text("path", DefaultContentRoot()), cli.Text("map", "green-shore"),
+                                             (ulong)cli.Int("seed", 7), cli.Int("years", 10));
                 case "help": Help(); return 0;
                 default:
                     Console.Error.WriteLine("unknown command '" + command + "'");
@@ -67,26 +65,11 @@ namespace Godless.Sim.Headless
             // batch shrinks when one is asked for. Two hundred seeds of an
             // empty world is a framework check; twenty seeds of a real island
             // is a content check.
-            bool settled = cli.Text("settle", "false") != "false";
-            cli.Seeds(out first, out count, defaultCount: settled ? 10 : withIsland ? 20 : 200);
-            int years = cli.Int("years", settled ? 5 : 300);
+            cli.Seeds(out first, out count, defaultCount: withIsland ? 20 : 200);
+            int years = cli.Int("years", 300);
 
             BatchRunner runner;
-            if (cli.Text("settle", "false") != "false")
-            {
-                // Stratum 2's batch: one settlement per seed on a planted island.
-                LoadResult content;
-                try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
-                catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
-                WorldChoice map;
-                try { map = WorldChoice.Pick(content.Database, cli.Text("map", "")); }
-                catch (System.Exception e) { Console.Error.WriteLine(e.Message); return 1; }
-
-                runner = new BatchRunner(SettlementInvariants.Settled(content.Database, map, cli.Int("people", 20)));
-                runner.Collect(SettlementInvariants.Collector());
-                foreach (Invariant i in SettlementInvariants.All()) runner.Assert(i);
-            }
-            else if (withIsland)
+            if (withIsland)
             {
                 LoadResult content;
                 try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
@@ -269,23 +252,6 @@ namespace Godless.Sim.Headless
             {
                 Console.WriteLine("\ngrammar '" + g.Name + "' builds " + g.Builds + ": " + g.Tell);
                 foreach (string gap in tiles.Answers(g)) Console.WriteLine("  gap: " + gap);
-            }
-
-            // Needs and activities (S12), with anything refused and why.
-            DriveRules drives = DriveRules.FromContent(result.Database);
-            IReadOnlyList<string> refused = drives.Problems();
-            if (refused.Count > 0)
-            {
-                Console.WriteLine("\ndrives (S12) — " + refused.Count.ToString(c) + " refused:");
-                foreach (string problem in refused) Console.WriteLine("  " + problem);
-            }
-            if (drives.Needs.Count > 0)
-            {
-                Console.WriteLine("\n" + drives.Needs.Count.ToString(c) + " need(s), each with what a stranger sees when it goes unmet:");
-                foreach (Need n in drives.Needs.All) Console.WriteLine("  " + n.Name.PadRight(16) + n.Tell);
-                var acts = new List<string>();
-                foreach (Activity a in drives.Activities.All) acts.Add(a.Name + (a.Productive ? "*" : ""));
-                Console.WriteLine("  activities: " + string.Join(", ", acts) + "   (* productive)");
             }
 
             Console.WriteLine("\ndigest " + result.Database.Digest().ToString("x16", c));
@@ -734,7 +700,7 @@ namespace Godless.Sim.Headless
                                   string gene, double value)
         {
             int px, pz;
-            if (!Founding.StandInSite(grid, island, biomes, Symbol.For("biome." + biomeName), out px, out pz)) return null;
+            if (!Survey.FlattestNearWater(grid, island, biomes, Symbol.For("biome." + biomeName), out px, out pz)) return null;
 
             int hx = px * ParcelGrid.Size + 2, hz = pz * ParcelGrid.Size + 2;
             Catchment catchment = Catchment.Survey(island, biomes, materials, hx, hz);
@@ -764,494 +730,6 @@ namespace Godless.Sim.Headless
             return Silhouette.Measure(plan, built, materials, types, ground);
         }
 
-        // ── sim settle ──────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Founds one settlement on a real island and prints its days: the
-        /// weather, who slept in the open, what people did with their time and
-        /// what pressure it left. S12's tell, readable without a renderer.
-        /// </summary>
-        static int Settle(Args cli)
-        {
-            var c = CultureInfo.InvariantCulture;
-            ulong seed = (ulong)cli.Int("seed", 7);
-            int days = cli.Int("days", 30);
-            int people = cli.Int("people", 20);
-            int roofs = cli.Int("roofs", 0);
-            string wantBiome = cli.Text("biome", "temperate");
-
-            LoadResult content;
-            try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
-            catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
-
-            ContentDatabase db = content.Database;
-            VoxelTypes types = VoxelTypes.FromContent(db);
-            WorldChoice choice;
-            try { choice = WorldChoice.Pick(db, cli.Text("map", "")); }
-            catch (System.Exception e) { Console.Error.WriteLine(e.Message); return 1; }
-            BiomeTable biomes = choice.Biomes;
-            DriveRules rules = DriveRules.FromContent(db);
-            if (biomes.Count == 0) { Console.Error.WriteLine("no biomes declared — nowhere to settle"); return 1; }
-
-            var world = new SimWorld(seed, db, types);
-            IslandMap island = IslandGenerator.Generate(world.Voxels.Store, world.Streams, biomes, types, choice.Preset,
-                                                       cli.Text("bare", "false") != "false" ? null : choice.Features);
-            world.Island = island;
-            world.BeginHistory();
-
-            bool[] solid = TerrainBrush.SolidTable(db, types);
-            var wet = new bool[types.Count];
-            ushort water;
-            if (types.TryGetId(Symbol.For("voxel.water"), out water)) wet[water] = true;
-            ParcelGrid grid = ParcelGrid.Build(world.Voxels.Store, solid, wet);
-
-            int px, pz;
-            if (!Founding.StandInSite(grid, island, biomes, Symbol.For("biome." + wantBiome), out px, out pz)
-                && !Founding.StandInSite(grid, island, biomes, Symbol.None, out px, out pz))
-            { Console.Error.WriteLine("no dry, flat parcel near water on this island"); return 1; }
-
-            int hx = px * ParcelGrid.Size + 2, hz = pz * ParcelGrid.Size + 2;
-            var hearth = new Int3(hx, grid.GroundAt(hx, hz) + 1, hz);
-            int b = island.BiomeAt(hx, hz);
-            Biome biome = b >= 0 ? biomes.At(b) : null;
-
-            Settlement s = Settlement.Found("first", hearth, biome, people, rules, 0, world.Annals, RecordId.None);
-            s.ShelterCapacity = roofs;
-            IntentKindTable kinds = IntentKindTable.FromContent(db, rules.Needs);
-            var bus = new IntentBus(kinds, rules.Needs.Count);
-            s.AttachIntents(bus);
-            PressureTally tally = bus.Tally;
-            world.Settlements.Add(s);
-            Profiled(world, cli, new DriveSystem(rules)); Profiled(world, cli, new Subsistence(rules)); Profiled(world, cli, new StoreSystem(FoodRules.FromContent(db))); Profiled(world, cli, new IntentSystem());
-            Profiled(world, cli, new TownSystem(TownRules.FromContent(db), db, grid, biomes));
-
-            Console.WriteLine("seed " + seed.ToString(c) + ": " + people.ToString(c) + " people found a settlement at parcel ("
-                + px.ToString(c) + ", " + pz.ToString(c) + ") in " + (biome == null ? "no biome" : biome.Id.ToString())
-                + ", with " + roofs.ToString(c) + " roof(s)");
-            Console.WriteLine("site is a stand-in: the flattest dry parcel within four of water. S15 and S30 replace it.");
-
-            // S11: what the land within hauling range offers to build with.
-            MaterialTable materials = MaterialTable.FromContent(db, biomes);
-            // The same supplies the game founds a village with: a season and a half of food.
-            s.Food = people * Subsistence.MealsADay * 45;
-            s.Catchment = island.Deposits != null
-                ? Catchment.FromDeposits(island, biomes, materials, island.Deposits, hx, hz)
-                : Catchment.Survey(island, biomes, materials, hx, hz);
-            s.Stock = new MaterialStock(materials);
-            int[] depositsAtFounding = DepositsInReach(island, materials, hx, hz, true);
-            var offered = new List<string>();
-            for (int m = 0; m < materials.Count; m++)
-                if (s.Catchment.Offers(m))
-                    offered.Add(materials[m].Name + " " + (s.Catchment.YieldPerLabourTick(m) / materials[m].PerLabourTick * 100).ToString("0", c) + "%");
-            Console.WriteLine("within " + materials.HaulRangeVoxels.ToString(c) + " voxels the land offers, at this share of full yield: "
-                + (offered.Count == 0 ? "nothing" : string.Join(", ", offered)) + "\n");
-            s.Tasks = new TaskBoard(TaskKindTable.FromContent(db), s, rules, world.Streams);
-
-            // S15: the culture, and what it calls good ground.
-            var genes = Godless.Sim.Culture.GeneTable.FromContent(db);
-            var genome = new Godless.Sim.Culture.Genome(genes);
-            var named = new List<string>();
-            foreach (Godless.Sim.Culture.Gene gene in genes.All)
-            {
-                string text = cli.Text(gene.Name, null);
-                double value;
-                if (text == null || !double.TryParse(text, NumberStyles.Float, c, out value)) continue;
-                genome.Mutate(gene.Id, value, 0, s.Id, s.Founded, world.Annals);
-                named.Add(gene.Name + " " + genome[gene.Id].ToString("0.##", c));
-            }
-            s.Genome = genome;
-            if (named.Count > 0) Console.WriteLine("culture: " + string.Join(", ", named));
-
-            // S2N: the founders as families.
-            HouseholdRules householdRules = HouseholdRules.FromContent(db);
-            if (householdRules != null && cli.Text("no-families", "false") == "false")
-                Households.Found(s, householdRules, world.Clock.Tick, world.Annals);
-
-            ConstraintFields constraints = ConstraintFields.Compute(island, grid, biomes);
-            TileSet tileset = TileSet.FromContent(db, materials);
-            Palette palette = Palette.FromContent(db);
-            Profiled(world, cli, new SiteSystem(GrammarTable.FromContent(db, genes),
-                                     SitingTable.FromContent(db, genes, kinds),
-                                     tileset, materials, palette, grid, constraints,
-                                     NegotiationTable.FromContent(db, genes)));
-
-            // S1A: hands that lay the voxels, allocated like any other work.
-            var construction = new Construction(world.Voxels, materials, types, tileset, palette,
-                                                deposits: island.Deposits, ticksPerDay: world.Clock.TicksPerDay);
-            construction.GroundTable = solid;
-            construction.Details = world.Details;
-            construction.Models = DetailModelTable.FromContent(db);
-            construction.Island = island;
-            Profiled(world, cli, new DepositSystem(grid));
-            Profiled(world, cli, new SupportSystem(solid, materials, DetailModelTable.FromContent(db), grid));
-            Profiled(world, cli, new TaskSystem(construction, grid, HaulRules.FromContent(db)));
-            Profiled(world, cli, new HaulingSystem(HaulRules.FromContent(db), FoodRules.FromContent(db), DetailModelTable.FromContent(db), grid));
-            Profiled(world, cli, new FarmSystem(FarmRules.FromContent(db), CropTable.FromContent(db, genes), grid, constraints, DetailModelTable.FromContent(db)));
-            Profiled(world, cli, new CommonsSystem(CommonsRules.FromContent(db, rules.Needs), grid, DetailModelTable.FromContent(db)));
-            Profiled(world, cli, new MovementSystem(grid, rules, PastimeTable.FromContent(db)).WithCommons(CommonsRules.FromContent(db, rules.Needs)));
-            world.BeginHistory();
-
-            var header = new StringBuilder("  day  weather     in open ");
-            foreach (Activity a in rules.Activities.All) if (a.Name != "sleep") header.Append(a.Name.PadLeft(11));
-            header.Append("   pressure:");
-            foreach (Need n in rules.Needs.All) header.Append(n.Name.PadLeft(9));
-            header.Append("     stock      built  people   food");
-            Console.WriteLine(header.ToString());
-
-            int lastIntents = 0, lastProjects = 0;
-            var lastTicks = new long[rules.Activities.Count];
-            var lastPressure = new double[rules.Needs.Count];
-            for (int d = 0; d < days; d++)
-            {
-                // One row is dawn to night of one day, so an intent raised at
-                // dawn lands on the row of the day it was raised.
-                do world.Tick(); while (world.Clock.TickOfDay != world.Clock.TicksPerDay - 1);
-
-                // S2T: bring the first standing house down on the day asked for, as a god would.
-                if (d == cli.Int("demolish-day", -1))
-                {
-                    Project target = null;
-                    foreach (Project candidate in s.Projects) if (candidate.Complete && candidate.Host == null) { target = candidate; break; }
-                    if (target != null)
-                    {
-                        int parts = target.Added.Count;
-                        int fell = new GodHand(world, grid).BringDown(s, target,
-                                       Construction.World(target, target.Plan.Width / 2, 0, target.Plan.Depth / 2));
-                        Console.WriteLine("  -- day " + world.Clock.TotalDays.ToString(c) + ": a god brought down " + target.Site.Record + " and "
-                            + parts.ToString(c) + " addition(s); " + fell.ToString(c) + " voxels fell");
-                    }
-                }
-
-                long day = world.Clock.TotalDays;
-                Sky sky = Weather.On(world.Streams, biome, day, world.Clock.DaysPerYear);
-                int inOpen = 0;
-                foreach (Agent a in s.People) if (!a.ShelteredLastNight) inOpen++;
-
-                var line = new StringBuilder();
-                line.Append(day.ToString(c).PadLeft(5)).Append("  ").Append(sky.ToString().PadRight(10))
-                    .Append((inOpen.ToString(c) + "/" + people.ToString(c)).PadLeft(8)).Append(' ');
-                for (int i = 0; i < rules.Activities.Count; i++)
-                {
-                    long ticks = s.ActivityTicks[i] - lastTicks[i];
-                    lastTicks[i] = s.ActivityTicks[i];
-                    if (rules.Activities[i].Name != "sleep") line.Append(ticks.ToString(c).PadLeft(11));
-                }
-                line.Append("            ");
-                for (int n = 0; n < rules.Needs.Count; n++)
-                {
-                    double p = tally.Total(n) - lastPressure[n];
-                    lastPressure[n] = tally.Total(n);
-                    line.Append(p.ToString("0.0", c).PadLeft(9));
-                }
-                long held = 0;
-                for (int m = 0; m < s.Stock.Materials.Count; m++) held += s.Stock.Of(m);
-                long placed = 0, wanted = 0;
-                foreach (Project project in s.Projects) { placed += project.Placed; wanted += project.Built.TotalVoxels; }
-                line.Append(held.ToString(c).PadLeft(10))
-                    .Append((wanted == 0 ? "" : placed.ToString(c) + "/" + wanted.ToString(c)).PadLeft(11))
-                    .Append(s.People.Count.ToString(c).PadLeft(8))
-                    .Append(s.Food.ToString("0", c).PadLeft(7)).Append("   ");
-                for (; lastIntents < bus.Intents.Count; lastIntents++) line.Append("+" + bus.Intents[lastIntents].Kind.Name + " ");
-                for (; lastProjects < s.Projects.Count; lastProjects++)
-                {
-                    Site site = s.Projects[lastProjects].Site;
-                    line.Append("sited (" + site.ParcelX.ToString(c) + "," + site.ParcelZ.ToString(c) + ") ");
-                }
-                Console.WriteLine(line.ToString());
-            }
-
-            IReadOnlyList<AnnalRecord> spells = world.Annals.OfKind(DriveSystem.ExposedKind);
-            Console.WriteLine("\n" + spells.Count.ToString(c) + " spell(s) of nights in the open on record; every unit of pressure names its cause:");
-            for (int n = 0; n < rules.Needs.Count; n++)
-            {
-                double total = tally.Total(n);
-                if (total <= 0.0) continue;
-                Console.WriteLine("  " + rules.Needs[n].Name.PadRight(10) + total.ToString("0.0", c).PadLeft(9)
-                    + "   " + Pct((long)(tally.Caused(n) * 1000), (long)(total * 1000)) + " traced to a record");
-            }
-            // S14's tell: every intent names the records that produced it.
-            if (bus.Intents.Count > 0)
-                Console.WriteLine("\n" + bus.Intents.Count.ToString(c) + " build intent(s), each with the records that asked for it:");
-            foreach (BuildIntent i in bus.Intents)
-            {
-                Console.WriteLine("  " + i.Record + "  day " + (i.RaisedTick / world.Clock.TicksPerDay).ToString(c) + "  "
-                    + i.Kind.Name + " near parcel (" + i.ParcelX.ToString(c) + ", " + i.ParcelZ.ToString(c) + "), weight "
-                    + i.Weight.ToString("0", c) + ", budget " + i.BudgetVoxels.ToString(c) + " voxels, " + i.Status.ToString().ToLowerInvariant());
-                foreach (RecordId cause in i.Causes)
-                {
-                    AnnalRecord r = world.Annals.Get(cause);
-                    string weather = r.Participants.Count == 0 ? "dry" : string.Join(" and ", r.Participants).Replace("condition.", "");
-                    Console.WriteLine("      because " + r.Id + ": from day " + (r.Tick / world.Clock.TicksPerDay).ToString(c) + ", "
-                        + (r.Kind == DriveSystem.ExposedKind
-                            ? r.ValueA.ToString(c) + " slept in the open, " + weather
-                            : r.Kind.ToString()));
-                }
-            }
-            // S15 and S19: where each house went, and what it is made of.
-            if (s.Projects.Count > 0) Console.WriteLine("\n" + s.Projects.Count.ToString(c) + " house(s) planned, sited and costed:");
-            foreach (Project project in s.Projects)
-            {
-                var of = new List<string>();
-                for (int m = 0; m < materials.Count; m++)
-                    if (project.Built.Cost[m] > 0) of.Add(project.Built.Cost[m].ToString(c) + " " + materials[m].Name);
-                Console.WriteLine("  " + project.Site.Record + " parcel (" + project.Site.ParcelX.ToString(c) + ", "
-                    + project.Site.ParcelZ.ToString(c) + ") score " + project.Site.Score.ToString("0.0", c)
-                    + ", sleeps " + project.Plan.Capacity.ToString(c) + (project.Complete ? " in " + project.Beds.Count.ToString(c) + " beds" : "")
-                    + ", " + string.Join(" + ", of)
-                    + "   " + (project.Complete ? "standing" : project.Placed + " of " + project.Built.TotalVoxels + " laid")
-                    + (project.Ground == null ? "" : ", " + project.Ground.Strategy.ToString().ToLowerInvariant()
-                        + (project.Ground.Moved > 0 ? " (" + project.Ground.Moved.ToString(c) + " voxels of earth moved)" : "")));
-                if (project.Reasons.Count > 0) Console.WriteLine("      why: " + string.Join("; ", project.Reasons));
-                if (project.Host != null && cli.Text("inspect", "false") != "false")
-                {
-                    // Where the part's body and its host's body stand, and how much of the part is really there.
-                    int present = 0, expected = 0;
-                    for (int y = 0; y < project.Plan.Height; y++)
-                        for (int z = 0; z < project.Plan.Depth; z++)
-                            for (int x = 0; x < project.Plan.Width; x++)
-                            {
-                                ushort want = project.Built.At(x, y, z);
-                                if (want == 0) continue;
-                                expected++;
-                                if (world.Voxels.Get(Construction.World(project, x, y, z)) == want) present++;
-                            }
-                    Int3 a0 = Construction.World(project, Grammar.Margin, 0, Grammar.Margin);
-                    Int3 a1 = Construction.World(project, project.Plan.Width - 1 - Grammar.Margin, project.Plan.Height - 1, project.Plan.Depth - 1 - Grammar.Margin);
-                    Project h = project.Host;
-                    Int3 h0 = Construction.World(h, Grammar.Margin, 0, Grammar.Margin);
-                    Int3 h1 = Construction.World(h, h.Plan.Width - 1 - Grammar.Margin, h.Plan.Height - 1, h.Plan.Depth - 1 - Grammar.Margin);
-                    Console.WriteLine("      inspect: " + project.PartKind + " body x " + a0.X + ".." + a1.X + " z " + a0.Z + ".." + a1.Z
-                        + " y " + a0.Y + ".." + a1.Y + "; host body x " + h0.X + ".." + h1.X + " z " + h0.Z + ".." + h1.Z
-                        + " y " + h0.Y + ".." + h1.Y + "; " + present + " of " + expected + " voxels standing"
-                        + ", ground " + (project.Ground == null ? "none" : project.Ground.Strategy.ToString()));
-                }
-                foreach (string note in project.Built.Compromises) Console.WriteLine("      " + note);
-            }
-
-            // S1C's tell: nobody was assigned anything, and yet.
-            if (s.Tasks.Count > 0)
-            {
-                Console.WriteLine("\nwho did the gathering (nobody was assigned anything):");
-                for (int j = 0; j < s.Tasks.Count; j++)
-                {
-                    long total = s.Tasks.TotalWork(j);
-                    if (total == 0) continue;
-                    // The regulars: everyone who did at least a tenth of it.
-                    var regulars = new List<string>();
-                    long byRegulars = 0;
-                    for (int i = 0; i < s.People.Count; i++)
-                        if (s.Tasks.WorkBy(i, j) * 10 >= total) { regulars.Add("#" + i.ToString(c)); byRegulars += s.Tasks.WorkBy(i, j); }
-                    int m = s.Tasks.MaterialOf(j);
-                    Console.WriteLine("  " + s.Tasks.TaskId(j).ToString().Replace("task.", "").PadRight(16) + total.ToString(c).PadLeft(6)
-                        + " ticks, " + Pct(byRegulars, total) + " by " + (regulars.Count == 0 ? "nobody in particular" : string.Join(" ", regulars))
-                        + (m >= 0 ? "   holding " + s.Stock.Of(m).ToString(c) : ""));
-                }
-                double sum = 0.0; int gatherers = 0;
-                for (int i = 0; i < s.People.Count; i++)
-                {
-                    long all = 0, main = 0;
-                    for (int j = 0; j < s.Tasks.Count; j++) { all += s.Tasks.WorkBy(i, j); main = Math.Max(main, s.Tasks.WorkBy(i, j)); }
-                    if (all < 20) continue;
-                    sum += (double)main / all; gatherers++;
-                }
-                if (gatherers > 0)
-                    Console.WriteLine("  " + gatherers.ToString(c) + " people gathered; on average " + (sum / gatherers * 100).ToString("0", c)
-                        + "% of each one's gathering was their own main material");
-                Console.WriteLine("  " + s.Tasks.IdleTicks.ToString(c) + " working ticks found nothing that needed doing");
-            }
-            if (s.Ruins.Count > 0 || s.Rubble.Count > 0)
-            {
-                // S2T: what fell, and what of it still lies there.
-                long beds = 0;
-                foreach (Project p in s.Projects) beds += p.Beds.Count;
-                Console.WriteLine("\nruins (S2T): " + s.Ruins.Count.ToString(c) + " building(s) came down; "
-                    + s.Rubble.Count.ToString(c) + " voxels of rubble still lie in the settlement; "
-                    + world.Details.Count.ToString(c) + " detail objects stand (" + beds.ToString(c) + " beds)");
-            }
-
-            if (island.Deposits != null)
-            {
-                // S2F: what is left in reach, against what was there.
-                int[] now = DepositsInReach(island, materials, hx, hz, false);
-                Console.WriteLine("\nwhat is left within reach (S2F), of what stood at founding:");
-                for (int m = 0; m < materials.Count; m++)
-                {
-                    if (depositsAtFounding[m] == 0) continue;
-                    int nearest = s.Catchment.NearestSource(m);
-                    string walk = nearest < 0 ? "none left in reach"
-                        : "nearest " + ((int)System.Math.Sqrt((double)(island.Deposits.X(nearest) - hx) * (island.Deposits.X(nearest) - hx)
-                                        + (double)(island.Deposits.Z(nearest) - hz) * (island.Deposits.Z(nearest) - hz))).ToString(c)
-                          + " voxels out, a tick brings " + s.Catchment.YieldPerLabourTick(m).ToString("0.00", c);
-                    Console.WriteLine("  " + materials[m].Name.PadRight(8) + (now[m] * 100L / depositsAtFounding[m]).ToString(c).PadLeft(4)
-                        + "%  (" + now[m].ToString(c) + " of " + depositsAtFounding[m].ToString(c) + ")  " + walk);
-                }
-                Console.WriteLine("  " + world.Annals.OfKind(Catchment.ExhaustedKind).Count.ToString(c)
-                    + " material(s) worked out of reach; foraging now feeds " + s.Catchment.FoodPerLabourTick.ToString("0.00", c)
-                    + " a tick, and the land in reach gives up " + s.Catchment.ForagePerDay.ToString("0", c) + " meals a day at most");
-            }
-            if (s.Households.Count > 0)
-            {
-                // S2N: who lives where.
-                // S2I, S2H, S2X: fields, stores and what is lying about.
-                Console.WriteLine("\nfarms (S2I): " + s.Farms.Count.ToString(c));
-                foreach (Farm f in s.Farms)
-                {
-                    int[] byState = new int[4];
-                    double fert = 0.0;
-                    foreach (Plot p in f.Plots) { byState[(int)p.State]++; fert += p.Fertility; }
-                    Console.WriteLine("  " + f.Record + " " + f.Crop.Name.PadRight(7) + f.Plots.Count.ToString(c).PadLeft(3) + " plots ("
-                        + byState[0].ToString(c) + " fallow, " + byState[1].ToString(c) + " growing, " + byState[2].ToString(c) + " ripe, "
-                        + byState[3].ToString(c) + " stubble), soil " + (fert / Math.Max(1, f.Plots.Count)).ToString("0.00", c)
-                        + ", " + f.MealsPerDay.ToString("0.0", c) + " meals a day; last weighed growing: " + f.LastGrowth);
-                }
-                int farmTask = -1;
-                for (int j = 0; j < s.Tasks.Count; j++) if (s.Tasks.KindOf(j).Verb == "farm") farmTask = j;
-                if (farmTask >= 0)
-                    Console.WriteLine("  farm task: demand " + s.Tasks.Demand(farmTask).ToString("0.0", c) + ", stimulus "
-                        + s.Tasks.Stimulus(farmTask).ToString("0.000", c) + ", " + s.Tasks.TotalWork(farmTask).ToString(c) + " ticks worked");
-                else Console.WriteLine("  no farm task on the board");
-                var hands = new SortedDictionary<string, int>();
-                for (int i = 0; i < s.People.Count; i++)
-                {
-                    int ct = s.Tasks.CurrentTask(i);
-                    string key = ct < 0 ? "(none)" : s.Tasks.TaskId(ct).ToString();
-                    hands[key] = (hands.ContainsKey(key) ? hands[key] : 0) + 1;
-                }
-                var handText = new List<string>();
-                foreach (KeyValuePair<string, int> kv in hands) handText.Add(kv.Key + " " + kv.Value.ToString(c));
-                Console.WriteLine("  hands now: " + string.Join(", ", handText));
-                for (int j = 0; j < s.Tasks.Count; j++)
-                    if (s.Tasks.Demand(j) > 0.0)
-                        Console.WriteLine("    " + s.Tasks.TaskId(j) + " demand " + s.Tasks.Demand(j).ToString("0.0", c) + " stimulus " + s.Tasks.Stimulus(j).ToString("0.00", c));
-                long harvests = world.Annals.OfKind(Farms.HarvestedKind).Count, sowings = world.Annals.OfKind(Farms.SownKind).Count;
-                Console.WriteLine("  " + sowings.ToString(c) + " sowings, " + harvests.ToString(c) + " harvests on record");
-                foreach (Project p in s.Projects)
-                {
-                    if (p.Complete || p.Destroyed || p.Built == null) continue;
-                    long[] owed = Construction.Owed(p);
-                    var bill = new List<string>();
-                    for (int m = 0; m < owed.Length; m++)
-                        if (owed[m] > 0)
-                            bill.Add(materials[m].Name + " " + owed[m].ToString(c) + " (held " + s.Stock.Of(m).ToString(c) + ", heaped "
-                                     + Hauling.Piled(s, m).ToString("0", c) + ", a tick brings " + s.Catchment.YieldPerLabourTick(m).ToString("0.00", c) + ")");
-                    Console.WriteLine("unfinished " + p.Site.Record + " " + p.Intent.Kind.Name + (p.Host != null ? " " + p.PartKind : "")
-                        + ": " + p.Placed.ToString(c) + " laid, begun " + p.Begun.Exists + ", ready " + Construction.Ready(s, p)
-                        + ", obtainable " + Construction.Obtainable(s, p) + "; owes " + string.Join(", ", bill));
-                }
-                if (s == world.Settlements[0])
-                {
-                    Console.WriteLine("towns (S2Y): " + world.Settlements.Count);
-                    foreach (Settlement t in world.Settlements)
-                    {
-                        int housedT = 0, homelessT = Towns.Homeless(t);
-                        Console.WriteLine("  " + t.Id + " at parcel (" + t.HearthParcelX + ", " + t.HearthParcelZ + "), founded day "
-                            + world.Annals.Get(t.Founded).Tick / world.Clock.TicksPerDay + ": " + t.People.Count + " people, "
-                            + t.ShelterCapacity + " sleeping places, " + homelessT + " homeless, " + t.Farms.Count + " farms, holds "
-                            + (t.Borders != null ? t.Borders.Area(t) : 0) + " parcels; homeless for " + t.HomelessDays + " days, "
-                            + (t.NoSiteTick < 0 ? "never short of ground" : "last short of ground on day " + t.NoSiteTick / world.Clock.TicksPerDay));
-                        if (t.Borders != null)
-                        {
-                            int fx, fz;
-                            TownRules tr = TownRules.FromContent(db);
-                            bool found = Towns.FindSite(world, db, grid, biomes, t.Borders, t, tr, out fx, out fz);
-                            Console.WriteLine("    a new town from here: " + (found ? "at parcel (" + fx + ", " + fz + ")" : "nowhere (" + Towns.WhyNowhere(world, db, grid, biomes, t.Borders, t, tr) + ")"));
-                        }
-                    }
-                    // S2Z: what each town's fire has become, and what gathered there.
-                    CommonsRules cr = CommonsRules.FromContent(db, rules.Needs);
-                    if (cr != null)
-                        foreach (Settlement t in world.Settlements)
-                        {
-                            Commons cm = t.Commons;
-                            if (cm == null) continue;
-                            Console.WriteLine("  " + t.Id + " commons (S2Z): " + cm.PlaceName(cr) + ", holds " + cr.Stages[cm.Stage].Holds
-                                + ", " + cm.Seats.Count + " seats, " + cm.Paved + " columns paved, " + cm.GatheringsHeld + " gatherings"
-                                + (cm.Underway >= 0 ? ", making " + cr.Stages[cm.Underway].Name : "")
-                                + (cm.Building != null ? ", " + cm.Building.Intent.Kind.Name + (cm.Building.Complete ? " standing" : " going up") : "")
-                                + (cm.Last != null ? "; last: " + cm.Last.Kind.Doing + " at " + cm.Last.Place + ", day " + cm.Last.Day + ", " + cm.Last.Attending + " came" : ""));
-                        }
-                    var gatheredKinds = new SortedDictionary<string, int>();
-                    foreach (AnnalRecord r in world.Annals.OfKind(Commons.GatheredKind))
-                    {
-                        string k = r.Participants.Count > 0 ? r.Participants[0].ToString() : "?";
-                        int n; gatheredKinds.TryGetValue(k, out n); gatheredKinds[k] = n + 1;
-                    }
-                    foreach (KeyValuePair<string, int> kv in gatheredKinds) Console.WriteLine("    " + kv.Key + ": " + kv.Value);
-                    foreach (AnnalRecord r in world.Annals.OfKind(Commons.RaisedKind))
-                        Console.WriteLine("    day " + r.Tick / world.Clock.TicksPerDay + ": " + r.Subject + " raised its commons to stage " + r.ValueA);
-
-                    foreach (AnnalRecord r in world.Annals.OfKind(Towns.OutgrownKind))
-                        Console.WriteLine("  day " + r.Tick / world.Clock.TicksPerDay + ": " + r.Subject + " outgrown, " + r.ValueA + " of " + r.ValueB + " left");
-                }
-                Console.WriteLine("daylight at the fire: " + (s.DaylightTicks > 0 ? 100.0 * s.DaylightAtFire / s.DaylightTicks : 0.0).ToString("0.0", c)
-                    + "% of " + s.DaylightTicks.ToString(c) + " agent-ticks");
-
-                // Why a waiting house cannot be sited, if one is waiting.
-                foreach (BuildIntent open in s.Intents.Intents)
-                {
-                    if (open.Status != IntentStatus.Open || open.Kind.Purpose != IntentPurpose.Home) continue;
-                    GrammarTable grammarsNow = GrammarTable.FromContent(db, genes);
-                    SitingTable sitingNow = SitingTable.FromContent(db, genes, kinds);
-                    SitingRule rule = sitingNow.For(open.Kind.Name);
-                    Blueprint probe = grammarsNow.For(open.Kind.Name).Build(s.Genome, palette, 80, 80, open.BudgetVoxels,
-                        new Dictionary<string, double> { { "capacity", 6 } });
-                    bool[] reach = SiteScorer.ReachableFromFire(s, grid);
-                    int reachable = 0, claimedNear = 0;
-                    for (int qz = open.ParcelZ - rule.SearchRadius; qz <= open.ParcelZ + rule.SearchRadius; qz++)
-                        for (int qx = open.ParcelX - rule.SearchRadius; qx <= open.ParcelX + rule.SearchRadius; qx++)
-                        {
-                            if (!ParcelGrid.InBounds(qx, qz)) continue;
-                            if (reach[qz * ParcelGrid.Width + qx]) reachable++;
-                            if (s.IsClaimed(qx, qz)) claimedNear++;
-                        }
-                    int found = SiteScorer.Candidates(s, open, probe, rule, grid, constraints, s.Genome, 50, reach).Count;
-                    int land = 0, dry = 0, free = 0, allowed = 0, walk = 0;
-                    int far = rule.SearchRadius * 3;
-                    for (int qz = open.ParcelZ - far; qz <= open.ParcelZ + far; qz++)
-                        for (int qx = open.ParcelX - far; qx <= open.ParcelX + far; qx++)
-                        {
-                            if (!ParcelGrid.InBounds(qx, qz) || !grid.IsLand(qx, qz)) continue;
-                            land++;
-                            if (grid.WetColumns(qx, qz) > 4) continue;
-                            dry++;
-                            if (s.IsClaimed(qx, qz) && !s.IsField(qx, qz)) continue;
-                            free++;
-                            if (grid.Slope[qx, qz] >= 10) continue;
-                            allowed++;
-                            if (reach[qz * ParcelGrid.Width + qx]) walk++;
-                        }
-                    Console.WriteLine("  within " + far + ": land " + land + ", dry " + dry + ", free or field " + free + ", not a cliff " + allowed + ", walkable " + walk
-                        + "; plan " + probe.Width + "x" + probe.Depth);
-                    int pw = (probe.Width - 2 * Grammar.Margin + ParcelGrid.Size - 1) / ParcelGrid.Size, pd = (probe.Depth - 2 * Grammar.Margin + ParcelGrid.Size - 1) / ParcelGrid.Size;
-                    int ringGap = rule.Weight("wing", s.Genome) > rule.Weight("storey", s.Genome) + 0.1 ? 2 : 1;
-                    Console.WriteLine("  " + pw + "x" + pd + " parcels, gap " + ringGap + ": " + SiteScorer.WhyNoSite(s, grid, open.ParcelX, open.ParcelZ, far, pw, pd, ringGap, reach));
-                    Console.WriteLine("waiting house " + open.Record + " at parcel (" + open.ParcelX + ", " + open.ParcelZ + "), radius " + rule.SearchRadius
-                        + ": " + found + " sites for a family of 6; " + reachable + " parcels walkable from the fire, " + claimedNear + " claimed, in reach");
-                    break;
-                }
-                Console.WriteLine("stores (S2H): " + Stores.Capacity(s).ToString("0", c) + " meals kept in stores; "
-                    + s.FoodSpoiled.ToString("0", c) + " meals rotted so far");
-                double heapedFood = Hauling.Piled(s, -1);
-                Console.WriteLine("heaps (S2X): " + s.Piles.Count.ToString(c) + ", " + heapedFood.ToString("0", c) + " meals of food lying about");
-
-                Households.Settle(s);
-                int housed = 0, crowded = 0, roofless = 0;
-                foreach (Household h in s.Households) { if (!h.Housed) roofless++; else if (h.Crowded) crowded++; else housed++; }
-                Console.WriteLine("\nfamilies (S2N): " + s.Households.Count.ToString(c) + " — " + housed.ToString(c) + " housed, "
-                    + crowded.ToString(c) + " crowded, " + roofless.ToString(c) + " with no roof of their own");
-                foreach (Household h in s.Households)
-                    Console.WriteLine("  " + h.Id.ToString().Replace(s.Id + ".", "").PadRight(14) + h.Size.ToString(c).PadLeft(3) + " people, "
-                        + (h.Housed ? h.Beds.ToString(c) + " beds in " + h.Home.Count.ToString(c) + " home(s)" : "no roof"));
-            }
-            foreach (TimedSystem t in Timed)
-                Console.WriteLine("  profile " + t.Id.ToString().PadRight(22) + t.Watch.Elapsed.TotalSeconds.ToString("0.00", c) + " s");
-            Console.WriteLine("\nroofs now: " + s.ShelterCapacity.ToString(c) + " sleeping places for " + s.People.Count.ToString(c)
-                + " people (" + s.Born.ToString(c) + " born, " + s.Died.ToString(c) + " lost); "
-                + s.Food.ToString("0", c) + " meals in the store, land feeds "
-                + s.Catchment.FoodPerLabourTick.ToString("0.00", c) + " a forager-tick.");
-            Console.WriteLine("activity ticks are agent-ticks: " + people.ToString(c) + " people x 3 daylight ticks a day.");
-            return 0;
-        }
 
         /// <summary>Whether any column in a drawn cell holds river or lake water. Rivers are one column wide; sampling would miss them.</summary>
         static bool AnyWater(IslandMap map, int x0, int z0, int w, int h, out bool lake)
@@ -1274,38 +752,6 @@ namespace Godless.Sim.Headless
             return (100.0 * part / whole).ToString("0.0", CultureInfo.InvariantCulture) + "%";
         }
 
-        static readonly List<TimedSystem> Timed = new List<TimedSystem>();
-
-        static void Profiled(SimWorld world, Args cli, ISimSystem system)
-        {
-            if (cli.Text("profile", "false") == "false") { world.Add(system); return; }
-            var timed = new TimedSystem(system);
-            Timed.Add(timed);
-            world.Add(timed);
-        }
-
-        /// <summary>Wall-clock per system, for `sim settle --profile`. Headless only: the sim never sees a clock.</summary>
-        sealed class TimedSystem : ISimSystem
-        {
-            readonly ISimSystem _inner;
-            public readonly Stopwatch Watch = new Stopwatch();
-            public TimedSystem(ISimSystem inner) { _inner = inner; }
-            public Symbol Id { get { return _inner.Id; } }
-            public void Tick(SimWorld world) { Watch.Start(); _inner.Tick(world); Watch.Stop(); }
-        }
-
-        /// <summary>Material units per material in features within haul range; with <paramref name="initial"/>, what they started with.</summary>
-        static int[] DepositsInReach(IslandMap island, MaterialTable materials, int hx, int hz, bool initial)
-        {
-            var units = new int[materials.Count];
-            if (island.Deposits == null) return units;
-            foreach (int f in island.Deposits.Within(hx, hz, materials.DepositRangeVoxels))
-            {
-                int m = materials.IndexOf(island.Deposits.KindOf(f).Yields);
-                if (m >= 0) units[m] += initial ? island.Deposits.Initial(f) : island.Deposits.Remaining(f);
-            }
-            return units;
-        }
 
         static char GlyphFor(string biomeId)
         {
@@ -1420,11 +866,13 @@ namespace Godless.Sim.Headless
             Console.WriteLine(
 @"godless sim harness
 
-  sim run      [--seeds A..B] [--years N] [--island | --settle [--map M] [--people P]]
+  sim run      [--seeds A..B] [--years N] [--island [--map M]]
                                             batch run, checking every invariant
   sim verify   [--seeds A..B] [--years N]   run each seed twice, compare byte for byte
   sim content  [--path P]                   load Assets/Content and report what it holds
   sim maps     [--path P]                   list the maps content declares, and what each is like
+  sim eval     [--map M] [--seed N] [--years Y]
+                                            measure the game against each milestone's goals; exit 1 on a miss
   sim island   [--seed N] [--width W] [--map M]
                                             generate an island and draw it
   sim parcels  [--seed N] [--field F]       draw a planning field: height, slope, water-distance,
@@ -1433,12 +881,10 @@ namespace Godless.Sim.Headless
                                             run a grammar for a genome and draw the house (S18)
   sim separate [--seeds A..B] [--gene G] [--biomes A,B]
                                             measure whether two biomes (or two cultures) build differently (S1G)
-  sim settle   [--seed N] [--days D] [--people P] [--roofs R] [--biome B] [--<gene> V ...]
-                                            found a settlement and print its days (S12, S14)
 
 --map picks one of the worlds in Assets/Content (see `sim maps`); without it
 you get the built-in island with every biome content declares. It works on
-run, island, parcels, separate and settle.
+run, island, parcels and separate.
 
 Defaults: run 0..200 x 300 years (0..20 with --island), verify 0..20 x 100 years.
 --island generates real terrain from Assets/Content for every seed, which is

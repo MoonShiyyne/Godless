@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using Godless.Sim.Core;
-using Godless.Sim.Settlements;
+using Godless.Sim.Economy;
 using Godless.Sim.Voxels;
 
 namespace Godless.Sim.Build

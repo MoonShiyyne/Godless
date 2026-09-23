@@ -66,7 +66,7 @@ namespace Godless.Sim.Tests
             Assert.Equal(8, report.Runs.Count);
             foreach (RunResult r in report.Runs)
             {
-                Assert.Equal(25L * 360L * 4L, r.Ticks);
+                Assert.Equal(25L * 360L, r.Ticks);   // v2: a step a day
                 Assert.Equal(25, r.AnnalCount);   // one record a year
                 Assert.True(r.DeltaCount > 0);
             }

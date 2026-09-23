@@ -1,9 +1,0 @@
-{
-  "type": "activity",
-  "id": "keep-watch",
-  "requires": ["day", "hearth"],
-  "at": "fire",
-  "relieves": { "safety": 0.2 },
-  "doing": "keeping watch",
-  "pose": "stand"
-}

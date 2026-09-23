@@ -5,7 +5,7 @@ using Godless.Sim.Build;
 using Godless.Sim.Content;
 using Godless.Sim.Core;
 using Godless.Sim.Culture;
-using Godless.Sim.Settlements;
+using Godless.Sim.Economy;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using Xunit;
