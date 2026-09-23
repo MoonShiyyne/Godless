@@ -350,7 +350,8 @@ namespace Godless.Unity
 
             FeedPanel();
 
-            if (GUI.Button(new Rect(Screen.width - 180, Screen.height - 44, 166, 30), "Choose another world")) ChooseAnotherWorld();
+            // Top right, under the stats: the bottom edge is the timeline's.
+            if (GUI.Button(new Rect(Screen.width - 180, 70, 166, 28), "Choose another world")) ChooseAnotherWorld();
         }
 
         /// <summary>The feed: newest at the bottom, fading with age; click a line to go there.</summary>
