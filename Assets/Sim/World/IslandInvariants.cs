@@ -60,6 +60,7 @@ namespace Godless.Sim.World
                 long largest = 0;
                 foreach (var pair in present) if (pair.Value > largest) largest = pair.Value;
                 into.Record("island.dominant-biome-fraction", sampled > 0 ? (double)largest / sampled : 1.0);
+                into.Record("island.dominant-biome-most", preset.MaxDominantBiome);
 
                 CollectWater(world, map, into);
                 CollectDeposits(world, map, into);
@@ -102,6 +103,10 @@ namespace Godless.Sim.World
             ushort water;
             bool hasWater = world.VoxelTypes.TryGetId(Core.Symbol.For("voxel.water"), out water);
 
+            // The cap is the map's, as Hydrology applied it: a massif's tarns
+            // stand deeper than a delta's meres on purpose (L5).
+            int cap = (map.Map ?? WorldPreset.Default()).MaxLakeDepth;
+
             long rivers = 0, lakes = 0, mouths = 0, misplaced = 0, overdeep = 0;
             for (int z = 0; z < ChunkStore.SizeZ; z++)
                 for (int x = 0; x < ChunkStore.SizeX; x++)
@@ -118,7 +123,7 @@ namespace Godless.Sim.World
                     else
                     {
                         lakes++;
-                        if (level - h > Hydrology.MaxLakeDepth) overdeep++;
+                        if (level - h > cap) overdeep++;
                     }
 
                     bool ok = hasWater && h > 0 && IsSolid(solid, store.Get(x, h - 1, z));
@@ -183,12 +188,15 @@ namespace Godless.Sim.World
                 // be held to showing three, and a map showing four of which
                 // one covers everything passes while being exactly the
                 // failure this is for. So: more than one, and none of them
-                // the whole island.
+                // the whole island — where "the whole island" is the map's
+                // number too. A delta is mud and reed on purpose; at 200
+                // seeds its flood plain covers up to 91% of the land, and a
+                // global 0.9 called that a swallowed island.
                 Invariant.PerRun("S09", "more than one biome appears on land",
                     run => run.Metric("island.biomes-present") >= 2.0),
 
                 Invariant.PerRun("S09", "no single biome swallows the island",
-                    run => run.Metric("island.dominant-biome-fraction") <= 0.9),
+                    run => run.Metric("island.dominant-biome-fraction") <= run.Metric("island.dominant-biome-most")),
 
                 // S2F. A tree in a river, or a boulder hanging over a hole, is a
                 // deposit nobody can reach and a picture nobody believes.
@@ -213,7 +221,10 @@ namespace Godless.Sim.World
                     run => run.Metric("water.misplaced-columns") == 0.0),
 
                 // Lakes stay in their basins: a closed basin holds a lake at
-                // its bottom rather than drowning a highland plateau.
+                // its bottom rather than drowning a highland plateau. Deeper
+                // than the cap the map declares, not a global one — reading
+                // Hydrology's default here failed every seed of the Cold
+                // Massif, whose document asks for four.
                 Invariant.PerRun("S0B", "no lake stands deeper than its cap",
                     run => run.Metric("water.overdeep-lake-columns") == 0.0),
             };

@@ -91,6 +91,22 @@ namespace Godless.Sim.Tests
             }
         }
 
+        /// <summary>
+        /// The limits the S09 and S0B invariants hold a map to are read from
+        /// the map. Both failures this replaced came from a global number
+        /// judging a place that had declared its own: the massif's four-deep
+        /// tarns against Hydrology's three, the delta's flood plain against a
+        /// hard-coded 0.9.
+        /// </summary>
+        [Fact]
+        public void AMapsOwnLimitsComeFromItsDocument()
+        {
+            WorldTable maps = WorldTable.FromContent(RealContent());
+            Assert.Equal(4, maps.Find("cold-massif").MaxLakeDepth);
+            Assert.Equal(0.95, maps.Find("broad-delta").MaxDominantBiome);
+            Assert.Equal(WorldPreset.Default().MaxDominantBiome, maps.Find("green-shore").MaxDominantBiome);
+        }
+
         [Fact]
         public void MapsSortStablyAndAreFoundByName()
         {

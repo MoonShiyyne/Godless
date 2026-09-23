@@ -19,6 +19,11 @@
   // floods a map is caught at 200 seeds rather than by eye.
   "land": { "least": 0.06, "most": 0.34 },
 
+  // Mesa is what this country is: the commonest biome on every seed, 75% of
+  // the land on average and up to 93% over seeds 0-199. Above this the reach
+  // would have nothing else on it.
+  "dominantBiome": { "most": 0.95 },
+
   "centres": [
     { "x": 0.46, "z": 0.42, "radius": 0.44 },
     { "x": 0.60, "z": 0.66, "radius": 0.26 }
