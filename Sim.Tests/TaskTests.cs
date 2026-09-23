@@ -229,6 +229,69 @@ namespace Godless.Sim.Tests
             Assert.True(oak > granite, "the land gives oak up most readily, so there is most of it: " + oak + " oak, " + granite + " granite");
         }
 
+        /// <summary>
+        /// The land comes to offer a material it did not when the town was
+        /// founded — the reach widened out to a pine wood, or what was cut grew
+        /// back — and a task goes on the board for it. The board was fixed at
+        /// founding, so green shore planned a wing in pine that nobody had a
+        /// task to fetch, and it stood unfinished from year 8 on.
+        /// </summary>
+        [Fact]
+        public void AMaterialThatComesIntoReachGetsAGatheringTaskAndNobodyElseChanges()
+        {
+            var town = new Town(Gather(0.05, 1.0));
+            town.Live(30);
+            MaterialTable materials = town.S.Stock.Materials;
+            int slate = materials.IndexOf("slate");
+            Assert.Equal(-1, town.Board.IndexOf("task.gather.slate"));
+            Assert.False(town.Board.Gathers(slate));
+
+            // What everyone had on the tasks they had, before slate is found.
+            int people = town.S.People.Count, before = town.Board.Count;
+            var ids = new Symbol[before];
+            var threshold = new double[people, before];
+            var work = new long[people, before];
+            for (int j = 0; j < before; j++) ids[j] = town.Board.TaskId(j);
+            for (int i = 0; i < people; i++)
+                for (int j = 0; j < before; j++) { threshold[i, j] = town.Board.Threshold(i, j); work[i, j] = town.Board.WorkBy(i, j); }
+
+            var sources = new long[materials.Count];
+            for (int m = 0; m < materials.Count; m++) sources[m] = town.S.Catchment.Sources(m);
+            sources[slate] = 1500;
+            town.S.Catchment = Catchment.FromSources(materials, sources);
+            town.Board.Step(town.S, town.Rng);
+
+            Assert.Equal(before + 1, town.Board.Count);
+            Assert.True(town.Board.Gathers(slate));
+
+            // In material order, whenever it came (L2).
+            int last = -1;
+            for (int j = 0; j < town.Board.Count; j++)
+            {
+                int m = town.Board.MaterialOf(j);
+                if (m < 0) continue;
+                Assert.True(m > last, "gathering tasks out of material order at " + town.Board.TaskId(j));
+                last = m;
+            }
+
+            // Everyone keeps their temperament and their history: one tick of
+            // learning at most, and at most one tick's work.
+            for (int k = 0; k < before; k++)
+            {
+                int j = town.Board.IndexOf(ids[k].ToString());
+                Assert.True(j >= 0, ids[k] + " left the board");
+                for (int i = 0; i < people; i++)
+                {
+                    Assert.InRange(town.Board.Threshold(i, j), threshold[i, k] - 0.031, threshold[i, k] + 0.031);
+                    Assert.InRange(town.Board.WorkBy(i, j), work[i, k], work[i, k] + 1);
+                }
+            }
+
+            town.Live(60);
+            Assert.True(town.Board.TotalWork(town.Board.IndexOf("task.gather.slate")) > 0, "nobody went for the slate");
+            Assert.True(town.S.Stock.Of(slate) > 0);
+        }
+
         [Fact]
         public void TheSameSeedDividesTheWorkTheSameWay()
         {

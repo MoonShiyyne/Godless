@@ -101,13 +101,79 @@ namespace Godless.Sim.Build
         /// </summary>
         public const double StartAt = 0.25;
 
-        /// <summary>Voxels still to lay on everything commissioned that can actually be started.</summary>
+        /// <summary>
+        /// Days a begun building waits on one material before the rest of it
+        /// goes up in something of the same kind from the yard. Waiting is
+        /// what a slow material costs; a wing that owes a hundred voxels of
+        /// pine at a fifth of a voxel a tick is a season of waiting, beside a
+        /// yard full of oak.
+        /// </summary>
+        public const int StandInAfterDays = 20;
+
+        /// <summary>
+        /// Voxels still to lay on everything commissioned that a builder can
+        /// do something about now: lay it, or fetch what it waits on.
+        /// </summary>
         public static long Remaining(Settlement settlement)
         {
             long left = 0;
             foreach (Project p in settlement.Projects)
-                if (!p.Complete && Ready(settlement, p)) left += Order(p).Count - p.Placed;
+                if (!p.Complete && (Workable(settlement, p) || Wants(settlement, p) >= 0)) left += Order(p).Count - p.Placed;
             return left;
+        }
+
+        /// <summary>
+        /// What a builder with nothing to lay goes to fetch: what the first
+        /// building waiting on the land is waiting for, begun ones first. -1
+        /// when nothing waits on anything the land gives.
+        /// </summary>
+        public static int Fetch(Settlement settlement)
+        {
+            for (int pass = 0; pass < 2; pass++)
+                foreach (Project p in settlement.Projects)
+                {
+                    if (p.Complete || p.Begun.Exists != (pass == 0)) continue;
+                    int m = Wants(settlement, p);
+                    if (m >= 0) return m;
+                }
+            return -1;
+        }
+
+        /// <summary>The material a ready building is waiting on that the land in reach gives, or -1.</summary>
+        static int Wants(Settlement settlement, Project project)
+        {
+            if (project.Complete || project.Destroyed || project.Built == null || !Ready(settlement, project)) return -1;
+            int m = NextMaterial(project);
+            if (m < 0 || m >= settlement.Stock.Materials.Count || settlement.Stock.Of(m) > 0) return -1;
+            return settlement.Catchment != null && settlement.Catchment.YieldPerLabourTick(m) > 0.0 ? m : -1;
+        }
+
+        /// <summary>The material the next voxel to lay is made of, or -1 when there is none.</summary>
+        public static int NextMaterial(Project project)
+        {
+            if (project.Built == null) return -1;
+            List<int> order = Order(project);
+            return project.Placed < order.Count ? project.Built.MaterialAtCell(order[project.Placed]) : -1;
+        }
+
+        /// <summary>
+        /// Whether a builder can do anything on it now: it is ready, and what
+        /// its next voxel is made of is in the yard, or may be stood in for, or
+        /// is gone from the land so the builder will make do. A building
+        /// stalled on one material is left while there is other building to
+        /// do. Before, every builder in the village walked to the first ready
+        /// building and stood at its foot waiting for pine nobody fetched,
+        /// while two houses with everything they needed were never begun.
+        /// </summary>
+        public static bool Workable(Settlement settlement, Project project)
+        {
+            if (project.Complete || project.Destroyed || project.Built == null || !Ready(settlement, project)) return false;
+            // A plan made of something the settlement never had is remade from the yard when it is begun.
+            if (!project.Begun.Exists && project.Built.Compromises.Count > 0) return true;
+            int m = NextMaterial(project);
+            if (m < 0 || m >= settlement.Stock.Materials.Count || settlement.Stock.Of(m) > 0) return true;
+            if (project.StandsIn && Substitute(settlement, m, true) >= 0) return true;
+            return !Obtainable(settlement, project);   // gone from the land: the builder makes do
         }
 
         /// <summary>
@@ -151,16 +217,21 @@ namespace Godless.Sim.Build
             return true;
         }
 
-        /// <summary>Something in the yard to use instead: the same class if there is any, else whatever there is most of. -1 if the yard is empty.</summary>
-        int Substitute(Settlement settlement, int material)
+        /// <summary>
+        /// Something in the yard to use instead: the same class if there is
+        /// any, else (unless <paramref name="sameKind"/>) whatever there is
+        /// most of. -1 if there is nothing.
+        /// </summary>
+        static int Substitute(Settlement settlement, int material, bool sameKind)
         {
+            MaterialTable materials = settlement.Stock.Materials;
             int best = -1;
             long most = 0;
-            for (int pass = 0; pass < 2 && best < 0; pass++)
-                for (int m = 0; m < _materials.Count; m++)
+            for (int pass = 0; pass < (sameKind ? 1 : 2) && best < 0; pass++)
+                for (int m = 0; m < materials.Count; m++)
                 {
                     if (m == material) continue;
-                    if (pass == 0 && _materials[m].Class != _materials[material].Class) continue;
+                    if (pass == 0 && materials[m].Class != materials[material].Class) continue;
                     long held = settlement.Stock.Of(m);
                     if (held > most) { most = held; best = m; }
                 }
@@ -191,10 +262,18 @@ namespace Godless.Sim.Build
         /// </summary>
         public void Review(Settlement settlement, long tick, RngStream rng)
         {
+            long day = tick / _ticksPerDay;
             foreach (Project p in settlement.Projects)
             {
                 if (p.Complete || p.Destroyed || p.Built == null) continue;
-                if (p.RethoughtOn != tick / _ticksPerDay && !Obtainable(settlement, p)) Rethink(settlement, p, rng, null, tick);
+                if (p.RethoughtOn != day && !Obtainable(settlement, p)) Rethink(settlement, p, rng, null, tick);
+
+                // How long a begun building has waited on what its next voxel
+                // is made of. Long enough, and the same kind of thing will do.
+                int next = p.Begun.Exists ? NextMaterial(p) : -1;
+                if (next < 0 || settlement.Stock.Of(next) > 0) { p.WaitingSince = -1; p.StandsIn = false; continue; }
+                if (p.WaitingSince < 0) p.WaitingSince = day;
+                p.StandsIn = day - p.WaitingSince >= StandInAfterDays;
             }
         }
 
@@ -218,13 +297,17 @@ namespace Godless.Sim.Build
         /// </summary>
         public bool Work(Settlement settlement, Agent agent, ParcelGrid grid, long tick, Annalist annals, RngStream rng)
         {
+            // What is begun is finished before anything new is started, and a
+            // building waiting on one material is passed over for one that has
+            // what it needs, in the order they were commissioned.
             Project project = null;
-            foreach (Project p in settlement.Projects)
-            {
-                if (p.Complete) continue;
-                if (p.RethoughtOn != tick / _ticksPerDay && !Obtainable(settlement, p)) Rethink(settlement, p, rng, null, tick);
-                if (Ready(settlement, p)) { project = p; break; }
-            }
+            for (int pass = 0; pass < 2 && project == null; pass++)
+                foreach (Project p in settlement.Projects)
+                {
+                    if (p.Complete || p.Begun.Exists != (pass == 0)) continue;
+                    if (p.RethoughtOn != tick / _ticksPerDay && !Obtainable(settlement, p)) Rethink(settlement, p, rng, null, tick);
+                    if (Workable(settlement, p)) { project = p; break; }
+                }
             if (project == null) return false;
 
             if (Walk(settlement, agent, grid, project)) return true;
@@ -278,18 +361,26 @@ namespace Godless.Sim.Build
                 // hearth stone the land no longer holds do not hold up a house.
                 // Use what the yard has, the same kind of thing if it can, and
                 // failing that leave the voxel out and say so.
-                if (settlement.Stock.Of(material) <= 0 && project.RethoughtOn == tick / _ticksPerDay
-                    && !Obtainable(settlement, project))
+                if (settlement.Stock.Of(material) <= 0)
                 {
-                    int instead = Substitute(settlement, material);
-                    if (instead < 0)
+                    bool gone = project.RethoughtOn == tick / _ticksPerDay && !Obtainable(settlement, project);
+                    if (gone || project.StandsIn)
                     {
-                        project.Built.Note("left out a voxel of " + _materials[material].Name + ": none to be had");
-                        project.Placed++;
-                        continue;
+                        // Waited on too long, it is finished in the same kind
+                        // of thing: the wall shows where the pine gave out.
+                        int instead = Substitute(settlement, material, !gone);
+                        if (instead < 0 && !gone) return;
+                        if (instead < 0)
+                        {
+                            project.Built.Note("left out a voxel of " + _materials[material].Name + ": none to be had");
+                            project.Placed++;
+                            continue;
+                        }
+                        if (!gone) NoteOnce(project.Built, "finished in " + _materials[instead].Name + " after waiting on "
+                                                           + _materials[material].Name);
+                        type = _types.IdOf(_materials[instead].Voxel);
+                        material = instead;
                     }
-                    type = _types.IdOf(_materials[instead].Voxel);
-                    material = instead;
                 }
 
                 if (!settlement.Stock.TryTake(material, 1, tick, settlement.Id, at, annals, project.Begun))
@@ -323,6 +414,12 @@ namespace Godless.Sim.Build
             }
 
             if (project.Placed >= order.Count) Finish(settlement, project, tick, annals);
+        }
+
+        static void NoteOnce(Structure built, string compromise)
+        {
+            foreach (string c in built.Compromises) if (c == compromise) return;
+            built.Note(compromise);
         }
 
         /// <summary>

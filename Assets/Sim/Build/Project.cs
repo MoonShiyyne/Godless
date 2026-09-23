@@ -67,6 +67,15 @@ namespace Godless.Sim.Build
         /// <summary>The day its materials were last remade from what can be had (S2F), so it is not remade every tick.</summary>
         internal long RethoughtOn = -1;
 
+        /// <summary>The day the material its next voxel wants was first seen gone from the yard, or -1 while it is there.</summary>
+        internal long WaitingSince = -1;
+
+        /// <summary>
+        /// Waited long enough on one material that the rest may go up in the
+        /// same kind of thing from the yard: pine walls finished in oak.
+        /// </summary>
+        public bool StandsIn { get; internal set; }
+
         // ── S2O: what the dwelling program decided, and why ───────────────
 
         internal readonly List<string> ReasonList = new List<string>();

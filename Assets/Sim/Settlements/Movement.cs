@@ -335,7 +335,7 @@ namespace Godless.Sim.Settlements
                 {
                     string verb = s.Tasks.KindOf(s.Tasks.CurrentTask(i)).Verb;
                     // A builder has already walked this tick (S1A does its own).
-                    if (verb == "build")
+                    if (verb == "build" && a.Fetching < 0)
                     {
                         a.Doing = doing;
                         a.Pose = "work";
@@ -757,7 +757,8 @@ namespace Godless.Sim.Settlements
                 else { gx = a.HaulToX; gz = a.HaulToZ; doing = "carrying " + a.HaulWhat + " to " + a.HaulTo; pose = "carry"; }
                 return true;
             }
-            if (kind.Verb == "build")
+            // A builder fetching what the building waits on is drawn at the wood or the quarry.
+            if (kind.Verb == "build" && a.Fetching < 0)
             {
                 doing = "building";
                 return true;
@@ -772,7 +773,7 @@ namespace Godless.Sim.Settlements
                 return true;
             }
 
-            int m = s.Tasks.MaterialOf(task);
+            int m = kind.Verb == "build" ? a.Fetching : s.Tasks.MaterialOf(task);
             string material = m >= 0 ? s.Stock.Materials[m].Name : "material";
             if (deposits != null && a.WorkingAt >= 0)
             {

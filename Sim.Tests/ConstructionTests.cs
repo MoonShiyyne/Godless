@@ -224,6 +224,80 @@ namespace Godless.Sim.Tests
             Assert.True(someoneThere, "nobody is at the building site");
         }
 
+        /// <summary>
+        /// A begun building waiting on a material that is not in the yard does
+        /// not hold every builder at its foot: they go to one that has what it
+        /// needs. And once it has waited long enough, the rest goes up in the
+        /// same kind of thing from the yard. Green shore had forty-seven people
+        /// standing at a pine wing for years while two houses with everything
+        /// they needed were never begun.
+        /// </summary>
+        [Fact]
+        public void ABuildingStalledOnOneMaterialIsPassedOverAndThenFinishedInTheSameKind()
+        {
+            var village = new Village();
+            Settlement s = village.Town;
+            MaterialTable materials = s.Stock.Materials;
+            Project stalled = null, other = null;
+            Assert.True(village.LiveUntil(() =>
+            {
+                if (village.First == null || !village.First.Begun.Exists || village.First.Placed < 20 || village.First.Complete) return false;
+                int m = Construction.NextMaterial(village.First);
+                if (m < 0) return false;
+                foreach (Project p in s.Projects)
+                {
+                    if (p == village.First || p.Complete || !Construction.Workable(s, p)) continue;
+                    int n = Construction.NextMaterial(p);
+                    if (n >= 0 && materials[n].Class != materials[m].Class) { stalled = village.First; other = p; return true; }
+                }
+                return false;
+            }), "never had a begun building and another ready one made of something else");
+
+            // Everything of the stalled one's next material's kind leaves the yard,
+            // and the land stops offering it, so nobody can fetch more.
+            int wanted = Construction.NextMaterial(stalled);
+            var sources = new long[materials.Count];
+            for (int m = 0; m < materials.Count; m++)
+            {
+                sources[m] = s.Catchment.Sources(m);
+                if (materials[m].Class != materials[wanted].Class) continue;
+                sources[m] = 0;
+                Assert.True(s.Stock.TryTake(m, s.Stock.Of(m), village.World.Clock.Tick, s.Id, s.Hearth, village.World.Annals, RecordId.None));
+            }
+            // While the land still gives it, a builder with nothing to lay goes for it.
+            if (s.Catchment.YieldPerLabourTick(wanted) > 0.0) Assert.Equal(wanted, Construction.Fetch(s));
+            s.Catchment = Catchment.FromSources(materials, sources);
+            Assert.NotEqual(wanted, Construction.Fetch(s));
+
+            Assert.False(Construction.Workable(s, stalled));
+            int stalledAt = stalled.Placed, otherAt = other.Placed;
+            village.Live(5);
+            Assert.Equal(stalledAt, stalled.Placed);
+            Assert.True(other.Placed > otherAt || other.Complete, "the builders stood at the stalled building");
+
+            // Something of the same kind turns up in the yard, and after the wait it is used.
+            int instead = -1;
+            for (int m = 0; m < materials.Count; m++)
+                if (m != wanted && materials[m].Class == materials[wanted].Class) { instead = m; break; }
+            Assert.True(instead >= 0, "no other material of the kind " + materials[wanted].Class);
+            s.Stock.Add(instead, 2000);
+            village.Live(3);
+            Assert.Equal(stalledAt, stalled.Placed);
+            village.Live(Construction.StandInAfterDays + 5);
+            Assert.True(stalled.Placed > stalledAt, "the stalled building never took up the " + materials[instead].Name);
+            Assert.Contains("finished in " + materials[instead].Name + " after waiting on " + materials[wanted].Name, stalled.Built.Compromises);
+
+            List<int> order = new List<int>();
+            Blueprint plan = stalled.Plan;
+            for (int y = 0; y < plan.Height; y++)
+                for (int z = 0; z < plan.Depth; z++)
+                    for (int x = 0; x < plan.Width; x++)
+                        if (stalled.Built.At(x, y, z) != VoxelTypes.AirId) order.Add((y * plan.Depth + z) * plan.Width + x);
+            int cell = order[stalledAt];
+            Int3 at = Construction.World(stalled, cell % plan.Width, cell / (plan.Width * plan.Depth), (cell / plan.Width) % plan.Depth);
+            Assert.Equal(village.World.VoxelTypes.IdOf(materials[instead].Voxel), village.World.Voxels.Get(at));
+        }
+
         [Fact]
         public void TheSameSeedBuildsTheSameVillage()
         {

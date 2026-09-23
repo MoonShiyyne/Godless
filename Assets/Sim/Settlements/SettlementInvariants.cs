@@ -172,6 +172,23 @@ namespace Godless.Sim.Settlements
                         double dx = a.HearthParcelX - b.HearthParcelX, dz = a.HearthParcelZ - b.HearthParcelZ;
                         if (towns != null && dx * dx + dz * dz < (double)towns.NearestTownParcels * towns.NearestTownParcels) crowdedFires++;
                     }
+                // S1C: whatever an unfinished building still owes, if the land offers it,
+                // somebody has a task to fetch it. The board was once fixed at founding,
+                // and a town's widened reach planned wings in pine that nobody gathered.
+                long unlisted = 0;
+                foreach (Settlement s in world.Settlements)
+                {
+                    if (s.Tasks == null || !s.Tasks.GathersByMaterial || s.Catchment == null) continue;
+                    foreach (Build.Project p in s.Projects)
+                    {
+                        if (p.Complete || p.Destroyed || p.Built == null) continue;
+                        long[] owed = Build.Construction.Owed(p);
+                        for (int m = 0; m < owed.Length; m++)
+                            if (owed[m] > 0 && s.Catchment.Offers(m) && !s.Tasks.Gathers(m)) unlisted++;
+                    }
+                }
+                into.Record("tasks.owed-ungathered", unlisted);
+
                 into.Record("towns.trespass", trespass);
                 into.Record("towns.fires-too-close", crowdedFires);
                 into.Record("food.negative", negativeFood);
@@ -294,6 +311,10 @@ namespace Godless.Sim.Settlements
                 // S2Z. The first fire is kept, and what it has become is drawn.
                 Invariant.PerRun("S2Z", "every town's commons is kept, and its fire and seats are drawn by details that exist",
                     run => run.Metric("commons.broken") == 0.0),
+
+                // S1C. A material a building owes and the land offers has a task to fetch it.
+                Invariant.PerRun("S1C", "no material an unfinished building owes and the land offers lacks a gathering task",
+                    run => run.Metric("tasks.owed-ungathered") == 0.0),
 
                 // S2Y. Towns keep to their own ground and their own distance.
                 Invariant.PerRun("S2Y", "no two towns claim the same parcel",

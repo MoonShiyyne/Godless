@@ -513,6 +513,42 @@ Found playing: the player's only verbs did not reach the people.
   walker, and damp and flood risk on a new hill read the old ground. Lowering
   the ground under a tree leaves the tree standing on air.
 
+### Found at twenty years: houses stopped in year 8 (S1C, S1A)
+
+Green shore, seed 7, founded the way the Editor founds it: 19 houses by
+year 8 and not one more. At year 12 there were 361 people and 188 beds. A pine
+wing owed 136 pine and nobody fetched it, and 47 builders stood on its parcel
+beside 2,366 oak, while two ready houses were never begun. There were two causes.
+
+- **The task board was fixed at founding** (S1C). It listed a gathering
+  task only for what the land offered then. When the reach widens (S2V) or
+  what was cut grows back (S2F), the realizer plans buildings in the new
+  material, but nobody has a task to fetch it. The board now adds a task
+  whenever the catchment comes to offer a material, in material order.
+  Everyone keeps their thresholds and work history; the new task's thresholds
+  are drawn from the person and the task, as a founder's were.
+- **Every builder went to the first ready building** (S1A), and laying
+  stopped at the first voxel not in the yard. Now begun buildings come
+  before new ones, and a building whose next voxel's material is not in the
+  yard is passed over for one that has what it needs. With nothing to lay,
+  builders fetch what the waiting building needs from the land and carry it
+  back themselves. They keep the build task; dropping it put them all on
+  forage for good (cold massif). After `Construction.StandInAfterDays` (20)
+  of waiting, the rest goes up in the same class of material from the yard,
+  and the building notes it ("finished in oak after waiting on pine").
+- **Invariant (S1C):** no material an unfinished building owes and the land
+  offers lacks a gathering task.
+- **Measured, twenty years** (houses / share with no roof, before → after):
+  green shore seed 7: 19 / 42% → 50 / 1%; seeds 1-4: 25/16%, 14/56%,
+  21/4%, 39/4% → 34/4%, 38/10%, 29/0%, 34/0%. Cold massif seeds 1-4:
+  9/13%, 14/0%, 50/6%, 11/21% → 12/5%, 14/0%, 55/4%, 12/5%. Seed 7 is
+  worse: 16/0% → 10/16%.
+- **What still stops towns is food, not building.** Cold massif seed 7 ends
+  with two begun buildings that have everything they need, and all 118
+  people foraging. With forage's call capped and hunger never met, it is
+  the loudest task for everyone, so build never gets a hand back. Green
+  shore seed 7 levels off at about 400 the same way.
+
 **Next after this block: G1 itself.** Two tests, and the plan asks for three strangers rather
 than one person and one seed. Worn roads and the paving threshold stay at
 S2K, in stratum 2.

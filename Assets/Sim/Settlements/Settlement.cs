@@ -163,6 +163,7 @@ namespace Godless.Sim.Settlements
             a.LastWorkX = a.LastWorkZ = -1;
             a.FieldX = a.FieldZ = a.FieldFarm = -1;
             a.WorkingAt = -1;
+            a.Fetching = -1;
             a.Path = null;
             _people.Add(a);
         }

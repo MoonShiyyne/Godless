@@ -54,11 +54,15 @@ namespace Godless.Sim.Collective
         /// <summary>How fast a task's stimulus follows its demand. A day or two of lag.</summary>
         public const double Smoothing = 0.15;
 
-        readonly TaskKind[] _kind;          // per task
-        readonly int[] _material;           // per task; -1 = every material, by yield
-        readonly Symbol[] _id;              // per task
-        readonly double[] _stimulus;        // per task
-        readonly double[] _demand;          // per task, as last computed
+        TaskKind[] _kind;                   // per task
+        int[] _material;                    // per task; -1 = every material, by yield
+        Symbol[] _id;                       // per task
+        double[] _stimulus;                 // per task
+        double[] _demand;                   // per task, as last computed
+        readonly TaskKindTable _kinds;
+        readonly bool[] _listed;            // per material: whether its gathering tasks are on the board
+        readonly bool _gathers;             // the settlement has a yard and land to gather from
+        StreamRegistry _streams;
         double[] _ordered;                  // per material, voxels the standing plans still want
         double[][] _threshold;              // per agent, per task
         long[][] _work;                     // per agent, per task
@@ -71,34 +75,15 @@ namespace Godless.Sim.Collective
         public TaskBoard(TaskKindTable kinds, Settlement s, DriveRules rules, StreamRegistry streams)
         {
             _activities = rules.Activities;
-            var kind = new List<TaskKind>();
-            var material = new List<int>();
-            var id = new List<Symbol>();
-
+            _kinds = kinds;
+            _streams = streams;
             MaterialTable materials = s.Stock != null ? s.Stock.Materials : null;
-            foreach (TaskKind k in kinds.All)
-            {
-                if (k.Verb == "gather" && (materials == null || s.Catchment == null)) continue;
-                if (k.Verb == "build" || k.Verb == "forage") { kind.Add(k); material.Add(-1); id.Add(k.Id); continue; }
-                if (k.Verb == "gather" && k.PerMaterial)
-                {
-                    for (int m = 0; m < materials.Count; m++)
-                    {
-                        if (!s.Catchment.Offers(m)) continue;
-                        kind.Add(k); material.Add(m);
-                        id.Add(Symbol.For("task." + k.Name + "." + materials[m].Name));
-                    }
-                }
-                else
-                {
-                    kind.Add(k); material.Add(-1); id.Add(k.Id);
-                }
-            }
+            _gathers = materials != null && s.Catchment != null;
+            _listed = new bool[materials != null ? materials.Count : 0];
+            if (_gathers) for (int m = 0; m < materials.Count; m++) _listed[m] = s.Catchment.Offers(m);
+            LayOut(materials);
 
-            _kind = kind.ToArray();
             foreach (TaskKind k in _kind) if (k.Verb == "haul") _hauls = true;
-            _material = material.ToArray();
-            _id = id.ToArray();
             int tasks = _kind.Length, people = s.People.Count;
             _stimulus = new double[tasks];
             _demand = new double[tasks];
@@ -119,6 +104,91 @@ namespace Godless.Sim.Collective
             }
         }
 
+        /// <summary>
+        /// The board's tasks in their fixed order: content's task kinds in
+        /// turn, and a per-material gathering task for each material listed,
+        /// by material index. The order depends only on which materials have
+        /// been listed, never on when (L2).
+        /// </summary>
+        void LayOut(MaterialTable materials)
+        {
+            var kind = new List<TaskKind>();
+            var material = new List<int>();
+            var id = new List<Symbol>();
+            foreach (TaskKind k in _kinds.All)
+            {
+                if (k.Verb == "gather" && !_gathers) continue;
+                if (k.Verb == "build" || k.Verb == "forage") { kind.Add(k); material.Add(-1); id.Add(k.Id); continue; }
+                if (k.Verb == "gather" && k.PerMaterial)
+                {
+                    for (int m = 0; m < materials.Count; m++)
+                    {
+                        if (!_listed[m]) continue;
+                        kind.Add(k); material.Add(m);
+                        id.Add(Symbol.For("task." + k.Name + "." + materials[m].Name));
+                    }
+                }
+                else
+                {
+                    kind.Add(k); material.Add(-1); id.Add(k.Id);
+                }
+            }
+            _kind = kind.ToArray();
+            _material = material.ToArray();
+            _id = id.ToArray();
+        }
+
+        /// <summary>
+        /// Puts a gathering task on the board for every material the land has
+        /// come to offer since (S2V: the reach widens; S2F: what was cut grows
+        /// back). The board used to be fixed at founding, so a town whose
+        /// reach grew out to a pine wood planned wings in pine that nobody had
+        /// a task to fetch, and they stood unfinished for years. Everyone keeps
+        /// their thresholds and their history for the tasks they had; the new
+        /// one's thresholds are drawn from the person and the task, as a
+        /// founder's were. Tasks are never taken off: one whose material is
+        /// gone falls silent (ComputeDemand).
+        /// </summary>
+        void Admit(Settlement s)
+        {
+            if (!_gathers) return;
+            bool any = false;
+            for (int m = 0; m < _listed.Length; m++)
+                if (!_listed[m] && s.Catchment.Offers(m)) { _listed[m] = true; any = true; }
+            if (!any) return;
+
+            Symbol[] oldId = _id;
+            double[] oldStimulus = _stimulus, oldDemand = _demand;
+            LayOut(s.Stock.Materials);
+            int tasks = _kind.Length;
+            var from = new int[tasks];      // new task -> old task, or -1
+            var to = new int[oldId.Length]; // old task -> new task
+            for (int j = 0; j < tasks; j++)
+            {
+                from[j] = System.Array.IndexOf(oldId, _id[j]);
+                if (from[j] >= 0) to[from[j]] = j;
+            }
+
+            _stimulus = new double[tasks];
+            _demand = new double[tasks];
+            for (int j = 0; j < tasks; j++)
+                if (from[j] >= 0) { _stimulus[j] = oldStimulus[from[j]]; _demand[j] = oldDemand[from[j]]; }
+
+            for (int i = 0; i < _threshold.Length; i++)
+            {
+                var threshold = new double[tasks];
+                var work = new long[tasks];
+                for (int j = 0; j < tasks; j++)
+                {
+                    if (from[j] >= 0) { threshold[j] = _threshold[i][from[j]]; work[j] = _work[i][from[j]]; }
+                    else threshold[j] = Draw(Symbol.FromHash(_rows[i]), j, _streams);
+                }
+                _threshold[i] = threshold;
+                _work[i] = work;
+                if (_current[i] >= 0) _current[i] = to[_current[i]];
+            }
+        }
+
         double Draw(Symbol person, int task, StreamRegistry streams)
         {
             RngStream r = streams.Derive(ThresholdStream, StableHash.Combine(person.Hash, _id[task].Hash));
@@ -134,6 +204,7 @@ namespace Godless.Sim.Collective
         /// </summary>
         public void Sync(Settlement s, StreamRegistry streams)
         {
+            _streams = streams;
             int people = s.People.Count, tasks = _kind.Length;
             var threshold = new double[people][];
             var work = new long[people][];
@@ -171,6 +242,24 @@ namespace Godless.Sim.Collective
         /// <summary>The material a gathering task brings in, or -1 for a mixed one.</summary>
         public int MaterialOf(int task) { return _material[task]; }
 
+        /// <summary>Whether gathering is split by material on this board at all (content's choice).</summary>
+        public bool GathersByMaterial
+        {
+            get
+            {
+                if (!_gathers) return false;
+                foreach (TaskKind k in _kinds.All) if (k.Verb == "gather" && k.PerMaterial) return true;
+                return false;
+            }
+        }
+
+        /// <summary>Whether some task on the board gathers this material and nothing else.</summary>
+        public bool Gathers(int material)
+        {
+            for (int j = 0; j < _kind.Length; j++) if (_kind[j].Verb == "gather" && _material[j] == material) return true;
+            return false;
+        }
+
         public double Stimulus(int task) { return _stimulus[task]; }
         public double Demand(int task) { return _demand[task]; }
         public double Threshold(int agent, int task) { return _threshold[agent][task]; }
@@ -204,6 +293,7 @@ namespace Godless.Sim.Collective
         /// </summary>
         public void Step(Settlement s, RngStream rng, WorkSite work = null, System.Func<int, bool> absent = null)
         {
+            Admit(s);
             int tasks = _kind.Length;
             if (tasks == 0) return;
             ComputeDemand(s, work);
@@ -321,7 +411,17 @@ namespace Godless.Sim.Collective
             if (_kind[task].Verb == "build")
             {
                 if (work == null || work.Builder == null) return false;
-                return work.Builder.Work(s, agent, work.Grid, work.Tick, work.Annals, rng);
+                agent.Fetching = -1;
+                if (work.Builder.Work(s, agent, work.Grid, work.Tick, work.Annals, rng)) return true;
+
+                // Nothing to lay: the building waits on something the land
+                // gives, so the builders go and get it and carry it back
+                // themselves, rather than stand at its foot. Green shore had
+                // forty-seven people standing at a wing waiting for pine.
+                int wanted = Construction.Fetch(s);
+                if (wanted < 0 || !Gather(s, wanted, agent, work, false)) return false;
+                agent.Fetching = wanted;
+                return true;
             }
 
             if (_kind[task].Verb == "farm")
@@ -344,9 +444,25 @@ namespace Godless.Sim.Collective
             }
 
             int m = _material[task];
+            if (m >= 0) return Gather(s, m, agent, work, true);
 
+            // A mixed gathering task spends the tick on whatever the land gives most readily.
+            int best = -1;
+            for (int k = 0; k < s.Stock.Materials.Count; k++)
+                if (best < 0 || s.Catchment.YieldPerLabourTick(k) > s.Catchment.YieldPerLabourTick(best)) best = k;
+            if (best >= 0) s.Stock.Gather(best, 1.0, s.Catchment);
+            return true;
+        }
+
+        /// <summary>
+        /// A tick of gathering one material. What is cut lies in a heap for
+        /// the haulers where there are any (S2X), unless <paramref name="heap"/>
+        /// is false: a builder fetching for their own wall carries it back.
+        /// </summary>
+        bool Gather(Settlement s, int m, Agent agent, WorkSite work, bool heap)
+        {
             // Rubble first (S2T): what fell is already cut, and lies closer than any wood.
-            if (m >= 0 && s.Rubble.Count > 0 && work != null && work.Voxels != null && Collapse.HasRubble(s, m))
+            if (s.Rubble.Count > 0 && work != null && work.Voxels != null && Collapse.HasRubble(s, m))
             {
                 int most = (int)SimMath.Round(s.Stock.Materials[m].PerLabourTick);
                 Collapse.Salvage(work.Voxels, work.Details, s, m, most < 1 ? 1 : most, work.Tick);
@@ -354,27 +470,17 @@ namespace Godless.Sim.Collective
                 return true;
             }
 
-            if (m >= 0)
+            if (s.Catchment.HasDeposits && work != null && work.Voxels != null)
             {
-                if (s.Catchment.HasDeposits && work != null && work.Voxels != null)
-                {
-                    // S2F: the nearest tree with anything left comes down.
-                    int worked = s.Catchment.Harvest(m, agent.LabourShare, s.Stock, work.Voxels, work.Tick, work.TicksPerDay,
-                                                     work.Annals, s.Id, s.Hearth, s.Founded,
-                                                     _hauls && work.Hauling != null ? s : null);
-                    if (worked < 0) return false;
-                    agent.WorkingAt = worked;
-                    return true;
-                }
-                s.Stock.Gather(m, agent.LabourShare, s.Catchment);
+                // S2F: the nearest tree with anything left comes down.
+                int worked = s.Catchment.Harvest(m, agent.LabourShare, s.Stock, work.Voxels, work.Tick, work.TicksPerDay,
+                                                 work.Annals, s.Id, s.Hearth, s.Founded,
+                                                 heap && _hauls && work.Hauling != null ? s : null);
+                if (worked < 0) return false;
+                agent.WorkingAt = worked;
                 return true;
             }
-
-            // A mixed gathering task spends the tick on whatever the land gives most readily.
-            int best = -1;
-            for (int k = 0; k < s.Stock.Materials.Count; k++)
-                if (best < 0 || s.Catchment.YieldPerLabourTick(k) > s.Catchment.YieldPerLabourTick(best)) best = k;
-            if (best >= 0) s.Stock.Gather(best, 1.0, s.Catchment);
+            s.Stock.Gather(m, agent.LabourShare, s.Catchment);
             return true;
         }
 

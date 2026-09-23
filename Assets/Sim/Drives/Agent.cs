@@ -123,6 +123,9 @@ namespace Godless.Sim.Drives
         /// <summary>The deposit feature this person last worked (S2F), or -1.</summary>
         public int WorkingAt { get; internal set; } = -1;
 
+        /// <summary>The material a builder with nothing to lay has gone to fetch for the building waiting on it (S1A), or -1.</summary>
+        public int Fetching { get; internal set; } = -1;
+
         // S2X: the last load carried — from where, to where, what, and the place's name.
         public int HaulFromX { get; internal set; }
         public int HaulFromZ { get; internal set; }
