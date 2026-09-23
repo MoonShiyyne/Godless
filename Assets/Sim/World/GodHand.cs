@@ -60,8 +60,7 @@ namespace Godless.Sim.World
         /// </summary>
         public long Present()
         {
-            if (!_world.Voxels.Log.CanRecord(_world.Clock.Tick)) _world.Tick();
-            return _world.Clock.Tick;
+            return _world.Present();
         }
 
         /// <summary>Raises a dome of ground round a column. Returns the stroke's record.</summary>

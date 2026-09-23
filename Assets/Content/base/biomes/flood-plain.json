@@ -10,6 +10,9 @@
   "winterSeverity": 0,
   "treeCoverPercent": 5,
 
+  // v2 M1: what a parcel of this land can feed, in grazing units at full growth.
+  "grazing": 3.5,
+
   "surface": "mud",
   "subsurface": "mud",
 

@@ -1,0 +1,7 @@
+{
+  "type": "feed",
+  "id": "god-spawned",
+  "kind": "god.spawned",
+  "text": "The god set down {name} \u00d7{a}",
+  "importance": 2
+}

@@ -1,0 +1,7 @@
+{
+  "type": "feed",
+  "id": "god-blessed",
+  "kind": "god.blessed",
+  "text": "The god blessed {a} creatures",
+  "importance": 2
+}

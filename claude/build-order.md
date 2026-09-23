@@ -38,7 +38,45 @@ it makes something worth seeing (the "tell the player" rule).
 
 ## Current position
 
-**M0 done** (see below). **Next: M1, Life.**
+**M0 and M1 done** (see below). **Next: M2, Villages.**
+
+### What M1 shipped
+
+- **Creatures as data** (`Life/Creatures.cs`): a row per creature across
+  plain arrays, dead rows reused in a fixed order, a neighbour grid rebuilt by
+  counting sort each step; nothing allocates per step (L10). 1,136 creatures
+  step in 1.45 ms headless — the first thing to optimise when M2 adds work.
+- **Species are content** (`species/*.json`): people, deer, sheep, wolves —
+  speed, senses, lifespan, breeding, hunger, grazing, who hunts and flees whom,
+  where they live wild, and the voxel models they are drawn with (deer, sheep
+  and wolf models are new, standing, walking in two frames, and grazing).
+- **Life, a step at a time** (`Life/LifeSystem.cs`): age, hunger, flee, fight
+  back, graze, hunt, roam for prey or new ground, herd, breed unless crowded
+  (a crowded young adult leaves and starts a herd elsewhere). Grazing is a
+  per-parcel field set by each biome's `grazing`, eaten down and regrown
+  monthly. People live in **bands** with a camp: a camp eaten bare moves, one
+  unmoved a year has settled, a settled band past twice its size splits.
+- **The world starts alive**: wild herds by biome and three bands of people
+  on the best ground by water. A native species below its content floor gets a
+  herd wandering in from remote ground each month, so the god can empty a
+  valley but the island refills.
+- **Powers** (`Life/Powers.cs`), all through the command queue: set down
+  people (a band with a camp), deer, sheep, wolves; smite; bless (gold, hardy,
+  long-lived); curse (dark red, hungry, mad — they attack whatever is near);
+  fire (burns the trees out of the world and the grazing to nothing); rain;
+  water (a pond sunk into the ground). Every one has a feed line.
+- **Editor**: a power bar along the bottom; creatures drawn instanced and
+  eased between steps, people in their band's colour, hover to read any of
+  them; a population line on the HUD.
+- **Measured** (`sim eval`, 11 of 11): the M1 gate's 1,000 creatures in
+  budget; 5 of 5 bands set down at random settled within 5 minutes at 1x;
+  every power lands the next step; every power and band event is told; left
+  alone 20 years, every species lives on and people grow (36 to 182).
+  `sim run --life` checks the life invariants on every map.
+- **Tuning found by measuring, worth keeping in mind**: a step is a day, so
+  hunger per day must be small — a 40-step chase is 40 days; a disperser
+  that re-picks its goal every step never leaves; a lone creature must be
+  able to breed or dispersal shrinks a species.
 
 ### What M0 shipped
 

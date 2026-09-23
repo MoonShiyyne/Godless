@@ -1,0 +1,7 @@
+{
+  "type": "feed",
+  "id": "god-cursed",
+  "kind": "god.cursed",
+  "text": "The god cursed {a} creatures",
+  "importance": 2
+}

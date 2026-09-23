@@ -1,0 +1,33 @@
+{
+  "type": "species",
+  "id": "human",
+  "name": "person",
+  "plural": "people",
+  "tell": "People walk in bands out from a camp, gather from the land and hunt the herds, and move the camp on when the land round it is eaten bare.",
+  "person": true,
+
+  // Movement and senses, in voxels (half a metre). A step is a day at v2's
+  // clock; at 1x that is a tenth of a second, so 0.5 a step is a brisk walk.
+  "speed": 0.5,
+  "sense": 20,
+
+  "adultYears": 16,
+  "lifeYears": 60,
+  "birthsPerYear": 0.4,
+  "litter": 1,
+
+  // Hunger rises this much a day (a step) and is eased by eating; at 1 they
+  // starve. A step is a day and a walk across a valley takes a month of steps,
+  // so hunger is slow: a chase must not cost a creature its life.
+  "hungerPerDay": 0.006,
+  "graze": 0.6,
+  "health": 1.0,
+  "attack": 0.35,
+  "meat": 0.8,
+
+  "hunts": ["deer", "sheep"],
+  "fightsBack": ["wolf"],
+  "crowding": 40,
+
+  "model": { "stand": "person-stand", "walk": ["person-walk-a", "person-walk-b"], "act": "person-work", "rest": "person-sit" }
+}

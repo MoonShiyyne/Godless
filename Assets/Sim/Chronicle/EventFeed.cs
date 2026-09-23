@@ -34,7 +34,8 @@ namespace Godless.Sim.Chronicle
     /// the player's side of the record, like the chronicle hover will be.
     ///
     /// A line's text may name the record's values: {a} and {b} are its two
-    /// numbers, {subject} what it is about, {x} and {z} where.
+    /// numbers, {subject} what it is about and {name} the last part of that
+    /// ("species.deer" is "deer"), {x} and {z} where.
     ///
     /// The tell: raise a hill and a line says so at once, and clicking it
     /// takes you there.
@@ -91,11 +92,20 @@ namespace Godless.Sim.Chronicle
         /// <summary>Starts reading from the annals as they stand, so a world loaded or scrubbed does not replay its whole past.</summary>
         public void SkipTo(Annalist annals) { _read = annals.Count; }
 
+        static string Name(Symbol subject)
+        {
+            if (subject.IsNone) return "";
+            string s = subject.ToString();
+            int dot = s.LastIndexOf('.');
+            return dot >= 0 ? s.Substring(dot + 1) : s;
+        }
+
         static string Fill(string text, AnnalRecord r)
         {
             return text.Replace("{a}", r.ValueA.ToString(System.Globalization.CultureInfo.InvariantCulture))
                        .Replace("{b}", r.ValueB.ToString(System.Globalization.CultureInfo.InvariantCulture))
                        .Replace("{subject}", r.Subject.IsNone ? "" : r.Subject.ToString())
+                       .Replace("{name}", Name(r.Subject))
                        .Replace("{x}", r.Place.X.ToString(System.Globalization.CultureInfo.InvariantCulture))
                        .Replace("{z}", r.Place.Z.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }

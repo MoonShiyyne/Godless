@@ -1,0 +1,7 @@
+{
+  "type": "feed",
+  "id": "band-moved",
+  "kind": "life.band-moved",
+  "text": "A band of {a} ate its land bare and moved camp",
+  "importance": 2
+}

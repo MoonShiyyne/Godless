@@ -59,17 +59,30 @@ namespace Godless.Sim.Headless
         {
             bool withIsland = cli.Text("island", "false") != "false";
             bool bare = cli.Text("bare", "false") != "false";
+            bool living = cli.Text("life", "false") != "false";
 
             ulong first; int count;
             // Generating an island costs about half a second, so the default
             // batch shrinks when one is asked for. Two hundred seeds of an
             // empty world is a framework check; twenty seeds of a real island
             // is a content check.
-            cli.Seeds(out first, out count, defaultCount: withIsland ? 20 : 200);
-            int years = cli.Int("years", 300);
+            cli.Seeds(out first, out count, defaultCount: living ? 8 : withIsland ? 20 : 200);
+            int years = cli.Int("years", living ? 10 : 300);
 
             BatchRunner runner;
-            if (withIsland)
+            if (living)
+            {
+                LoadResult content;
+                try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
+                catch (System.Exception e) { Console.Error.WriteLine("content error: " + e.Message); return 1; }
+                WorldChoice map;
+                try { map = WorldChoice.Pick(content.Database, cli.Text("map", "green-shore")); }
+                catch (System.Exception e) { Console.Error.WriteLine(e.Message); return 1; }
+                runner = new BatchRunner(Godless.Sim.Life.LifeInvariants.Living(content.Database, map));
+                runner.Collect(Godless.Sim.Life.LifeInvariants.Collector());
+                foreach (Invariant i in Godless.Sim.Life.LifeInvariants.All()) runner.Assert(i);
+            }
+            else if (withIsland)
             {
                 LoadResult content;
                 try { content = ContentLoader.Load(new DirectoryContentSource(cli.Text("path", DefaultContentRoot()))); }
@@ -866,7 +879,7 @@ namespace Godless.Sim.Headless
             Console.WriteLine(
 @"godless sim harness
 
-  sim run      [--seeds A..B] [--years N] [--island [--map M]]
+  sim run      [--seeds A..B] [--years N] [--island [--map M] | --life [--map M]]
                                             batch run, checking every invariant
   sim verify   [--seeds A..B] [--years N]   run each seed twice, compare byte for byte
   sim content  [--path P]                   load Assets/Content and report what it holds

@@ -1,0 +1,7 @@
+{
+  "type": "feed",
+  "id": "band-founded",
+  "kind": "life.band-founded",
+  "text": "A band of {a} made camp",
+  "importance": 1
+}

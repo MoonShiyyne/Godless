@@ -1,4 +1,6 @@
+using Godless.Sim.Core;
 using Godless.Sim.Harness;
+using Godless.Sim.Life;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using UnityEngine;
@@ -7,18 +9,20 @@ using UnityEngine.InputSystem;
 namespace Godless.Unity
 {
     /// <summary>
-    /// Raise and lower the ground with the mouse. S07.
+    /// The god's hand (v2 M1): a bar of powers along the bottom, and the
+    /// mouse to use the one chosen.
     ///
-    ///   left-click / hold          raise
-    ///   shift + left-click / hold  lower
-    ///   - and =                    brush radius
+    ///   Raise, Lower                         hold to paint the ground (shift lowers while Raise is chosen)
+    ///   People, Deer, Sheep, Wolves          click to set them down (people come as a band with a camp)
+    ///   Smite, Bless, Curse                  click on creatures
+    ///   Fire, Rain, Water                    click on the land
+    ///   - and =                              brush size
     ///
     /// Everything real happens in the sim: VoxelRaycast finds the column and
-    /// a RaiseGround or LowerGround command goes through the world's command
-    /// queue (v2 M0), which lands it at the start of the next step — or at
-    /// once while paused — with the god.* record every voxel cites, and the
-    /// planning grid reads the new ground the step after. This class only
-    /// turns a mouse into those commands.
+    /// the power goes through the world's command queue (v2 M0), which lands
+    /// it at the start of the next step — or at once while paused — with the
+    /// god.* record everything it touches cites. This class only turns a mouse
+    /// into commands. (Named for what it was in v1; the scene holds it by name.)
     /// </summary>
     [RequireComponent(typeof(WorldBootstrap))]
     public sealed class TerrainEditor : MonoBehaviour
@@ -28,17 +32,24 @@ namespace Godless.Unity
         [Tooltip("Seconds between strokes while the button is held.")]
         [SerializeField] float strokeInterval = 0.08f;
 
+        enum Power { Raise, Lower, People, Deer, Sheep, Wolves, Smite, Bless, Curse, Fire, Rain, Water }
+        static readonly string[] Labels = { "Raise", "Lower", "People", "Deer", "Sheep", "Wolves", "Smite", "Bless", "Curse", "Fire", "Rain", "Water" };
+        static readonly string[] SpeciesOf = { null, null, "human", "deer", "sheep", "wolf", null, null, null, null, null, null };
+        static readonly int[] CountOf = { 0, 0, 10, 6, 7, 4, 0, 0, 0, 0, 0, 0 };
+
+        Power _power = Power.Raise;
         WorldBootstrap _boot;
         Timeline _timeline;
         GodHand _hand;
         SimWorld _handWorld;
         float _nextStroke;
+        Rect _bar;
 
         public int Strokes { get; private set; }
         public string Status { get; private set; }
 
         /// <summary>What the keys are, for the HUD to say out loud.</summary>
-        public static string Keys { get { return "click raise   shift-click lower   - = brush size"; } }
+        public static string Keys { get { return "choose a power below, then click   shift-click lowers   - = brush size"; } }
 
         void Awake()
         {
@@ -80,57 +91,112 @@ namespace Godless.Unity
                 Status = "viewing the past — return to the present to act";
                 return;
             }
-            Status = "brush radius " + radius;
+            Status = Labels[(int)_power] + (_power == Power.Raise || _power == Power.Lower ? ", brush " + radius : "");
 
-            if (!mouse.leftButton.isPressed) return;
-            if (Time.unscaledTime < _nextStroke) return;
-            _nextStroke = Time.unscaledTime + strokeInterval;
+            Vector2 pointer = mouse.position.ReadValue();
+            if (_bar.Contains(new Vector2(pointer.x, Screen.height - pointer.y))) return;   // clicking the bar is not an act
 
-            bool lower = keys != null && (keys.leftShiftKey.isPressed || keys.rightShiftKey.isPressed);
-            StrokeAt(mouse.position.ReadValue(), lower);
+            bool shift = keys != null && (keys.leftShiftKey.isPressed || keys.rightShiftKey.isPressed);
+            if (_power == Power.Raise || _power == Power.Lower)
+            {
+                if (!mouse.leftButton.isPressed || Time.unscaledTime < _nextStroke) return;
+                _nextStroke = Time.unscaledTime + strokeInterval;
+                StrokeAt(pointer, _power == Power.Lower || shift);
+                return;
+            }
+            if (mouse.leftButton.wasPressedThisFrame) Use(pointer);
         }
 
-        /// <summary>
-        /// One stroke of the brush at a screen point (origin bottom-left).
-        /// Separate from Update so the whole edit path — camera ray, pick,
-        /// brush, annal record, remesh — can be driven without a physical
-        /// mouse. Synthetic device events share Mouse.current with the real
-        /// one, so a test that queues a press is overwritten the moment the
-        /// user's hand moves. Returns false if nothing was picked.
-        /// </summary>
+        /// <summary>One stroke of the brush at a screen point (origin bottom-left). False if nothing was picked.</summary>
         public bool StrokeAt(Vector2 pointer, bool lower)
         {
             GodHand hand = Hand();
             if (hand == null) return false;
             if (_timeline != null && (_timeline.IsScrubbed || _timeline.Covers(pointer))) return false;
-
-            // Water stops the ray too, so clicking the sea finds the column
-            // under it — the brush then builds up from the seabed.
-            bool[] solid = hand.Solid;
-            ushort water = hand.Water;
             VoxelRaycast.Hit hit;
-            if (!Pick(pointer, id => id < solid.Length && (solid[id] || (id == water && water != VoxelTypes.AirId)), out hit))
-                return false;
-
-            // Through the one door every god power uses (v2 M0): it lands at the
-            // start of the next step, or at once while the world is paused.
-            IGodCommand act = lower ? (IGodCommand)new LowerGround(hand, hit.Voxel, radius, strength)
-                                    : new RaiseGround(hand, hit.Voxel, radius, strength);
-            _boot.World.Commands.Submit(act, _boot.World.Clock.Tick);
-            if (_boot.Pacer == null || _boot.Pacer.IsPaused) _boot.World.Commands.ApplyNow(_boot.World);
-            _boot.ShowChanges();
+            if (!PickGround(pointer, out hit)) return false;
+            Submit(lower ? (IGodCommand)new LowerGround(hand, hit.Voxel, radius, strength) : new RaiseGround(hand, hit.Voxel, radius, strength));
             Strokes++;
             return true;
         }
 
-        bool Pick(Vector2 pointer, System.Func<ushort, bool> stops, out VoxelRaycast.Hit hit)
+        /// <summary>The chosen power at a screen point. False if nothing was picked or there is no life to act on.</summary>
+        public bool Use(Vector2 pointer)
+        {
+            LifeSystem life = _boot.Life;
+            if (life == null || Hand() == null) return false;
+            if (_timeline != null && (_timeline.IsScrubbed || _timeline.Covers(pointer))) return false;
+            VoxelRaycast.Hit hit;
+            if (!PickGround(pointer, out hit)) return false;
+            Int3 at = hit.Voxel;
+            IGodCommand act = null;
+            switch (_power)
+            {
+                case Power.People: case Power.Deer: case Power.Sheep: case Power.Wolves:
+                {
+                    int s = life.Life.Species.IndexOf(SpeciesOf[(int)_power]);
+                    if (s >= 0) act = new Spawn(life, s, at, CountOf[(int)_power]);
+                    break;
+                }
+                case Power.Smite: act = new Smite(life, at, 3); break;
+                case Power.Bless: act = new Godless.Sim.Life.Touch(life, at, true, 6); break;
+                case Power.Curse: act = new Godless.Sim.Life.Touch(life, at, false, 6); break;
+                case Power.Fire: act = new Fire(life, _boot.Parcels, at, 12); break;
+                case Power.Rain: act = new Rain(life, at, 40); break;
+                case Power.Water: act = new Water(_boot.Parcels, at, Mathf.Max(3, radius)); break;
+            }
+            if (act == null) return false;
+            Submit(act);
+            return true;
+        }
+
+        void Submit(IGodCommand act)
+        {
+            SimWorld world = _boot.World;
+            world.Commands.Submit(act, world.Clock.Tick);
+            if (_boot.Pacer == null || _boot.Pacer.IsPaused) world.Commands.ApplyNow(world);
+            _boot.ShowChanges();
+        }
+
+        bool PickGround(Vector2 pointer, out VoxelRaycast.Hit hit)
         {
             hit = default(VoxelRaycast.Hit);
+            GodHand hand = Hand();
             Camera cam = Camera.main;
-            if (cam == null) return false;
+            if (hand == null || cam == null) return false;
+            // Water stops the ray too, so clicking the sea finds the column under it.
+            bool[] solid = hand.Solid;
+            ushort water = hand.Water;
             Ray ray = cam.ScreenPointToRay(pointer);
             return VoxelRaycast.Cast(_boot.World.Voxels.Store, ray.origin.x, ray.origin.y, ray.origin.z,
-                                     ray.direction.x, ray.direction.y, ray.direction.z, 3000, stops, out hit);
+                                     ray.direction.x, ray.direction.y, ray.direction.z, 3000,
+                                     id => id < solid.Length && (solid[id] || (id == water && water != VoxelTypes.AirId)), out hit);
+        }
+
+        GUIStyle _button, _chosen;
+
+        void OnGUI()
+        {
+            if (_boot.World == null || _boot.Phase != WorldBootstrap.SetupPhase.Playing) return;
+            if (_button == null)
+            {
+                _button = new GUIStyle(GUI.skin.button) { fontSize = 13 };
+                _chosen = new GUIStyle(_button) { fontStyle = FontStyle.Bold };
+                _chosen.normal.textColor = _chosen.hover.textColor = new Color(1f, 0.85f, 0.4f);
+            }
+            float w = 70f, h = 30f, gap = 4f;
+            float total = Labels.Length * (w + gap) - gap;
+            float x = (Screen.width - total) * 0.5f, y = Screen.height - 150f;
+            _bar = new Rect(x - 6f, y - 6f, total + 12f, h + 12f);
+            GUI.Box(_bar, GUIContent.none);
+            for (int i = 0; i < Labels.Length; i++)
+            {
+                bool chosen = (int)_power == i;
+                Color was = GUI.backgroundColor;
+                if (chosen) GUI.backgroundColor = new Color(1f, 0.7f, 0.3f);
+                if (GUI.Button(new Rect(x + i * (w + gap), y, w, h), Labels[i], chosen ? _chosen : _button)) _power = (Power)i;
+                GUI.backgroundColor = was;
+            }
         }
     }
 }

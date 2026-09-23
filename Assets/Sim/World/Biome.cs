@@ -20,6 +20,9 @@ namespace Godless.Sim.World
         public int WinterSeverity { get; private set; }
         public int TreeCoverPercent { get; private set; }
 
+        /// <summary>What a parcel of this land feeds at full growth, in grazing units (v2 M1).</summary>
+        public double Grazing { get; private set; }
+
         public int MinElevation { get; private set; }
         public int MaxElevation { get; private set; }
         public int MinMoisture { get; private set; }
@@ -71,6 +74,7 @@ namespace Godless.Sim.World
                 RainfallMm = doc["rainfallMm"].AsInt32(0),
                 WinterSeverity = doc["winterSeverity"].AsInt32(0),
                 TreeCoverPercent = doc["treeCoverPercent"].AsInt32(0),
+                Grazing = System.Math.Max(0.0, doc["grazing"].AsDouble(doc["rainfallMm"].AsInt32(0) / 400.0)),
                 MinElevation = select["minElevation"].AsInt32(0),
                 MaxElevation = select["maxElevation"].AsInt32(int.MaxValue),
                 MinMoisture = select["minMoisture"].AsInt32(0),

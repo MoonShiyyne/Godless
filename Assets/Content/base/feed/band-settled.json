@@ -1,0 +1,7 @@
+{
+  "type": "feed",
+  "id": "band-settled",
+  "kind": "life.band-settled",
+  "text": "A band of {a} has settled",
+  "importance": 3
+}

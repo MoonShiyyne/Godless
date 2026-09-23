@@ -97,6 +97,7 @@ L10 BUDGET. Every per-unit cost is counted against 2,000+ units at 60 fps.
       Economy/          materials, what the land gives, stock
       Build/            building grammar, realizer, tiles, silhouettes, terrain negotiation
       Culture/          genome and gene tells (cultures, religions and languages from M6)
+      Life/             species, creatures as data, bands and camps, grazing, the god's powers over life
     Assets/Unity/       rendering, meshing jobs, input, UI
     Assets/Content/     base game shipped AS MODS
     Sim/                library csproj — compiles Assets/Sim for tooling
@@ -104,7 +105,7 @@ L10 BUDGET. Every per-unit cost is counted against 2,000+ units at 60 fps.
     Sim.Tests/          xUnit + the batch harness
     Tools/              law guard, verify
 
-New folders arrive with their milestone: units (M1), settlements (M2),
+New folders arrive with their milestone: settlements (M2),
 earthworks (M3), polities (M4), and so on; see `claude/build-order.md`.
 
 ## Unity rules

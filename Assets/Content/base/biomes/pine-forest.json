@@ -8,6 +8,9 @@
   "winterSeverity": 4,
   "treeCoverPercent": 80,
 
+  // v2 M1: what a parcel of this land can feed, in grazing units at full growth.
+  "grazing": 2.2,
+
   "surface": "soil",
   "subsurface": "granite",
 

@@ -20,6 +20,10 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Optimised in every configuration: the tests run whole worlds, and an
+         unoptimised build made the life tests ten times slower. The JIT does
+         not reorder IEEE arithmetic, so L2 is unaffected. -->
+    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <ItemGroup>

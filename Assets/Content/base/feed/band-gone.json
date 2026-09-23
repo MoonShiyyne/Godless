@@ -1,0 +1,7 @@
+{
+  "type": "feed",
+  "id": "band-gone",
+  "kind": "life.band-gone",
+  "text": "A band has died out",
+  "importance": 3
+}

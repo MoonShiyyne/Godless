@@ -1,0 +1,25 @@
+{
+  "type": "life",
+  "id": "base",
+  "tell": "The land feeds what lives on it: herds thin a meadow and move on, and a camp that has eaten everything round it packs up and goes.",
+
+  // Grazing: each biome sets how much a parcel holds ("grazing" in the biome
+  // document). What is eaten grows back this share of the gap a month.
+  "regrowPerMonth": 0.2,
+
+  // Days a creature can go at the edge of starving before it dies.
+  "starveDays": 60,
+
+  // A band's camp: people keep within this many voxels of it, and once a
+  // month weigh the food round it. Short of food, they move it to the best
+  // ground within the search; unmoved for this many months, it has settled.
+  "campRadius": 18,
+  "campSearch": 90,
+  "settleMonths": 12,
+
+  // The world does not start empty: wild herds by biome (each species' "wild"
+  // block), and a few bands of people at good ground.
+  "startBands": 3,
+  "bandSize": 12,
+  "bandSpacing": 60
+}

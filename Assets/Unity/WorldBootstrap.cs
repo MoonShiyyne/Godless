@@ -6,6 +6,7 @@ using Godless.Sim.Content;
 using Godless.Sim.Core;
 using Godless.Sim.Deltas;
 using Godless.Sim.Harness;
+using Godless.Sim.Life;
 using Godless.Sim.Voxels;
 using Godless.Sim.World;
 using UnityEngine;
@@ -73,6 +74,9 @@ namespace Godless.Unity
         /// <summary>The map this world was generated on. Never null once the world exists.</summary>
         public WorldPreset Map { get; private set; }
 
+        /// <summary>Life on the land, for the god's powers over it (v2 M1).</summary>
+        public LifeSystem Life { get; private set; }
+
         /// <summary>What happened, told to the player (v2 M0).</summary>
         public EventFeed Feed { get; private set; }
 
@@ -104,6 +108,7 @@ namespace Godless.Unity
         void Awake()
         {
             if (GetComponent<DetailRenderer>() == null) gameObject.AddComponent<DetailRenderer>();
+            if (GetComponent<CreatureView>() == null) gameObject.AddComponent<CreatureView>();
         }
 
         void Start()
@@ -178,7 +183,8 @@ namespace Godless.Unity
             View.Bind(World.Voxels.Store, VoxelVisuals.FromContent(_content, _types));
 
             Parcels = Survey.Of(World, _content, _biomes, out _fields);
-            World.Add(new GroundSystem(Parcels, _fields, _biomes)).Add(new DepositSystem(Parcels));
+            Life = Genesis.AddSystems(World, _content, Parcels, _fields, _biomes);
+            foreach (string problem in Life.Life.Species.Problems) Debug.LogWarning("content: " + problem);
 
             Feed = EventFeed.FromContent(_content);
             foreach (string problem in Feed.Problems) Debug.LogWarning("content: " + problem);
@@ -336,6 +342,22 @@ namespace Godless.Unity
             string when = "Year " + (World.Clock.Year + 1) + ", month " + (World.Clock.Month + 1) + "   ·   "
                         + Pacer.Label + (Pacer.Behind > 4.0 ? "  (the picture is behind the world)" : "");
             GUI.Label(new Rect(14, 10, 700, 26), when, _heading);
+            if (World.Life != null)
+            {
+                Living life = World.Life;
+                var counts = new System.Text.StringBuilder();
+                int bands = 0, settled = 0;
+                foreach (Band b in life.Bands) if (!b.Gone) { bands++; if (b.Settled) settled++; }
+                for (int s = 0; s < life.Species.Count; s++)
+                {
+                    Species sp = life.Species[s];
+                    int n = life.CountOf(s);
+                    if (counts.Length > 0) counts.Append("   ");
+                    counts.Append(n).Append(' ').Append(n == 1 ? sp.Singular : sp.Plural);
+                    if (sp.Person) counts.Append(" in ").Append(bands).Append(bands == 1 ? " band" : " bands").Append(settled > 0 ? " (" + settled + " settled)" : "");
+                }
+                GUI.Label(new Rect(14, 96, 900, 22), counts.ToString(), _small);
+            }
 
             string keys = "";
             if (GetComponent<SimSpeed>() != null) keys += SimSpeed.Keys;
@@ -360,7 +382,7 @@ namespace Godless.Unity
             int shown = Mathf.Min(feedLines, _feed.Count);
             if (shown == 0) return;
             float lineH = 24f, w = Mathf.Min(460f, Screen.width - 40f);
-            float y = Screen.height - 110f - shown * lineH;
+            float y = 124f;
             _panel = new Rect(14, y - 6, w, shown * lineH + 12);
             GUI.Box(_panel, GUIContent.none, _box);
             for (int i = _feed.Count - shown; i < _feed.Count; i++)

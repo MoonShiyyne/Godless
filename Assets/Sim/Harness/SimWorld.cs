@@ -49,6 +49,9 @@ namespace Godless.Sim.Harness
         /// <summary>How time runs in this world, from content (v2 M0).</summary>
         public TimeRules Time { get; private set; }
 
+        /// <summary>Everything alive: creatures, bands and the land's food (v2 M1), or null in a world without life.</summary>
+        public Life.Living Life { get; set; }
+
         /// <summary>The god's acts, waiting to land at the start of the next step (v2 M0).</summary>
         public CommandQueue Commands { get; } = new CommandQueue();
         public StreamRegistry Streams { get; private set; }
@@ -115,6 +118,18 @@ namespace Godless.Sim.Harness
             if (Commands.Pending > 0) Commands.ApplyNow(this);
             for (int i = 0; i < _systems.Count; i++) _systems[i].Tick(this);
             Voxels.EndTick(Clock.Tick);
+        }
+
+        /// <summary>
+        /// The tick an act of the god lands on: the present, unless history
+        /// has already closed it (the untouched world at tick 0, or a tick
+        /// ended in a snapshot), in which case the world runs its next step
+        /// first, whole, and the act lands there.
+        /// </summary>
+        public long Present()
+        {
+            if (!Voxels.Log.CanRecord(Clock.Tick)) Tick();
+            return Clock.Tick;
         }
 
         public void RunYears(int years)
