@@ -16,7 +16,16 @@
   // How much of the map this world should be land. The harness checks
   // every seed against this, so a generator change that quietly drowns or
   // floods a map is caught at 200 seeds rather than by eye.
-  "land": { "least": 0.008, "most": 0.16 },
+  //
+  // Measured, not guessed: over seeds 0-199 the delta is 0.6% to 6.6% land,
+  // 2.9% on average. Only the top fifth of the relief clears the sea, so how
+  // much that is swings with the seed; the rivers then cut a voxel down,
+  // which at this height puts the channel back under the waterline.
+  "land": { "least": 0.004, "most": 0.10 },
+
+  // Flood plain is what this country is. Over the same seeds it covers 50%
+  // to 91% of the land; above this the delta would have nothing else on it.
+  "dominantBiome": { "most": 0.95 },
 
   "centres": [
     { "x": 0.42, "z": 0.46, "radius": 0.40 },

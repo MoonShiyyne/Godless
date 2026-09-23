@@ -73,6 +73,14 @@ namespace Godless.Sim.World
         public double MinLand { get; internal set; }
         public double MaxLand { get; internal set; }
 
+        /// <summary>
+        /// The most of the land one biome may cover. A delta is mostly flood
+        /// plain on purpose and a green island is not; what the harness holds
+        /// each map to is the map's to say, so long as something is left over
+        /// for G1's "change the biome" to change.
+        /// </summary>
+        public double MaxDominantBiome { get; internal set; }
+
         /// <summary>Flow at which water cuts a channel here. Wet maps run more rivers.</summary>
         public long RiverFlow { get; internal set; }
 
@@ -125,6 +133,7 @@ namespace Godless.Sim.World
                 MaxLakeDepth = Hydrology.MaxLakeDepth,
                 MinLand = 0.02,
                 MaxLand = 0.75,
+                MaxDominantBiome = 0.9,
             };
             preset.CentreX.Add(0.5);
             preset.CentreZ.Add(0.5);
@@ -187,6 +196,7 @@ namespace Godless.Sim.World
                     MaxLakeDepth = water["maxLakeDepth"].AsInt32(fallback.MaxLakeDepth),
                     MinLand = doc["land"]["least"].AsDouble(fallback.MinLand),
                     MaxLand = doc["land"]["most"].AsDouble(fallback.MaxLand),
+                    MaxDominantBiome = doc["dominantBiome"]["most"].AsDouble(fallback.MaxDominantBiome),
                 };
 
                 JsonValue centres = doc["centres"];
@@ -220,6 +230,8 @@ namespace Godless.Sim.World
                 if (preset.Relief <= 0) { problems.Add("map '" + id + "' has no relief: the land would be flat."); continue; }
                 if (preset.MinLand <= 0.0 || preset.MaxLand <= preset.MinLand || preset.MaxLand > 1.0)
                 { problems.Add("map '" + id + "' asks for a land fraction between " + preset.MinLand + " and " + preset.MaxLand + "."); continue; }
+                if (preset.MaxDominantBiome <= 0.0 || preset.MaxDominantBiome >= 1.0)
+                { problems.Add("map '" + id + "' lets one biome cover " + preset.MaxDominantBiome + " of its land: that is no share at all, or the whole island."); continue; }
 
                 loaded.Add(preset);
             }

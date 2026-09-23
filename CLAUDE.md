@@ -127,7 +127,10 @@ Two rules that keep falling out of this:
   8% to 75% of the map" was a generator constant and became wrong the day a
   delta existed; it is now `land.least`/`land.most` in each world document and
   the S09 invariant reads it. Prefer moving a threshold into content over
-  widening it until every map fits.
+  widening it until every map fits. The same went for the biome-dominance
+  cap (`dominantBiome.most`, default 0.9) and the lake cap the S0B check
+  reads (`water.maxLakeDepth`). Fit a map's numbers to `sim run --island
+  --map M` at 200 seeds, not 10: at 10, three of five maps looked clean.
 
 ## Speed is a display decision
 
