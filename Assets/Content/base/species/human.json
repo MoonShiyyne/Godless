@@ -29,5 +29,13 @@
   "fightsBack": ["wolf"],
   "crowding": 40,
 
+  // A band keeps to its camp, not a leader; "keep" is how far a member may
+  // stray from its own place there. Past "most", restless members leave or
+  // strike out to make camp of their own and take others with them.
+  "group": { "keep": 18, "most": 24 },
+  // Each person's own temperament is drawn about these, "spread" either way,
+  // and passed on to their children with a little drift.
+  "temperament": { "bold": 0.5, "social": 0.65, "restless": 0.4, "spread": 0.25 },
+
   "model": { "stand": "person-stand", "walk": ["person-walk-a", "person-walk-b"], "act": "person-work", "rest": "person-sit" }
 }

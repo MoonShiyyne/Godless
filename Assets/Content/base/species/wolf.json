@@ -17,7 +17,8 @@
   "meat": 0.3,
   "hunts": ["deer", "sheep"],
   "huntsWhenStarving": ["human"],
-  "herd": 12,
+  "group": { "keep": 12, "most": 7 },
+  "temperament": { "bold": 0.75, "social": 0.6, "restless": 0.5, "spread": 0.2 },
   "crowding": 5,
   "wild": { "floor": 8, "biomes": ["pine-forest", "temperate", "highland"], "herdsPerThousandParcels": 2, "herdSize": 4 },
   "model": { "stand": "wolf-stand", "walk": ["wolf-walk-a", "wolf-walk-b"], "act": "wolf-stand", "rest": "wolf-stand" }

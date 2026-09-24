@@ -33,8 +33,21 @@ namespace Godless.Sim.Life
         /// <summary>How much hunger eating one eases.</summary>
         public double Meat { get; internal set; }
 
-        /// <summary>Voxels it keeps within of its own kind, or 0 for none.</summary>
-        public double Herd { get; internal set; }
+        /// <summary>
+        /// Whether it keeps in groups, how loosely (voxels a member may stray
+        /// from its place before it walks back), and how many a group holds
+        /// before its restless members start to leave. People keep to their
+        /// band's camp instead of a leader.
+        /// </summary>
+        public bool Groups { get { return GroupMost > 1; } }
+        public double GroupKeep { get; internal set; }
+        public int GroupMost { get; internal set; }
+
+        /// <summary>The temperament of its kind: where each creature's own is drawn about, and how widely.</summary>
+        public double Bold { get; internal set; }
+        public double Social { get; internal set; }
+        public double Restless { get; internal set; }
+        public double Spread { get; internal set; }
         /// <summary>Most of its own kind within 16 voxels before it stops breeding.</summary>
         public int Crowding { get; internal set; }
 
@@ -106,7 +119,12 @@ namespace Godless.Sim.Life
                     Health = d["health"].AsDouble(1.0),
                     Attack = d["attack"].AsDouble(0.0),
                     Meat = d["meat"].AsDouble(0.5),
-                    Herd = d["herd"].AsDouble(0),
+                    GroupKeep = d["group"]["keep"].AsDouble(8),
+                    GroupMost = System.Math.Max(1, d["group"]["most"].AsInt32(1)),
+                    Bold = SimMath.Clamp01(d["temperament"]["bold"].AsDouble(0.5)),
+                    Social = SimMath.Clamp01(d["temperament"]["social"].AsDouble(0.5)),
+                    Restless = SimMath.Clamp01(d["temperament"]["restless"].AsDouble(0.5)),
+                    Spread = SimMath.Clamp01(d["temperament"]["spread"].AsDouble(0.2)),
                     Crowding = System.Math.Max(1, d["crowding"].AsInt32(8)),
                 };
                 Names(d["hunts"], s.HuntNames);
@@ -130,6 +148,7 @@ namespace Godless.Sim.Life
                 else if (s.LifeDays <= s.AdultDays) fault = "dies before it is grown";
                 else if (!(s.HungerPerDay > 0.0 && s.HungerPerDay < 1.0)) fault = "grows hungry by " + s.HungerPerDay + " a day; it must be a share of one";
                 else if (s.StandModel.Length == 0) fault = "names no model to draw it with";
+                else if (s.Groups && !(s.GroupKeep > 0.0)) fault = "keeps in groups of " + s.GroupMost + " but keeps " + s.GroupKeep + " voxels from them; it must be above 0";
                 if (fault != null) { t._problems.Add("species '" + id + "' " + fault + "."); continue; }
                 t._all.Add(s);
             }

@@ -97,7 +97,7 @@ L10 BUDGET. Every per-unit cost is counted against 2,000+ units at 60 fps.
       Economy/          materials, what the land gives, stock
       Build/            building grammar, realizer, tiles, silhouettes, terrain negotiation
       Culture/          genome and gene tells (cultures, religions and languages from M6)
-      Life/             species, creatures as data, bands and camps, grazing, the god's powers over life
+      Life/             species, creatures as data each with its own will, groups (bands, herds, packs), grazing, the god's powers over life
     Assets/Unity/       rendering, meshing jobs, input, UI
     Assets/Content/     base game shipped AS MODS
     Sim/                library csproj — compiles Assets/Sim for tooling

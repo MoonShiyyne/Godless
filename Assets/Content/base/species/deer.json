@@ -16,7 +16,8 @@
   "attack": 0.0,
   "meat": 1.0,
   "flees": ["wolf", "human"],
-  "herd": 10,
+  "group": { "keep": 10, "most": 12 },
+  "temperament": { "bold": 0.2, "social": 0.7, "restless": 0.35, "spread": 0.2 },
   "crowding": 8,
   "wild": { "floor": 30, "biomes": ["temperate", "pine-forest", "highland", "flood-plain"], "herdsPerThousandParcels": 6, "herdSize": 6 },
   "model": { "stand": "deer-stand", "walk": ["deer-walk-a", "deer-walk-b"], "act": "deer-graze", "rest": "deer-graze" }

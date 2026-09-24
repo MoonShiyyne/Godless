@@ -1,0 +1,7 @@
+{
+  "type": "feed",
+  "id": "person-joined",
+  "kind": "life.person-joined",
+  "text": "A wanderer joined a band, now {a} strong",
+  "importance": 1
+}

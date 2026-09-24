@@ -44,7 +44,7 @@ namespace Godless.Sim.Life
         }
     }
 
-    /// <summary>Put creatures on the land: a herd of animals, or a band of people with a camp where they stand.</summary>
+    /// <summary>Put creatures on the land: a herd of grown animals keeping together, or a band of people with a camp where they stand. Each is its own from then on.</summary>
     public sealed class Spawn : IGodCommand
     {
         readonly LifeSystem _life;
@@ -64,13 +64,7 @@ namespace Godless.Sim.Life
             RngStream rng = world.Streams.Get("god.spawn");
             if (!_life.Passable(At.X, At.Z)) return r;
             if (sp.Person) { _life.FoundBand(world, Species, At.X, At.Z, Count, r, rng); return r; }
-            for (int k = 0; k < Count; k++)
-            {
-                double x = At.X + rng.NextInt(-3, 4), z = At.Z + rng.NextInt(-3, 4);
-                if (!_life.Passable((int)x, (int)z)) { x = At.X; z = At.Z; }
-                long born = tick - rng.NextInt(sp.AdultDays, System.Math.Max(sp.AdultDays + 1, sp.LifeDays / 2));
-                _life.Spawn(sp, Species, x, z, born, -1, rng);
-            }
+            _life.SetDown(world, Species, At.X, At.Z, Count, tick, rng);
             return r;
         }
     }

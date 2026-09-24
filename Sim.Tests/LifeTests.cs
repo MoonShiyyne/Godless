@@ -90,7 +90,7 @@ namespace Godless.Sim.Tests
             foreach (Species s in life.Species.All)
                 Assert.True(life.CountOf(life.Species.IndexOf(s.Name)) > 0, "no " + s.Plural + " at the start");
             Assert.NotEmpty(life.Bands);
-            foreach (Band b in life.Bands)
+            foreach (Group b in life.Bands)
             {
                 Assert.True(b.Members > 0);
                 Assert.Equal(LifeSystem.BandFoundedKind, w.Sim.Annals.Get(b.Record).Kind);
@@ -145,11 +145,11 @@ namespace Godless.Sim.Tests
             World w = Make();
             w.Sim.Tick();
             int human = w.Life.Life.Species.IndexOf("human");
-            int before = w.Sim.Life.Bands.Count;
+            int before = w.Sim.Life.Groups.Count;
             w.Sim.Commands.Submit(new Spawn(w.Life, human, new Int3(w.X, 0, w.Z), 10), w.Sim.Clock.Tick);
             w.Sim.Tick();
-            Assert.Equal(before + 1, w.Sim.Life.Bands.Count);
-            Band b = w.Sim.Life.Bands[before];
+            Group b = w.Sim.Life.Groups.Find(g => g.Number >= before && g.IsBand);
+            Assert.NotNull(b);
             Assert.Equal(10, b.Members);
             AnnalRecord founded = w.Sim.Annals.Get(b.Record);
             Assert.Equal(Powers.SpawnedKind, w.Sim.Annals.Get(founded.Cause).Kind);   // on record: the god set them down
@@ -220,6 +220,93 @@ namespace Godless.Sim.Tests
             World w = Make();
             for (int t = 0; t < 360; t++) w.Sim.Tick();
             Assert.True(w.Sim.Life.Creatures.Deaths[(int)Death.Killed] > 5);
+        }
+
+        /// <summary>No two creatures of a herd are the same: each has its own temperament and pace.</summary>
+        [Fact]
+        public void EachCreatureHasATemperamentOfItsOwn()
+        {
+            World w = Make();
+            w.Sim.Tick();
+            Creatures c = w.Sim.Life.Creatures;
+            var bold = new HashSet<double>();
+            var pace = new HashSet<double>();
+            int n = 0;
+            for (int i = 0; i < c.Length; i++)
+            {
+                if (!c.Alive[i]) continue;
+                n++; bold.Add(c.Bold[i]); pace.Add(c.Pace[i]);
+                Assert.InRange(c.Bold[i], 0.0, 1.0);
+                Assert.InRange(c.Social[i], 0.0, 1.0);
+                Assert.InRange(c.Restless[i], 0.0, 1.0);
+            }
+            Assert.True(bold.Count > n / 2, "temperaments repeat: " + bold.Count + " kinds of boldness among " + n);
+            Assert.True(pace.Count > n / 2);
+        }
+
+        /// <summary>
+        /// A group at ease is not one body: its members stand apart, and do
+        /// different things — some graze, some rest, some wander.
+        /// </summary>
+        [Fact]
+        public void AGroupIsManyCreaturesNotOne()
+        {
+            World w = Make();
+            int deer = w.Life.Life.Species.IndexOf("deer");
+            w.Sim.Tick();
+            w.Sim.Commands.Submit(new Spawn(w.Life, deer, new Int3(w.X, 0, w.Z), 8), w.Sim.Clock.Tick);
+            int varied = 0, looked = 0;
+            double apart = 0.0;
+            int pairs = 0;
+            Creatures c = w.Sim.Life.Creatures;
+            for (int t = 0; t < 240; t++)
+            {
+                w.Sim.Tick();
+                if (t % 20 != 19) continue;
+                foreach (Group g in w.Sim.Life.Groups)
+                {
+                    if (g.Gone || g.Members < 3) continue;
+                    var doing = new HashSet<Doing>();
+                    for (int i = 0; i < c.Length; i++)
+                    {
+                        if (!c.Alive[i] || c.Group[i] != g.Number) continue;
+                        doing.Add(c.Doing[i]);
+                        double near = double.MaxValue;
+                        for (int j = 0; j < c.Length; j++)
+                        {
+                            if (j == i || !c.Alive[j] || c.Group[j] != g.Number) continue;
+                            double dx = c.X[i] - c.X[j], dz = c.Z[i] - c.Z[j];
+                            near = System.Math.Min(near, System.Math.Sqrt(dx * dx + dz * dz));
+                        }
+                        apart += near; pairs++;
+                    }
+                    looked++;
+                    if (doing.Count >= 2) varied++;
+                }
+            }
+            Assert.True(looked > 0);
+            Assert.True(varied * 2 >= looked, varied + " of " + looked + " groups had members doing different things");
+            Assert.True(apart / pairs >= 1.5, "members stand " + (apart / pairs) + " voxels from the nearest of their group");
+        }
+
+        /// <summary>One alone joins the first of its kind it meets; a group grown past its size loses its restless.</summary>
+        [Fact]
+        public void CreaturesJoinAndLeaveGroupsOfTheirOwnAccord()
+        {
+            World w = Make();
+            int sheep = w.Life.Life.Species.IndexOf("sheep");
+            w.Sim.Tick();
+            Living life = w.Sim.Life;
+            long joined = life.Joined;
+            w.Sim.Commands.Submit(new Spawn(w.Life, sheep, new Int3(w.X, 0, w.Z), 5), w.Sim.Clock.Tick);
+            w.Sim.Commands.Submit(new Spawn(w.Life, sheep, new Int3(w.X + 8, 0, w.Z), 1), w.Sim.Clock.Tick);
+            for (int t = 0; t < 120; t++) w.Sim.Tick();
+            Assert.True(life.Joined > joined, "the lone sheep never joined anyone");
+
+            long left = life.Left;
+            w.Sim.Commands.Submit(new Spawn(w.Life, sheep, new Int3(w.X, 0, w.Z + 20), 30), w.Sim.Clock.Tick);
+            for (int t = 0; t < 360; t++) w.Sim.Tick();
+            Assert.True(life.Left > left, "a flock of 30, twice its kind's size, kept every one for a year");
         }
 
         [Fact]

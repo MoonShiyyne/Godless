@@ -16,7 +16,8 @@
   "attack": 0.0,
   "meat": 0.9,
   "flees": ["wolf", "human"],
-  "herd": 6,
+  "group": { "keep": 6, "most": 14 },
+  "temperament": { "bold": 0.15, "social": 0.85, "restless": 0.2, "spread": 0.15 },
   "crowding": 10,
   "wild": { "floor": 25, "biomes": ["highland", "alpine", "shore", "mesa"], "herdsPerThousandParcels": 5, "herdSize": 7 },
   "model": { "stand": "sheep-stand", "walk": ["sheep-walk-a", "sheep-walk-b"], "act": "sheep-graze", "rest": "sheep-graze" }

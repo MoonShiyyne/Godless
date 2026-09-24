@@ -136,13 +136,15 @@ namespace Godless.Sim.Headless
                     int tx = r.NextInt(60, 964), tz = r.NextInt(60, 964);
                     if (life.Passable(tx, tz)) { x = tx; z = tz; break; }
                 }
-                int before = life.Life.Bands.Count;
+                int before = life.Life.Groups.Count;
                 w.Commands.Submit(new Spawn(life, human, new Int3(x, 0, z), 10), w.Clock.Tick);
+                w.Tick();
+                Group b = null;
+                for (int n = before; n < life.Life.Groups.Count && b == null; n++) if (life.Life.Groups[n].IsBand) b = life.Life.Groups[n];
+                if (b == null) continue;
                 int steps = (int)(300 * time.TicksPerSecondAt1x);
-                for (int t = 0; t < steps; t++) w.Tick();
-                if (life.Life.Bands.Count <= before) continue;
+                for (int t = 1; t < steps; t++) w.Tick();
                 tried++;
-                Band b = life.Life.Bands[before];
                 if (b.Settled || b.Gone) resolved++;
                 if (b.Settled) settledCount++;
             }
@@ -182,17 +184,35 @@ namespace Godless.Sim.Headless
                 fails.Count == 0 ? "spawn, smite, bless, curse, fire, rain, water" : "failed: " + string.Join(", ", fails));
 
             string[] told = { "god.spawned", "god.smote", "god.blessed", "god.cursed", "god.fire", "god.rain", "god.water",
-                              "life.band-founded", "life.band-moved", "life.band-settled", "life.band-gone" };
+                              "life.band-founded", "life.band-moved", "life.band-settled", "life.band-gone",
+                              "life.band-split", "life.person-left", "life.person-joined" };
             var untold = new List<string>();
             foreach (string k in told) if (!feed.Tells(Symbol.For(k))) untold.Add(k);
             add("M1", "the player is told of every power and every band's fortunes", untold.Count == 0,
                 untold.Count == 0 ? told.Length + " kinds told" : "untold: " + string.Join(", ", untold));
 
-            // Left alone for twenty years, the world lives on.
+            // Left alone for twenty years, the world lives on — and every creature in it is its own.
             world = Make(content, mapName, seed, out grid, out hand, out fx, out fz, out life);
             world.Tick();
             int people0 = world.Life.CountOf(human);
-            for (int t = 0; t < 20 * 360; t++) world.Tick();
+            int looked = 0, varied = 0;
+            double apart = 0.0;
+            long pairs = 0;
+            for (int t = 0; t < 20 * 360; t++)
+            {
+                world.Tick();
+                if (t < 2 * 360 && t % 30 == 29) LookAtGroups(world.Life, ref looked, ref varied, ref apart, ref pairs);
+            }
+            add("M1", "a group is many creatures, not one: in 3 of 4 groups at a glance, members are doing different things",
+                looked > 0 && varied * 4 >= looked * 3, varied + " of " + looked + " glances at groups of 3 or more");
+            double spacing = pairs > 0 ? apart / pairs : 0.0;
+            add("M1", "a group stands spread out: members keep 1.5 voxels or more from the nearest of their group, on average",
+                spacing >= 1.5, spacing.ToString("0.0", c) + " voxels");
+            int splits = world.Annals.OfKind(LifeSystem.BandSplitKind).Count;
+            Living lived = world.Life;
+            add("M1", "creatures join and leave groups of their own accord: in 20 years, 50 of each, and a band splits",
+                lived.Joined >= 50 && lived.Left >= 50 && splits >= 1,
+                lived.Joined + " joined, " + lived.Left + " left, " + lived.StruckOut + " struck out, " + splits + " band splits");
             var counts = new List<string>();
             bool all = true;
             for (int s = 0; s < life.Life.Species.Count; s++)
@@ -203,6 +223,35 @@ namespace Godless.Sim.Headless
             }
             add("M1", "left alone 20 years, every species lives on and people have grown", all && world.Life.CountOf(human) > people0,
                 string.Join(", ", counts) + " (people began at " + people0 + ")");
+        }
+
+        /// <summary>One glance at every group of three or more: are its members doing different things, and how far apart do they stand?</summary>
+        static void LookAtGroups(Living life, ref int looked, ref int varied, ref double apart, ref long pairs)
+        {
+            Creatures c = life.Creatures;
+            var members = new List<int>();
+            foreach (Group g in life.Groups)
+            {
+                if (g.Gone || g.Members < 3) continue;
+                members.Clear();
+                for (int i = 0; i < c.Length; i++) if (c.Alive[i] && c.Group[i] == g.Number) members.Add(i);
+                int kinds = 0;
+                var seen = new bool[16];
+                foreach (int i in members)
+                {
+                    if (!seen[(int)c.Doing[i]]) { seen[(int)c.Doing[i]] = true; kinds++; }
+                    double near = double.MaxValue;
+                    foreach (int j in members)
+                    {
+                        if (j == i) continue;
+                        double dx = c.X[i] - c.X[j], dz = c.Z[i] - c.Z[j];
+                        near = Math.Min(near, Math.Sqrt(dx * dx + dz * dz));
+                    }
+                    apart += near; pairs++;
+                }
+                looked++;
+                if (kinds >= 2) varied++;
+            }
         }
 
         static SimWorld Make(ContentDatabase content, string mapName, ulong seed, out ParcelGrid grid, out GodHand hand, out int fx, out int fz)

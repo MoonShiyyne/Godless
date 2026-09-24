@@ -44,18 +44,30 @@ it makes something worth seeing (the "tell the player" rule).
 
 - **Creatures as data** (`Life/Creatures.cs`): a row per creature across
   plain arrays, dead rows reused in a fixed order, a neighbour grid rebuilt by
-  counting sort each step; nothing allocates per step (L10). 1,136 creatures
-  step in 1.45 ms headless — the first thing to optimise when M2 adds work.
+  counting sort each step; nothing allocates per step (L10). 1,101 creatures
+  step in 0.5 ms headless.
 - **Species are content** (`species/*.json`): people, deer, sheep, wolves —
   speed, senses, lifespan, breeding, hunger, grazing, who hunts and flees whom,
   where they live wild, and the voxel models they are drawn with (deer, sheep
   and wolf models are new, standing, walking in two frames, and grazing).
 - **Life, a step at a time** (`Life/LifeSystem.cs`): age, hunger, flee, fight
-  back, graze, hunt, roam for prey or new ground, herd, breed unless crowded
-  (a crowded young adult leaves and starts a herd elsewhere). Grazing is a
-  per-parcel field set by each biome's `grazing`, eaten down and regrown
-  monthly. People live in **bands** with a camp: a camp eaten bare moves, one
-  unmoved a year has settled, a settled band past twice its size splits.
+  back, graze, hunt, roam for prey or new ground, breed unless crowded.
+  Grazing is a per-parcel field set by each biome's `grazing`, eaten down and
+  regrown monthly.
+- **Every creature is its own** (revised after first play: groups moved as
+  one body). Each has its own temperament — bold, social, restless, drawn
+  about its species' and passed to its young with drift — and its own pace.
+  The timid look round every step and bolt early; the bold let danger come
+  closer and stand to fight; each flees its own way, so a herd scatters. A
+  **group** (`Group`: a band, herd or pack) has no will: its leader goes where
+  it chooses, and each member keeps its own place by the leader or the camp,
+  as close as it likes, and otherwise rests, grazes or ambles on its own dice.
+  About once a month each weighs its company: in a group past its size, or
+  hungry, the restless leave, and the bold and restless strike out and take
+  whoever chooses to follow; one alone joins the next of its kind it meets.
+  A pack's hungry members join their leader's chase. A band's leader moves
+  the camp when the land is bare, and each member chooses whether to go.
+  Groups form, split, merge and dissolve from these choices alone.
 - **The world starts alive**: wild herds by biome and three bands of people
   on the best ground by water. A native species below its content floor gets a
   herd wandering in from remote ground each month, so the god can empty a
@@ -68,10 +80,14 @@ it makes something worth seeing (the "tell the player" rule).
 - **Editor**: a power bar along the bottom; creatures drawn instanced and
   eased between steps, people in their band's colour, hover to read any of
   them; a population line on the HUD.
-- **Measured** (`sim eval`, 11 of 11): the M1 gate's 1,000 creatures in
-  budget; 5 of 5 bands set down at random settled within 5 minutes at 1x;
+- **Measured** (`sim eval`, 14 of 14): the M1 gate's 1,000 creatures in
+  budget (0.50 ms a step for 1,101, since each creature looks round on its own
+  cadence); 5 of 5 bands set down at random settled within 5 minutes at 1x;
   every power lands the next step; every power and band event is told; left
-  alone 20 years, every species lives on and people grow (36 to 182).
+  alone 20 years, every species lives on and people grow (36 to 175); in
+  9 of 10 glances a group's members are doing different things and stand
+  3.8 voxels apart; in 20 years 1,618 joins, 2,396 departures and 7 band
+  splits, none of them decided by a group.
   `sim run --life` checks the life invariants on every map.
 - **Tuning found by measuring, worth keeping in mind**: a step is a day, so
   hunger per day must be small — a 40-step chase is 40 days; a disperser

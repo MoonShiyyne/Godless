@@ -12,7 +12,8 @@ namespace Godless.Unity
     /// Draws every creature (v2 M1): a small voxel figure per creature from its
     /// species' models, standing, walking in two frames, bent to graze or
     /// work, or sitting — facing the way it last moved. People wear their
-    /// band's colour, so a band reads as one group across a valley.
+    /// band's colour, so a band reads as one group across a valley, and a
+    /// person alone wears grey.
     ///
     /// Positions come from the sim once a step and are eased between steps by
     /// how far the pacer is toward the next one, so movement is smooth at any
@@ -114,7 +115,7 @@ namespace Godless.Unity
                 float yaw = Mathf.Atan2((float)c.FaceX[i], (float)c.FaceZ[i]) * Mathf.Rad2Deg;
 
                 int look = life.Species[s].Person ? (int)(c.Id[i] % 16UL) : 0;
-                int colour = life.Species[s].Person ? (c.Band[i] >= 0 ? c.Band[i] % 16 : 15) : 0;
+                int colour = life.Species[s].Person ? (c.Group[i] >= 0 ? c.Group[i] % 15 : 15) : 0;   // 15: alone
                 int flags = c.Flags[i] & 3;
                 int key = (((s * 5 + (int)pose) * 16 + colour) * 16 + look) * 4 + flags;
                 List<Matrix4x4> list;
@@ -236,9 +237,10 @@ namespace Godless.Unity
             return mesh;
         }
 
-        /// <summary>A band's own colour, far apart on the wheel in founding order.</summary>
+        /// <summary>A band's own colour, far apart on the wheel in founding order; 15 is undyed grey, for one alone.</summary>
         public static Color32 BandColour(int band)
         {
+            if (band == 15) return new Color32(150, 146, 136, 255);
             float hue = (0.03f + band * 0.381966f) % 1f;
             return Color.HSVToRGB(hue, 0.65f, 0.85f);
         }
@@ -254,9 +256,25 @@ namespace Godless.Unity
             if (c.Has(i, Creatures.Cursed)) text.Append(", cursed");
             text.Append("\n").Append(Words(c.Doing[i]));
             text.Append("\nhunger ").Append((c.Hunger[i] * 100).ToString("0")).Append("%   health ").Append((c.Health[i] / sp.Health * 100).ToString("0")).Append('%');
-            Band band = life.BandOf(c.Band[i]);
-            if (band != null) text.Append("\nband ").Append(band.Number + 1).Append(", ").Append(band.Members).Append(band.Settled ? " people, settled" : " people");
+            text.Append('\n').Append(Temperament(c, i));
+            Group g = life.GroupOf(c.Group[i]);
+            if (g == null) text.Append("\nalone");
+            else if (g.IsBand)
+                text.Append(g.Leader == i ? "\nleads band " : "\nof band ").Append(g.Number + 1).Append(", ").Append(g.Members).Append(g.Settled ? " people, settled" : " people");
+            else
+                text.Append(g.Leader == i ? "\nleads " : "\none of ").Append(g.Members).Append(' ').Append(sp.Plural);
             return text.ToString();
+        }
+
+        /// <summary>Its own temperament in a few words: only what stands out.</summary>
+        static string Temperament(Creatures c, int i)
+        {
+            var words = new List<string>();
+            if (c.Bold[i] > 0.65) words.Add("bold"); else if (c.Bold[i] < 0.3) words.Add("timid");
+            if (c.Social[i] > 0.75) words.Add("sociable"); else if (c.Social[i] < 0.35) words.Add("a loner");
+            if (c.Restless[i] > 0.6) words.Add("restless"); else if (c.Restless[i] < 0.25) words.Add("settled in its ways");
+            if (c.Pace[i] > 1.08) words.Add("quick"); else if (c.Pace[i] < 0.92) words.Add("slow");
+            return words.Count == 0 ? "even-tempered" : string.Join(", ", words);
         }
 
         static string Words(Doing d)
@@ -269,7 +287,7 @@ namespace Godless.Unity
                 case Doing.Fleeing: return "running away";
                 case Doing.Fighting: return "fighting";
                 case Doing.Resting: return "resting";
-                case Doing.Following: return "keeping up with the herd";
+                case Doing.Following: return "catching up with its group";
                 case Doing.Roaming: return "travelling";
                 case Doing.Wandering: return "wandering";
                 default: return "standing";

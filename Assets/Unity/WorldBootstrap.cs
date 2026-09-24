@@ -347,7 +347,7 @@ namespace Godless.Unity
                 Living life = World.Life;
                 var counts = new System.Text.StringBuilder();
                 int bands = 0, settled = 0;
-                foreach (Band b in life.Bands) if (!b.Gone) { bands++; if (b.Settled) settled++; }
+                foreach (Group b in life.Bands) if (!b.Gone) { bands++; if (b.Settled) settled++; }
                 for (int s = 0; s < life.Species.Count; s++)
                 {
                     Species sp = life.Species[s];

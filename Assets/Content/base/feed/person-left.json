@@ -1,0 +1,7 @@
+{
+  "type": "feed",
+  "id": "person-left",
+  "kind": "life.person-left",
+  "text": "Someone left a band to go their own way; {a} stayed",
+  "importance": 1
+}
