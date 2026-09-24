@@ -184,7 +184,8 @@ namespace Godless.Unity
                 _chosen = new GUIStyle(_button) { fontStyle = FontStyle.Bold };
                 _chosen.normal.textColor = _chosen.hover.textColor = new Color(1f, 0.85f, 0.4f);
             }
-            float w = 70f, h = 30f, gap = 4f;
+            float gap = 4f, h = 30f;
+            float w = Mathf.Min(70f, (Screen.width - 40f - gap * (Labels.Length - 1)) / Labels.Length);
             float total = Labels.Length * (w + gap) - gap;
             float x = (Screen.width - total) * 0.5f, y = Screen.height - 150f;
             _bar = new Rect(x - 6f, y - 6f, total + 12f, h + 12f);

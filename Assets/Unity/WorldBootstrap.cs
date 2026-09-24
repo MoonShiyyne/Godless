@@ -379,7 +379,9 @@ namespace Godless.Unity
         /// <summary>The feed: newest at the bottom, fading with age; click a line to go there.</summary>
         void FeedPanel()
         {
-            int shown = Mathf.Min(feedLines, _feed.Count);
+            // Only as many lines as fit between the top lines and the power bar.
+            int fits = Mathf.Max(1, (int)((Screen.height - 160f - 124f) / 24f));
+            int shown = Mathf.Min(Mathf.Min(feedLines, fits), _feed.Count);
             if (shown == 0) return;
             float lineH = 24f, w = Mathf.Min(460f, Screen.width - 40f);
             float y = 124f;
